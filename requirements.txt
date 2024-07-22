@@ -6,3 +6,5 @@ clip-by-openai
 pillow
 requests
 faiss-cpu
+transformers
+timm

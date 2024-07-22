@@ -29,6 +29,8 @@ archive.zip
 # macOS
 .DS_Store
 
-embeddings
+old_embeddings
 resources
 .env
+/embeddings/
+/embeddings_bdd100k/

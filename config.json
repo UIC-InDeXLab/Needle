@@ -1,0 +1,26 @@
+{
+  "resources": "./resources/flickr30k-images",
+  "tiles_path": "embeddings/tiles.pkl",
+  "embedders": [
+    {
+      "name": "swin_transformer",
+      "path": "./embeddings/embeddings_swin_transformer.pkl",
+      "model_name": "swin_large_patch4_window7_224"
+    },
+    {
+      "name": "efficientnet",
+      "path": "./embeddings/embeddings_efficientnet.pkl",
+      "model_name": "tf_efficientnet_b7"
+    },
+    {
+      "name": "regnet",
+      "path": "./embeddings/embeddings_regnet.pkl",
+      "model_name": "regnetx_032"
+    },
+    {
+      "name": "clip",
+      "path": "./embeddings/embeddings_clip.pkl",
+      "model_name": "ViT-B/32"
+    }
+  ]
+}

@@ -34,3 +34,6 @@ resources
 .env
 /embeddings/
 /embeddings_bdd100k/
+logs/*
+metadata/*
+weights.json

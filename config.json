@@ -1,26 +1,54 @@
 {
-  "resources": "./resources/flickr30k-images",
-  "tiles_path": "embeddings/tiles.pkl",
-  "embedders": [
+  "resources": "./resources/bdd100k/images/100k/train",
+  "dataset": "bdd",
+  "tiles_path": "./embeddings/{dataset}/tiles.pkl",
+  "weights_path": "./weights.json",
+  "image_embedders": [
     {
       "name": "swin_transformer",
-      "path": "./embeddings/embeddings_swin_transformer.pkl",
-      "model_name": "swin_large_patch4_window7_224"
+      "path": "./embeddings/{dataset}/embeddings_swin_transformer.pkl",
+      "model_name": "swinv2_large_window12to24_192to384.ms_in22k_ft_in1k"
     },
     {
       "name": "efficientnet",
-      "path": "./embeddings/embeddings_efficientnet.pkl",
-      "model_name": "tf_efficientnet_b7"
+      "path": "./embeddings/{dataset}/embeddings_efficientnet.pkl",
+      "model_name": "tf_efficientnet_l2.ns_jft_in1k_475"
     },
     {
       "name": "regnet",
-      "path": "./embeddings/embeddings_regnet.pkl",
-      "model_name": "regnetx_032"
+      "path": "./embeddings/{dataset}/embeddings_regnet.pkl",
+      "model_name": "regnety_1280.swag_ft_in1k"
     },
     {
-      "name": "clip",
-      "path": "./embeddings/embeddings_clip.pkl",
-      "model_name": "ViT-B/32"
+      "name": "mobilenetv4",
+      "path": "./embeddings/{dataset}/embeddings_mobilenetv4.pkl",
+      "model_name": "mobilenetv4_conv_aa_large.e230_r384_in12k_ft_in1k"
+    },
+    {
+      "name": "resnet50",
+      "path": "./embeddings/{dataset}/embeddings_resnet50.pkl",
+      "model_name": "resnet50.fb_swsl_ig1b_ft_in1k"
+    },
+    {
+      "name": "vit",
+      "path": "./embeddings/{dataset}/embeddings_vit.pkl",
+      "model_name": " vit_large_patch14_clip_336.openai_ft_in12k_in1k"
+    },
+    {
+      "name": "eva",
+      "path": "./embeddings/{dataset}/embeddings_eva.pkl",
+      "model_name": "eva02_large_patch14_448.mim_m38m_ft_in22k_in1k"
+    },
+    {
+      "name": "convnext",
+      "path": "./embeddings/{dataset}/embeddings_convnext.pkl",
+      "model_name": "convnext_large_mlp.clip_laion2b_augreg_ft_in1k_384"
+    }
+  ],
+  "text_embedders": [
+    {
+      "name": "minilm",
+      "model_name": "sentence-transformers/all-MiniLM-L6-v2"
     }
   ]
 }

@@ -2,9 +2,10 @@ fastapi
 uvicorn
 python-dotenv
 torch
-clip-by-openai
 pillow
 requests
 faiss-cpu
 transformers
 timm
+scikit-learn
+hnswlib

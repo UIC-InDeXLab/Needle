@@ -2,6 +2,8 @@ import os
 
 import requests
 
+from models.singleton import Singleton
+
 
 class Connector:
     def __init__(self, base_url):
@@ -62,11 +64,11 @@ class DALLEConnector(Connector):
         return self.post_form_data("/v1/images/generations", params=params)
 
 
-class StableDiffusionXLConnector(Connector):
+class LocalStableDiffusionConnector(Connector):
     def __init__(self):
-        super().__init__(os.getenv("SDXL_BASE_URL"))
+        super().__init__(os.getenv("SD_BASE_URL"))
 
-    def generate_image(self, prompt: str, size=1024):
+    def generate_image(self, prompt: str, size=512):
         params = {
             'prompt': prompt,
             'size': size
@@ -87,3 +89,20 @@ class BingWrapperConnector(Connector):
         }
 
         return self.post_form_data("/images/", params=params)
+
+
+@Singleton
+class EngineManager:
+    def __init__(self):
+        self._supported_engines = {
+            "bing": BingWrapperConnector,
+            "dall-e": DALLEConnector,
+            "stable-diffusion": LocalStableDiffusionConnector
+        }
+
+    @property
+    def supported_engines(self):
+        return list(self._supported_engines.keys())
+
+    def get_engine_by_name(self, name: str):
+        return self._supported_engines[name.strip()]

@@ -1,11 +1,13 @@
-from typing import List
-
-import requests
 import os
 import pickle
+from collections import defaultdict
+from typing import List
+
+import hnswlib
 import numpy as np
-from PIL import Image
-import faiss
+import requests
+
+from sklearn.decomposition import PCA
 
 from models.image import ImageFile
 from models.tile import Tile
@@ -38,7 +40,7 @@ def get_image_from_url(url):
     return requests.get(url).content
 
 
-def get_tiles(image: ImageFile, min_patch_size=256) -> List[Tile]:
+def get_tiles(image: ImageFile, min_patch_size=448) -> List[Tile]:
     width, height = image.bin.size
     tiles, cameras = [], []
 
@@ -71,9 +73,50 @@ def get_tiles(image: ImageFile, min_patch_size=256) -> List[Tile]:
     return tiles
 
 
-def create_hnsw_index(embeddings, m=64, ef_construction=200):
-    dim = embeddings.shape[1]
-    index = faiss.IndexHNSWFlat(dim, m)
-    index.hnsw.efConstruction = ef_construction
-    index.add(embeddings)
-    return index
+def create_hnsw_index(embeddings, m=64, ef_construction=300, dim = None, ids=None):
+    dim = embeddings.shape[1] if not dim else dim
+    p = hnswlib.Index(space='cosine', dim=dim)
+    p.init_index(max_elements=500000, ef_construction=ef_construction, M=m)
+    if embeddings.size != 0:
+        p.add_items(embeddings, ids=ids)
+
+    p.set_ef(300)
+    # index = faiss.IndexHNSWFlat(dim, m)
+    # index.metric_type = faiss.METRIC_INNER_PRODUCT
+    # index.hnsw.efConstruction = ef_construction
+    # index.add(embeddings)
+    return p
+
+
+def fagin_algorithm(lists, k):
+    """Implements Fagin's algorithm to find top k elements from multiple ranked lists.
+
+    Args:
+      lists: A list of lists, where each inner list contains tuples of (id, score).
+      k: The number of top elements to return.
+
+    Returns:
+      A list of the top k elements.
+    """
+    results = defaultdict(float)
+    for ranking in lists:
+        for image, score in ranking:
+            results[image] += score
+
+    sorted_results = sorted(results.items(), key=lambda x: x[1], reverse=True)
+
+    return [image for image, score in sorted_results[:k]]
+
+
+
+def aggregate_rankings(rankers_results, weights, k):
+    scores = {}
+    for i, R_i in enumerate(rankers_results):
+        for j, result in enumerate(R_i):
+            if result not in scores:
+                scores[result] = 0
+            scores[result] += weights[i] * (1 / (j + 1))
+
+    ranked_results = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)
+
+    return ranked_results[:k]

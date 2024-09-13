@@ -45,7 +45,11 @@ class TileManager:
 
     @property
     def path(self):
-        return Configuration.instance().tiles_path
+        return Configuration.instance().tiles_path.format(dataset=Configuration.instance().dataset)
+
+    @property
+    def tiles(self) -> List[Tile]:
+        return self._tiles
 
     def add_tile(self, tile: Tile):
         self._tiles.append(tile)

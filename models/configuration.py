@@ -19,8 +19,21 @@ class Configuration:
     def embedders(self):
         return self._config["embedders"]
 
-    def get_embedder_details(self, name: str) -> Dict:
-        return [e for e in self._config["embedders"] if str(e["name"]).strip().lower() == name.strip().lower()].pop()
+    @property
+    def dataset(self):
+        return self._config["dataset"]
+
+    @property
+    def weights_path(self):
+        return self._config["weights_path"]
+
+    def get_image_embedder_details(self, name: str) -> Dict:
+        return [e for e in self._config["image_embedders"] if
+                str(e["name"]).strip().lower() == name.strip().lower()].pop()
+
+    def get_text_embedder_details(self, name: str) -> Dict:
+        return [e for e in self._config["text_embedders"] if
+                str(e["name"]).strip().lower() == name.strip().lower()].pop()
 
     @property
     def tiles_path(self):

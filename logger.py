@@ -1,6 +1,6 @@
 import logging
-from logging.handlers import TimedRotatingFileHandler
 import os
+from logging.handlers import TimedRotatingFileHandler
 
 # Create logs directory if it doesn't exist
 if not os.path.exists('logs'):

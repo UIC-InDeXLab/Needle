@@ -1,4 +1,3 @@
-import os
 import shutil
 
 from PIL import Image, ImageDraw, ImageFont
@@ -37,6 +36,7 @@ def create_test_image():
             draw.text(text_position, number_text, fill="black", font=font)
 
     image.save("test_image.png")
+
 
 def move_file(destination_path):
     source_path = "test_image.png"

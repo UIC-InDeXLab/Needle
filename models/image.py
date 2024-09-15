@@ -16,4 +16,3 @@ class ImageFile:
     @property
     def bin(self):
         return Image.open(self.path).convert("RGB")
-

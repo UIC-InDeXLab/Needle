@@ -2,8 +2,6 @@ import os
 
 import requests
 
-from models.singleton import Singleton
-
 
 class Connector:
     def __init__(self, base_url):
@@ -74,5 +72,3 @@ class LocalStableDiffusionConnector(Connector):
             'size': size
         }
         return self.post_form_data_get_binary("/generate", params=params)
-
-

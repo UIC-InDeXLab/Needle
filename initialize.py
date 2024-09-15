@@ -1,14 +1,12 @@
 import os
 
-import faiss
 import numpy as np
 from tqdm import tqdm
 
+from logger import logger
 from models import Configuration, ImageFile, TileManager
 from models.embedders import EmbedderManager
-from models.query import Query, QueryManager
 from utils import load_embeddings, save_embeddings, create_hnsw_index, get_tiles
-from logger import logger
 
 hnsw_indices = {}
 

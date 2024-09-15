@@ -3,8 +3,9 @@ import unittest
 
 from PIL import Image
 
-from utils import get_image_tiles
+from models import ImageFile
 from test_utils import create_test_image, move_file
+from utils import get_tiles
 
 
 class TestGetImageTiles(unittest.TestCase):
@@ -17,10 +18,9 @@ class TestGetImageTiles(unittest.TestCase):
     def test_get_tiles(self):
         # Read the image file
         image_path = 'test_image.png'
-        image = Image.open(image_path).convert("RGB")
-
+        image = ImageFile(image_path)
         # Generate tiles
-        tiles = get_image_tiles(image, min_patch_size=224)
+        tiles = get_tiles(image, min_patch_size=224)
 
         # Create a directory to save tiles if it doesn't exist
         output_dir = 'output_tiles'

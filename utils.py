@@ -1,13 +1,9 @@
 import os
 import pickle
-from collections import defaultdict
 from typing import List
 
 import hnswlib
-import numpy as np
 import requests
-
-from sklearn.decomposition import PCA
 
 from models.image import ImageFile
 from models.tile import Tile

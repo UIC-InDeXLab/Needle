@@ -97,14 +97,14 @@ class EvaEmbedder(ImageEmbedder):
         return "eva"
 
 
-class ConvNext(ImageEmbedder):
+class ConvNextEmbedder(ImageEmbedder):
     @property
     def name(self):
         return "convnext"
 
 
 _SUPPORTED_IMAGE_EMBEDDERS = [SwinTransformerEmbedder, EfficientNetEmbedder, RegNetEmbedder, MobileNetV4Embedder,
-                              Resnet50Embedder, VitEmbedder, EvaEmbedder]
+                              Resnet50Embedder, VitEmbedder, EvaEmbedder, ConvNextEmbedder]
 
 
 class TextEmbedder(ABC):
@@ -150,9 +150,9 @@ class MiniLMTextEmbedder(TextEmbedder):
 @Singleton
 class EmbedderManager:
     def __init__(self):
-        self._image_embedder_classes = _SUPPORTED_IMAGE_EMBEDDERS[::-1]
+        self._image_embedder_classes = _SUPPORTED_IMAGE_EMBEDDERS
         self._device = torch.device(
-            "cuda:0" if torch.cuda.is_available() and
+            "cuda" if torch.cuda.is_available() and
                       str(os.getenv("USE_CUDA", "False")).strip().lower() in ["true", "t", "1"] else "cpu")
         self._image_embedders = {}
         for e in self._image_embedder_classes:
@@ -187,6 +187,7 @@ class EmbedderManager:
         weights = {name: embedder.weight for name, embedder in self._image_embedders.items()}
         with open(Configuration.instance().weights_path, 'w+') as f:
             json.dump(weights, f)
+        logger.info("Embedder weights dumped to the file")
 
     def finalize(self):
         self._save_embedder_weights()

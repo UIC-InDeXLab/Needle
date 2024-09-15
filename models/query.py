@@ -9,6 +9,7 @@ class Query:
     def __init__(self, q):
         self._q = q
         self._embedders_results = {}
+        self._generated_images = []
         self._id = Query._generate_id()
 
     @classmethod
@@ -23,6 +24,10 @@ class Query:
     @property
     def query(self):
         return self._q
+
+    @property
+    def generated_images(self):
+        return self._generated_images
 
     @property
     def embedder_results(self):

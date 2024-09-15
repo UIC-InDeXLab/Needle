@@ -73,7 +73,7 @@ def get_tiles(image: ImageFile, min_patch_size=448) -> List[Tile]:
     return tiles
 
 
-def create_hnsw_index(embeddings, m=64, ef_construction=300, dim = None, ids=None):
+def create_hnsw_index(embeddings, m=64, ef_construction=300, dim=None, ids=None):
     dim = embeddings.shape[1] if not dim else dim
     p = hnswlib.Index(space='cosine', dim=dim)
     p.init_index(max_elements=500000, ef_construction=ef_construction, M=m)
@@ -86,27 +86,6 @@ def create_hnsw_index(embeddings, m=64, ef_construction=300, dim = None, ids=Non
     # index.hnsw.efConstruction = ef_construction
     # index.add(embeddings)
     return p
-
-
-def fagin_algorithm(lists, k):
-    """Implements Fagin's algorithm to find top k elements from multiple ranked lists.
-
-    Args:
-      lists: A list of lists, where each inner list contains tuples of (id, score).
-      k: The number of top elements to return.
-
-    Returns:
-      A list of the top k elements.
-    """
-    results = defaultdict(float)
-    for ranking in lists:
-        for image, score in ranking:
-            results[image] += score
-
-    sorted_results = sorted(results.items(), key=lambda x: x[1], reverse=True)
-
-    return [image for image, score in sorted_results[:k]]
-
 
 
 def aggregate_rankings(rankers_results, weights, k):

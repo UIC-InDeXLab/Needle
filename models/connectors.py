@@ -76,33 +76,3 @@ class LocalStableDiffusionConnector(Connector):
         return self.post_form_data_get_binary("/generate", params=params)
 
 
-class BingWrapperConnector(Connector):
-    def __init__(self):
-        super().__init__(os.getenv("BING_WRAPPER_URL"))
-
-    def crawl_images(self, query: str, min_size: int = 1024, num_images: int = 4):
-        params = {
-            "query": query,
-            "n": num_images,
-            "min_width": min_size,
-            "min_height": min_size
-        }
-
-        return self.post_form_data("/images/", params=params)
-
-
-@Singleton
-class EngineManager:
-    def __init__(self):
-        self._supported_engines = {
-            "bing": BingWrapperConnector,
-            "dall-e": DALLEConnector,
-            "stable-diffusion": LocalStableDiffusionConnector
-        }
-
-    @property
-    def supported_engines(self):
-        return list(self._supported_engines.keys())
-
-    def get_engine_by_name(self, name: str):
-        return self._supported_engines[name.strip()]

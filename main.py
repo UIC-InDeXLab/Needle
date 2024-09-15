@@ -1,24 +1,25 @@
+import base64
 import io
 import os
-import sys
 from collections import defaultdict
 from contextlib import asynccontextmanager
+from typing import Dict
 
 import numpy as np
 from PIL import Image
 from dotenv import load_dotenv
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from typing import Dict
+from fastapi.websockets import WebSocket, WebSocketDisconnect
 
 from initialize import initialize_embeddings, hnsw_indices
-from models import EmbedderManager, TileManager, Configuration, LocalStableDiffusionConnector
-from models.connectors import EngineManager
-from models.embedders import TextEmbedder, ImageEmbedder
-from models.query import QueryManager, Query
-from utils import fagin_algorithm, aggregate_rankings
 from logger import logger
+from models import EmbedderManager, TileManager, Configuration
+from models.embedders import ImageEmbedder
+from models.generators import EngineManager
+from models.query import QueryManager, Query
+from utils import aggregate_rankings
 
 load_dotenv()
 
@@ -44,50 +45,27 @@ app.add_middleware(
 )
 
 
-@app.post("/find-neighbors/")
-async def find_neighbors(file: UploadFile = File(...),
-                         n: int = 20):
-    embedders = EmbedderManager.instance().get_image_embedders()
-    tiles = TileManager.instance().load()
-
-    results = {}
-    for model_name, embedder in embedders.items():
-        results[model_name] = []
-        image = Image.open(file.file).convert("RGB")
-        query_embedding = np.array([embedder.embed(image)])
-        hnsw_index = hnsw_indices[model_name]
-        # hnsw_index.hnsw.efSearch = ef_search
-        # distances, indices = hnsw_index.search(query_embedding, n)
-        labels, distances = hnsw_index.knn_query(query_embedding, k=4 * n)
-
-        for tile_idx, distance in zip(labels[0], distances[0]):
-            results[model_name].append((tile_idx, 1 - distance))
-
-    top_tiles = fagin_algorithm(list(results.values()), k=4 * n)
-    top_filenames = [tiles[index].parent.filename for index in top_tiles]
-    unique_filenames = list(dict.fromkeys(top_filenames))
-    return {"results": unique_filenames[:n]}
-
-
-@app.get("/search")
-async def generate_and_find_neighbors(query: str, n: int = 20, k: int = 4, image_size: int = 512,
-                                      generator_engine: str = "stable-diffusion"):
-    query_object = Query(query)
-
+@app.post("/query")
+async def create_query(q: str):
+    query_object = Query(q)
     qman: QueryManager = QueryManager.instance()
     qid = qman.add_query(query_object)
-    # connector = BingWrapperConnector()
-    # crawled_images_response = connector.crawl_images(query, min_size=256, num_images=k)
-    # generated_images = [requests.get(url).content for url in crawled_images_response["images"]]
+    return {"qid": qid}
 
-    # connector = DALLEConnector()
-    # res = connector.generate_image(prompt=query.replace(".", "").strip(), n=k)
-    # urls = [d["url"] for d in res["data"]]
-    # generated_images = [requests.get(url).content for url in urls]
 
-    urls = []
-    connector = LocalStableDiffusionConnector()
-    generated_images = [connector.generate_image(f"a {query.strip()}", size=image_size) for _ in range(k)]
+@app.get("/search/{qid}")
+async def search(qid: int, n: int = 20, k: int = 4, image_size: int = 512, generator_engine: str = "stable-diffusion"):
+    qman: QueryManager = QueryManager.instance()
+    query_object = qman.get_query(qid)
+    query = query_object.query
+
+    active_engine = EngineManager.instance().get_engine_by_name(generator_engine)
+
+    if not query_object.generated_images:
+        generated_images = active_engine.generate(prompt=query.strip(), image_size=image_size, k=k)
+        query_object.generated_images.extend(generated_images)
+    else:
+        generated_images = query_object.generated_images
 
     embedders = EmbedderManager.instance().get_image_embedders()
     tiles = TileManager.instance().tiles
@@ -117,11 +95,59 @@ async def generate_and_find_neighbors(query: str, n: int = 20, k: int = 4, image
                                    weights=[w for r, w in ranking_weights], k=4 * n)
     top_images = [tiles[index].parent.filename for index in top_tiles]
     top_files = list(dict.fromkeys(top_images))
-    return {"results": top_files[:n], "base_image_urls": urls, "qid": qid}
+    return {"results": top_files[:n],
+            "qid": qid,
+            "base_images": [base64.b64encode(image).decode('utf-8') for image in generated_images]
+            }
+
+
+@app.websocket("/feedback/{qid}")
+async def guide_image_feedback(websocket: WebSocket, qid: int):
+    await websocket.accept()
+
+    qman: QueryManager = QueryManager.instance()
+
+    try:
+        data = await websocket.receive_json()
+        query_obj = qman.get_query(qid)
+        k = data.get("k", 4)
+        image_size = data.get("image_size", 512)
+        generator_engine = data.get("generator_engine", "stable-diffusion")
+        active_engine = EngineManager.instance().get_engine_by_name(generator_engine)
+
+        if not query_obj.generated_images:
+            generated_images = active_engine.generate(prompt=query_obj.query.strip(), image_size=image_size, k=k)
+        else:
+            generated_images = query_obj.generated_images
+
+        base64_images = [base64.b64encode(image).decode('utf-8') for image in generated_images]
+
+        await websocket.send_json({"generated_images": base64_images})
+        rejected_count = 1
+
+        while rejected_count > 0:
+            feedback = await websocket.receive_json()
+            approved_images = feedback.get("approved", [])
+            query_obj.generated_images.extend(approved_images)
+
+            rejected_count = len(feedback.get("rejected", []))
+
+            if rejected_count > 0:
+                regenerated_images = active_engine.generate(prompt=query_obj.query.strip(), image_size=image_size,
+                                                            k=rejected_count)
+                base64_regenerated_images = [base64.b64encode(image).decode('utf-8') for image in regenerated_images]
+                await websocket.send_json({"regenerated_images": base64_regenerated_images})
+            else:
+                break
+
+        await websocket.send_json({"status": "all_approved"})
+
+    except WebSocketDisconnect:
+        await websocket.close()
 
 
 @app.post("/search/{qid}/")
-async def get_feedback(qid: int, feedback: Dict[str, str] = None, eta: float = 0.05):
+async def post_search_feedback(qid: int, feedback: Dict[str, str] = None, eta: float = 0.05):
     embedders = EmbedderManager.instance().get_image_embedders()
 
     qman: QueryManager = QueryManager.instance()
@@ -145,7 +171,7 @@ async def get_feedback(qid: int, feedback: Dict[str, str] = None, eta: float = 0
     for embedder_name, weight in new_weights:
         embedder: ImageEmbedder = EmbedderManager.instance().get_image_embedder_by_name(embedder_name)
         embedder.weight = weight
-        print(f"{embedder_name}={weight}")
+        logger.info(f"{embedder_name}={weight}")
     return {"successful": True}
 
 

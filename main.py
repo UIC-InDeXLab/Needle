@@ -128,7 +128,7 @@ async def guide_image_feedback(websocket: WebSocket, qid: int):
         while rejected_count > 0:
             feedback = await websocket.receive_json()
             approved_images = feedback.get("approved", [])
-            query_obj.generated_images.extend(approved_images)
+            query_obj.generated_images.extend([base64.b64decode(base64_image) for base64_image in approved_images])
 
             rejected_count = len(feedback.get("rejected", []))
 

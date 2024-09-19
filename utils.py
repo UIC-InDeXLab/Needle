@@ -69,14 +69,14 @@ def get_tiles(image: ImageFile, min_patch_size=448) -> List[Tile]:
     return tiles
 
 
-def create_hnsw_index(embeddings, m=64, ef_construction=300, dim=None, ids=None):
+def create_hnsw_index(embeddings, m=48, ef_construction=200, dim=None, ids=None):
     dim = embeddings.shape[1] if not dim else dim
     p = hnswlib.Index(space='cosine', dim=dim)
     p.init_index(max_elements=500000, ef_construction=ef_construction, M=m)
     if embeddings.size != 0:
         p.add_items(embeddings, ids=ids)
 
-    p.set_ef(300)
+    p.set_ef(200)
     # index = faiss.IndexHNSWFlat(dim, m)
     # index.metric_type = faiss.METRIC_INNER_PRODUCT
     # index.hnsw.efConstruction = ef_construction

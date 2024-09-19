@@ -4,8 +4,8 @@ python-dotenv
 torch
 pillow
 requests
-faiss-cpu
 transformers
 timm
 scikit-learn
 hnswlib
+websockets

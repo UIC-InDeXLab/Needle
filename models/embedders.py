@@ -103,8 +103,8 @@ class ConvNextEmbedder(ImageEmbedder):
         return "convnext"
 
 
-_SUPPORTED_IMAGE_EMBEDDERS = [SwinTransformerEmbedder, EfficientNetEmbedder, RegNetEmbedder, MobileNetV4Embedder,
-                              Resnet50Embedder, VitEmbedder, EvaEmbedder, ConvNextEmbedder]
+_SUPPORTED_IMAGE_EMBEDDERS = [SwinTransformerEmbedder, EfficientNetEmbedder, RegNetEmbedder,
+                              MobileNetV4Embedder, Resnet50Embedder, VitEmbedder, EvaEmbedder, ConvNextEmbedder]
 
 
 class TextEmbedder(ABC):

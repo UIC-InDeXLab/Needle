@@ -1,6 +1,6 @@
 {
-  "resources": "./resources/bdd100k/images/100k/train",
-  "dataset": "bdd",
+  "resources": "./resources/train2017",
+  "dataset": "lvis",
   "tiles_path": "./embeddings/{dataset}/tiles.pkl",
   "weights_path": "./weights.json",
   "image_embedders": [

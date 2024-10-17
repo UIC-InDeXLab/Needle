@@ -1,0 +1,51 @@
+{
+  "datasets": [
+    {
+      "name": "caltech256",
+      "resource_path": "/home/mahdi/Projects/Needle/ImageRetriever/resources/caltech256",
+      "metadata_path": "/home/mahdi/Projects/Needle/ImageRetriever/metadata/caltech256.csv"
+    },
+    {
+      "name": "lvis",
+      "resource_path": "/home/mahdi/Projects/Needle/ImageRetriever/resources/train2017",
+      "metadata_path": "/home/mahdi/Projects/Needle/ImageRetriever/metadata/lvis.csv"
+    },
+    {
+      "name": "gpt4-vision",
+      "resource_path": "/home/mahdi/Projects/Needle/ImageRetriever/resources/train2017",
+      "metadata_path": "/home/mahdi/Projects/Needle/ImageRetriever/metadata/gpt4-vision.csv"
+    },
+    {
+      "name": "bdd",
+      "resource_path": "/home/mahdi/Projects/Needle/ImageRetriever/resources/bdd100k/images/100k/train",
+      "metadata_path": "/home/mahdi/Projects/Needle/ImageRetriever/metadata/bdd.csv"
+    },
+    {
+      "name": "animals",
+      "resource_path": "/home/mahdi/Projects/Needle/ImageRetriever/resources/animals",
+      "metadata_path": "/home/mahdi/Projects/Needle/ImageRetriever/metadata/animals.csv"
+    },
+    {
+      "name": "concadia",
+      "resource_path": "/home/mahdi/Projects/Needle/ImageRetriever/resources/concadia",
+      "metadata_path": "/home/mahdi/Projects/Needle/ImageRetriever/metadata/concadia.csv"
+    },
+    {
+      "name": "senticap",
+      "resource_path": "/home/mahdi/Projects/Needle/ImageRetriever/resources/senticap",
+      "metadata_path": "/home/mahdi/Projects/Needle/ImageRetriever/metadata/senticap_specific.csv"
+    },
+    {
+      "name": "whoops",
+      "resource_path": "/home/mahdi/Projects/Needle/ImageRetriever/resources/whoops",
+      "metadata_path": "/home/mahdi/Projects/Needle/ImageRetriever/metadata/whoops.csv"
+    },
+    {
+      "name": "nocaps",
+      "resource_path": "/home/mahdi/Projects/Needle/ImageRetriever/resources/nocaps",
+      "metadata_path": "/home/mahdi/Projects/Needle/ImageRetriever/metadata/nocaps_hard.csv"
+    }
+
+
+  ]
+}

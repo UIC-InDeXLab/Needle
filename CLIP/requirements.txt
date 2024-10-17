@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+clip-by-openai
+tqdm
+python-dotenv
+numpy<2

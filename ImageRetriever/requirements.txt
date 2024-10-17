@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+python-dotenv
+torch
+pillow
+requests
+transformers
+timm
+scikit-learn
+hnswlib
+websockets
+asyncio

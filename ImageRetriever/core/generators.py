@@ -3,8 +3,8 @@ from typing import List
 
 import requests
 
-from models.connectors import SDXLTurboConnector, RunwayMLConnector, Connector, ReplicateConnector, DALLEConnector
-from models.singleton import Singleton
+from core.connectors import SDXLTurboConnector, RunwayMLConnector, Connector, ReplicateConnector, DALLEConnector
+from core.singleton import Singleton
 
 
 class ImageGeneratorEngine(ABC):

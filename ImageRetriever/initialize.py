@@ -1,40 +1,27 @@
-import os
+from pymilvus import connections
 
-import numpy as np
-from tqdm import tqdm
-
-from logger import logger
-from models import Configuration, ImageFile, TileManager
-from models.embedders import EmbedderManager
-from utils import load_embeddings, save_embeddings, create_hnsw_index, get_tiles
-
-hnsw_indices = {}
+from core import EmbedderManager
+from database.database_manager import SessionLocal, Directory
+from monitoring import directory_watcher
+from settings import settings
 
 
-def initialize_embeddings():
-    global hnsw_indices
+def connect_to_milvus():
+    connections.connect("default", host=settings.milvus.host, port=settings.milvus.port)
 
-    cman, tman, eman = Configuration.instance(), TileManager.instance(), EmbedderManager.instance()
 
-    for embedder_name, embedder in eman.get_image_embedders().items():
-        if os.path.exists(embedder.path):
-            embeddings = load_embeddings(embedder.path)
-            logger.info(f"Embedder {embedder_name} data loaded from disk")
-        else:
-            logger.info(f"Embedder {embedder_name} data not found locally, training ...")
-            embeddings = []
-            for filename in tqdm(os.listdir(cman.resources_dir), desc=f"Embedder: {embedder_name}"):
-                if filename.lower().endswith((".png", ".jpg", ".jpeg")):
-                    image = ImageFile(filename)
-                    image_tiles = get_tiles(image)
-                    for tile in image_tiles:
-                        embedding = embedder.embed(tile.bin)
-                        tile.vector_index = len(embeddings)
-                        tile.clean_binary()
-                        embeddings.append(embedding)
-                        if embedder_name == "swin_transformer":
-                            tman.add_tile(tile)
-            embeddings = np.array(embeddings)
-            save_embeddings(embedder.path, embeddings)
-        tman.save()
-        hnsw_indices[embedder_name] = create_hnsw_index(embeddings)
+def initialize():
+    connect_to_milvus()
+
+    embedders = EmbedderManager.instance().get_image_embedders()
+
+    for embedder_name, embedder in embedders.items():
+        collection_name = f"{embedder_name}"
+        directory_watcher.create_collection_for_embedder(collection_name, embedder)
+
+    directory_watcher.start()
+
+    session = SessionLocal()
+    directories = session.query(Directory).all()
+    for directory in directories:
+        directory_watcher.add_directory(directory.path)

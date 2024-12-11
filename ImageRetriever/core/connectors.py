@@ -1,7 +1,8 @@
-import os
 from abc import ABC, abstractmethod
 
 import requests
+
+from settings import settings
 
 
 class Connector:
@@ -44,7 +45,7 @@ class Connector:
 
 class DALLEConnector(Connector):
     def __init__(self):
-        super().__init__(os.getenv("DALLE_URL"))
+        super().__init__(settings.engines.dalle_url)
 
     def generate_image(self, prompt: str, size="256x256", n=1):
         params = {
@@ -57,7 +58,7 @@ class DALLEConnector(Connector):
 
 class ReplicateConnector(Connector):
     def __init__(self):
-        super().__init__(os.getenv("REPLICATE_URL"))
+        super().__init__(settings.engines.replicate_url)
 
     def generate_image(self, prompt: str, k=1):
         params = {
@@ -78,9 +79,9 @@ class LocalStableDiffusionConnector(Connector, ABC):
 
 class SDXLTurboConnector(LocalStableDiffusionConnector):
     def __init__(self):
-        super().__init__(os.getenv("SDXL_TURBO_URL"))
+        super().__init__(settings.engines.sdxl_url)
 
 
 class RunwayMLConnector(LocalStableDiffusionConnector):
     def __init__(self):
-        super().__init__(os.getenv("RUNWAY_ML_URL"))
+        super().__init__(settings.engines.runwayml_url)

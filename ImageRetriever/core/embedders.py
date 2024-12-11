@@ -4,11 +4,9 @@ from abc import ABC, abstractmethod
 
 import torch
 from timm import create_model, data
-from transformers import AutoModel, AutoTokenizer
 
-from logger import logger
-from models import Configuration
-from models.singleton import Singleton
+from core.singleton import Singleton
+from settings import settings
 
 
 class ImageEmbedder(ABC):
@@ -18,6 +16,7 @@ class ImageEmbedder(ABC):
         self.device = device
         self.preprocess = self.get_preprocess()
         self._weight = 1.0
+        self._embedding_dim = self._determine_embedding_dim()
 
     @property
     @abstractmethod
@@ -30,12 +29,11 @@ class ImageEmbedder(ABC):
 
     @property
     def model_name(self) -> str:
-        return Configuration.instance().get_image_embedder_details(self.name)["model_name"]
+        return settings.get_image_embedder_details(self.name)["model_name"]
 
     @property
     def path(self) -> str:
-        cman: Configuration = Configuration.instance()
-        return cman.get_image_embedder_details(self.name)["path"].format(dataset=cman.dataset)
+        return settings.get_image_embedder_details(self.name)["path"].format(dataset=settings.dataset)
 
     def embed(self, img_binary):
         img_binary = self.preprocess(img_binary)
@@ -43,6 +41,18 @@ class ImageEmbedder(ABC):
         with torch.no_grad():
             embedding = self.model(img_binary).squeeze(0).cpu().numpy()
         return embedding
+
+    def _determine_embedding_dim(self):
+        # Generate a dummy image tensor to determine the output dimension of the embedder
+        dummy_input = torch.zeros((3, 224, 224)).to(self.device)  # Assuming the input size is 3x224x224
+        dummy_input = self.preprocess(dummy_input).unsqueeze(0).to(self.device)
+        with torch.no_grad():
+            embedding = self.model(dummy_input).squeeze(0).cpu().numpy()
+        return embedding.shape[0]
+
+    @property
+    def embedding_dim(self):
+        return self._embedding_dim
 
     @property
     def weight(self):
@@ -59,29 +69,10 @@ class SwinTransformerEmbedder(ImageEmbedder):
         return "swin_transformer"
 
 
-class EfficientNetEmbedder(ImageEmbedder):
-    @property
-    def name(self):
-        return "efficientnet"
-
-
 class RegNetEmbedder(ImageEmbedder):
     @property
     def name(self):
         return "regnet"
-
-
-class MobileNetV4Embedder(ImageEmbedder):
-    @property
-    def name(self):
-        return "mobilenetv4"
-
-
-class Resnet50Embedder(ImageEmbedder):
-
-    @property
-    def name(self):
-        return "resnet50"
 
 
 class VitEmbedder(ImageEmbedder):
@@ -97,54 +88,7 @@ class EvaEmbedder(ImageEmbedder):
         return "eva"
 
 
-class ConvNextEmbedder(ImageEmbedder):
-    @property
-    def name(self):
-        return "convnext"
-
-
-_SUPPORTED_IMAGE_EMBEDDERS = [SwinTransformerEmbedder, EfficientNetEmbedder, RegNetEmbedder,
-                              MobileNetV4Embedder, Resnet50Embedder, VitEmbedder, EvaEmbedder, ConvNextEmbedder]
-
-
-class TextEmbedder(ABC):
-    def __init__(self, device=torch.device("cpu")):
-        self.device = device
-        self.model = self.load_model().to(self.device)
-        self.model.eval()
-        self.tokenizer = self.get_tokenizer()
-
-    @property
-    @abstractmethod
-    def name(self):
-        pass
-
-    def load_model(self):
-        model_name = self.model_name
-        model = AutoModel.from_pretrained(model_name)
-        return model
-
-    def get_tokenizer(self):
-        model_name = self.model_name
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        return tokenizer
-
-    @property
-    def model_name(self) -> str:
-        return Configuration.instance().get_text_embedder_details(self.name)["model_name"]
-
-    def embed(self, text: str):
-        inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True).to(self.device)
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-            embedding = outputs.last_hidden_state[:, 0, :].squeeze(0).cpu().numpy()
-        return embedding
-
-
-class MiniLMTextEmbedder(TextEmbedder):
-    @property
-    def name(self):
-        return "minilm"
+_SUPPORTED_IMAGE_EMBEDDERS = [SwinTransformerEmbedder, RegNetEmbedder, VitEmbedder, EvaEmbedder]
 
 
 @Singleton
@@ -152,15 +96,13 @@ class EmbedderManager:
     def __init__(self):
         self._image_embedder_classes = _SUPPORTED_IMAGE_EMBEDDERS
         self._device = torch.device(
-            "cuda" if torch.cuda.is_available() and
-                      str(os.getenv("USE_CUDA", "False")).strip().lower() in ["true", "t", "1"] else "cpu")
+            "cuda" if torch.cuda.is_available() and settings.app.use_cuda else "cpu")
         self._image_embedders = {}
         for e in self._image_embedder_classes:
             embedder = e(device=self._device)
             self._image_embedders[embedder.name] = embedder
 
         self._init_embedders_weights()
-        self._text_embedder = MiniLMTextEmbedder(device=self._device)
 
     def get_image_embedders(self):
         return self._image_embedders
@@ -168,26 +110,23 @@ class EmbedderManager:
     def get_image_embedder_by_name(self, name) -> ImageEmbedder:
         return self._image_embedders[name]
 
-    def get_text_embedder(self) -> TextEmbedder:
-        return self._text_embedder
-
     def _init_embedders_weights(self):
-        path = Configuration.instance().weights_path
+        path = settings.weights_path
         weights = dict()
         default_weight = 1 / len(self._image_embedders)
         if os.path.exists(path):
             with open(path, 'r+') as file:
                 weights = json.load(file)
-                logger.info("Embedder weights loaded from file")
+                # logger.info("Embedder weights loaded from file")
 
         for embedder_name, embedder in self._image_embedders.items():
             embedder.weight = weights.get(embedder_name, default_weight)
 
     def _save_embedder_weights(self):
         weights = {name: embedder.weight for name, embedder in self._image_embedders.items()}
-        with open(Configuration.instance().weights_path, 'w+') as f:
+        with open(settings.weights_path, 'w+') as f:
             json.dump(weights, f)
-        logger.info("Embedder weights dumped to the file")
+        # logger.info("Embedder weights dumped to the file")
 
     def finalize(self):
         self._save_embedder_weights()

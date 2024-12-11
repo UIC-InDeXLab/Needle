@@ -3,3 +3,5 @@
 **/*.pyc
 **/venv/**
 **/.env
+logs/**
+volumes/**

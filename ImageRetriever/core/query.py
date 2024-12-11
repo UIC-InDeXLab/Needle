@@ -1,6 +1,6 @@
 from typing import Optional
 
-from models.singleton import Singleton
+from core.singleton import Singleton
 
 
 class Query:

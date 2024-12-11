@@ -1,0 +1,264 @@
+#!/usr/bin/env python3
+
+import json
+import os
+import time
+
+import requests
+import typer
+import yaml
+
+app = typer.Typer(help="CLI interface for the Image Indexing and Searching FastAPI application.")
+
+directory_app = typer.Typer(help="Manage directories.")
+search_app = typer.Typer(help="Perform searches.")
+
+# Register the subcommands
+app.add_typer(directory_app, name="directory")
+app.add_typer(search_app, name="search")
+
+
+# Global configuration will be stored in ctx.obj
+@app.callback()
+def main(
+        ctx: typer.Context,
+        api_url: str = typer.Option("http://127.0.0.1:8000", help="API URL of the backend FastAPI service."),
+        output: str = typer.Option("human", help="Output format: human|json|yaml")
+):
+    """
+    Global options for CLI.
+    """
+    ctx.obj = {
+        "api_url": api_url,
+        "output": output.lower()
+    }
+
+
+def print_output(data, output_format):
+    """
+    Print data according to the chosen output format.
+    """
+    if output_format == "json":
+        typer.echo(json.dumps(data, indent=2))
+    elif output_format == "yaml":
+        typer.echo(yaml.safe_dump(data, sort_keys=False))
+    else:
+        # human readable format
+        # This just prints data straightforwardly, assuming it's structured
+        # Adjust as necessary for a nicer human-readable format.
+        if isinstance(data, dict):
+            for k, v in data.items():
+                if isinstance(v, list):
+                    typer.echo(f"{k}:")
+                    for i in v:
+                        typer.echo(f"  - {i}")
+                else:
+                    typer.echo(f"{k}: {v}")
+        elif isinstance(data, list):
+            for i in data:
+                typer.echo(i)
+        else:
+            typer.echo(data)
+
+
+@directory_app.command("add")
+def add_directory(
+        ctx: typer.Context,
+        path: str,
+        show_progress: bool = typer.Option(False, help="Show indexing progress")
+):
+    """
+    Add a directory to the index.
+
+    Usage:
+      cli.py directory add PATH [--show-progress]
+    """
+    api_url = ctx.obj["api_url"]
+    output_format = ctx.obj["output"]
+    abs_path = os.path.abspath(path)
+
+    resp = requests.post(f"{api_url}/directory", json={"path": str(abs_path)})
+    if resp.status_code != 200:
+        typer.echo(f"Error adding directory: {resp.text}, path: {abs_path}")
+        raise typer.Exit(code=1)
+
+    if output_format == "human":
+        typer.echo(f"Directory '{abs_path}' added successfully.")
+    else:
+        print_output({"status": "Directory added successfully", "path": abs_path}, output_format)
+
+    if show_progress:
+        dirs_resp = requests.get(f"{api_url}/directory")
+        if dirs_resp.status_code != 200:
+            typer.echo("Could not retrieve directories.")
+            raise typer.Exit(code=1)
+
+        directories = dirs_resp.json().get("directories", [])
+        directory = next((d for d in directories if d["path"] == abs_path), None)
+        if not directory:
+            typer.echo("Directory not found in listing.")
+            raise typer.Exit(code=1)
+
+        did = directory["id"]
+        if output_format == "human":
+            typer.echo("Indexing in progress...")
+
+        while True:
+            d_resp = requests.get(f"{api_url}/directory/{did}")
+            if d_resp.status_code != 200:
+                typer.echo("Error checking directory status.")
+                raise typer.Exit(code=1)
+
+            data = d_resp.json()
+            ratio = data["indexing_ratio"]
+            if output_format == "human":
+                typer.echo(f"Indexing ratio: {ratio * 100:.2f}%")
+            if ratio >= 1.0:
+                if output_format == "human":
+                    typer.echo("Indexing complete!")
+                else:
+                    print_output({"status": "Indexing complete", "directory_id": did}, output_format)
+                break
+            time.sleep(2)  # Polling interval
+
+
+@directory_app.command("remove")
+def remove_directory(ctx: typer.Context, path: str):
+    """
+    Remove a directory from the index.
+
+    Usage:
+      cli.py directory remove PATH
+    """
+    api_url = ctx.obj["api_url"]
+    output_format = ctx.obj["output"]
+    abs_path = os.path.abspath(path)
+    resp = requests.delete(f"{api_url}/directory", params={"path": abs_path})
+    if resp.status_code != 200:
+        typer.echo(f"Error removing directory: {resp.text}")
+        raise typer.Exit(code=1)
+
+    if output_format == "human":
+        typer.echo("Directory removed successfully.")
+    else:
+        print_output({"status": "Directory removed successfully", "path": abs_path}, output_format)
+
+
+@directory_app.command("list")
+def list_directories(ctx: typer.Context):
+    """
+    List all currently added directories.
+
+    Usage:
+      cli.py directory list
+    """
+    api_url = ctx.obj["api_url"]
+    output_format = ctx.obj["output"]
+    resp = requests.get(f"{api_url}/directory")
+    if resp.status_code != 200:
+        typer.echo(f"Error listing directories: {resp.text}")
+        raise typer.Exit(code=1)
+
+    data = resp.json()
+    directories = data.get("directories", [])
+
+    if not directories:
+        if output_format == "human":
+            typer.echo("No directories found.")
+        else:
+            print_output({"directories": []}, output_format)
+        return
+
+    if output_format == "human":
+        typer.echo("Directories:")
+        for d in directories:
+            typer.echo(f"- ID: {d['id']}, Path: {d['path']}, Indexed: {d['is_indexed']}")
+    else:
+        print_output({"directories": directories}, output_format)
+
+
+@directory_app.command("describe")
+def directory_detail(ctx: typer.Context, did: int):
+    """
+    Show details of a specific directory by its ID.
+
+    Usage:
+      cli.py directory describe DID
+    """
+    api_url = ctx.obj["api_url"]
+    output_format = ctx.obj["output"]
+    resp = requests.get(f"{api_url}/directory/{did}")
+    if resp.status_code != 200:
+        typer.echo(f"Error retrieving directory detail: {resp.text}")
+        raise typer.Exit(code=1)
+
+    data = resp.json()
+    directory = data["directory"]
+    images = data["images"]
+    ratio = data["indexing_ratio"]
+
+    if output_format == "human":
+        typer.echo(f"Directory ID: {directory['id']}")
+        typer.echo(f"Path: {directory['path']}")
+        typer.echo(f"Indexed: {directory['is_indexed']}")
+        typer.echo(f"Indexing Ratio: {ratio * 100:.2f}%")
+        typer.echo("Images:")
+        for img_path in images:
+            typer.echo(f"- {img_path}")
+    else:
+        print_output(data, output_format)
+
+
+@search_app.command("run")
+def search(
+        ctx: typer.Context,
+        prompt: str,
+        n: int = typer.Option(20, help="Number of results to return"),
+        k: int = typer.Option(4, help="Number of images to generate for query"),
+        image_size: int = typer.Option(512, help="Image size"),
+        include_base_images: bool = typer.Option(False, help="Include generated base images in output")
+):
+    """
+    Search for images based on a given prompt.
+
+    Usage:
+      cli.py search run "A cat on a sofa" [--n 20 --k 4 --image-size 512 --include-base-images]
+    """
+    api_url = ctx.obj["api_url"]
+    output_format = ctx.obj["output"]
+
+    # Create query
+    q_resp = requests.post(f"{api_url}/query", json={"q": prompt})
+    if q_resp.status_code != 200:
+        typer.echo(f"Error creating query: {q_resp.text}")
+        raise typer.Exit(code=1)
+    q_data = q_resp.json()
+    qid = q_data.get("qid")
+
+    # Perform search
+    s_resp = requests.get(f"{api_url}/search/{qid}", params={
+        "n": n,
+        "k": k,
+        "image_size": image_size,
+        "include_base_images": include_base_images
+    })
+    if s_resp.status_code != 200:
+        typer.echo(f"Error during search: {s_resp.text}")
+        raise typer.Exit(code=1)
+
+    results = s_resp.json()
+
+    if output_format == "human":
+        typer.echo("Search results:")
+        for img_id in results.get("results", []):
+            typer.echo(f"- {img_id}")
+        if include_base_images and "base_images" in results:
+            typer.echo("Base Images (encoded):")
+            for base_img in results["base_images"]:
+                typer.echo(f"- {base_img[:50]}...")  # Just show a snippet
+    else:
+        print_output(results, output_format)
+
+
+if __name__ == "__main__":
+    app()

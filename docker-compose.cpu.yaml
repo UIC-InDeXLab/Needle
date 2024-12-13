@@ -97,8 +97,6 @@ services:
       - postgres
       - standalone
       - sdxl-lightning
-    volumes:
-      - /home/mahdi/Projects/Needle/ImageRetriever/resources:/resources
     environment:
       POSTGRES__USER: myuser
       POSTGRES__PASSWORD: mypassword

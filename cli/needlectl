@@ -2,6 +2,7 @@
 
 import json
 import os
+import subprocess
 import time
 
 import requests
@@ -9,17 +10,17 @@ import typer
 import yaml
 from tqdm import tqdm
 
-app = typer.Typer(help="CLI interface for the Image Indexing and Searching FastAPI application.")
+app = typer.Typer(help="CLI interface for the Needle")
 
 directory_app = typer.Typer(help="Manage directories.")
 search_app = typer.Typer(help="Perform searches.")
+service_app = typer.Typer(help="Manage Needle services (start, stop, restart).")
 
-# Register the subcommands
 app.add_typer(directory_app, name="directory")
 app.add_typer(search_app, name="search")
+app.add_typer(service_app, name="service")
 
 
-# Global configuration will be stored in ctx.obj
 @app.callback()
 def main(
         ctx: typer.Context,
@@ -36,17 +37,12 @@ def main(
 
 
 def print_output(data, output_format):
-    """
-    Print data according to the chosen output format.
-    """
     if output_format == "json":
         typer.echo(json.dumps(data, indent=2))
     elif output_format == "yaml":
         typer.echo(yaml.safe_dump(data, sort_keys=False))
     else:
-        # human readable format
-        # This just prints data straightforwardly, assuming it's structured
-        # Adjust as necessary for a nicer human-readable format.
+        # human output
         if isinstance(data, dict):
             for k, v in data.items():
                 if isinstance(v, list):
@@ -62,6 +58,104 @@ def print_output(data, output_format):
             typer.echo(data)
 
 
+def get_compose_file():
+    docker_compose_path = os.getenv("NEEDLE_DOCKER_COMPOSE_FILE")
+    if not docker_compose_path or not os.path.isfile(docker_compose_path):
+        typer.echo("Error: NEEDLE_DOCKER_COMPOSE_FILE not set or file not found.")
+        raise typer.Exit(code=1)
+    return docker_compose_path
+
+
+def get_storage_dir():
+    home = os.path.expanduser("~")
+    storage_dir = os.path.join(home, ".needle")
+    if not os.path.exists(storage_dir):
+        os.makedirs(storage_dir, exist_ok=True)
+    return storage_dir
+
+
+def get_mounted_paths_file():
+    return os.path.join(get_storage_dir(), "mounted_paths.json")
+
+
+def load_mounted_paths():
+    file_path = get_mounted_paths_file()
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            return json.load(f)
+    return []
+
+
+def save_mounted_paths(paths):
+    file_path = get_mounted_paths_file()
+    with open(file_path, "w") as f:
+        json.dump(paths, f, indent=2)
+
+
+def update_docker_compose(new_path, service_name="api"):
+    docker_compose_path = get_compose_file()
+
+    # Load docker-compose.yml
+    with open(docker_compose_path, "r") as f:
+        compose_data = yaml.safe_load(f)
+
+    # Ensure structure
+    if "services" not in compose_data or service_name not in compose_data["services"]:
+        typer.echo("Error: 'api' service not found in docker-compose.yml.")
+        raise typer.Exit(code=1)
+
+    service = compose_data["services"][service_name]
+
+    # Ensure volumes section exists
+    if "volumes" not in service:
+        service["volumes"] = []
+
+    # Determine a mount point inside the container
+    dir_name = os.path.basename(new_path.rstrip("/"))
+    container_path = f"/app/data/{dir_name}"
+
+    # Check if this path is already mounted
+    host_mounts = [v.split(":")[0] for v in service["volumes"] if isinstance(v, str)]
+    if new_path not in host_mounts:
+        service["volumes"].append(f"{new_path}:{container_path}")
+
+    # Save changes back
+    with open(docker_compose_path, "w") as f:
+        yaml.safe_dump(compose_data, f, sort_keys=False)
+
+
+def docker_compose_run(*args):
+    docker_compose_path = get_compose_file()
+    cmd = ["docker-compose", "-f", docker_compose_path] + list(args)
+    subprocess.run(cmd, check=True)
+
+
+def restart_containers():
+    docker_compose_run("down")
+    docker_compose_run("up", "-d")
+
+
+def start_containers():
+    docker_compose_run("up", "-d")
+
+
+def stop_containers():
+    docker_compose_run("down")
+
+
+def wait_for_api(api_url, timeout=60):
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            resp = requests.get(api_url + "/health")
+            if resp.status_code == 200:
+                return True
+        except Exception:
+            pass
+        time.sleep(2)
+    return False
+
+
 @directory_app.command("add")
 def add_directory(
         ctx: typer.Context,
@@ -69,21 +163,43 @@ def add_directory(
         show_progress: bool = typer.Option(False, help="Show indexing progress")
 ):
     """
-    Add a directory to the index and optionally show progress with an ETA.
+    Add a directory to the index:
+    1. Save directory in mounted_paths.json.
+    2. Update docker-compose.yml to mount it.
+    3. Restart containers.
+    4. Wait until API is ready.
+    5. Call the API to actually register the directory.
     """
-
     api_url = ctx.obj["api_url"]
     output_format = ctx.obj["output"]
     abs_path = os.path.abspath(path)
 
-    # Add the directory
+    # 1. Update local file with mounted paths
+    mounted_paths = load_mounted_paths()
+    if abs_path not in mounted_paths:
+        mounted_paths.append(abs_path)
+    save_mounted_paths(mounted_paths)
+
+    # 2. Update docker-compose to mount this directory
+    update_docker_compose(abs_path)
+
+    # 3. Restart the containers
+    typer.echo("Restarting containers...")
+    restart_containers()
+
+    # 4. Wait until API is ready
+    typer.echo("Waiting for API to become available...")
+    if not wait_for_api(api_url):
+        typer.echo("API not available after restart.")
+        raise typer.Exit(code=1)
+
+    # 5. Call the API to add the directory
     resp = requests.post(f"{api_url}/directory", json={"path": str(abs_path)})
     if resp.status_code != 200:
-        typer.echo(f"Error adding directory: {resp.text}, path: {abs_path}")
+        typer.echo(f"Error adding directory to API: {resp.text}, path: {abs_path}")
         raise typer.Exit(code=1)
 
     did = resp.json()["id"]
-
 
     if output_format == "human":
         typer.echo(f"Directory '{abs_path}' added successfully, directory id: {did}.")
@@ -94,13 +210,11 @@ def add_directory(
     if not show_progress:
         return
 
-
     typer.echo("Indexing in progress...")
 
     # Initialize progress bar
     pbar = tqdm(total=100, desc="Indexing progress", unit="%")
     start_time = time.time()
-    last_ratio = 0.0
 
     while True:
         d_resp = requests.get(f"{api_url}/directory/{did}")
@@ -124,32 +238,23 @@ def add_directory(
                 print_output({"status": "Indexing complete", "directory_id": did}, output_format)
             break
 
-        # Estimate time remaining based on rate of progress
         elapsed = time.time() - start_time
-        # If ratio > 0, we can try to estimate
         if ratio > 0:
-            # Time per ratio unit
             time_per_ratio = elapsed / ratio
             remaining_ratio = 1.0 - ratio
             eta = time_per_ratio * remaining_ratio
         else:
-            # No progress yet, can't estimate
             eta = 0.0
 
-        # Show ETA in the progress bar's postfix
         pbar.set_postfix_str(f"ETA: {eta:.1f}s")
-
-        last_ratio = ratio
-        time.sleep(2)  # Polling interval
+        time.sleep(2)
 
 
 @directory_app.command("remove")
 def remove_directory(ctx: typer.Context, path: str):
     """
     Remove a directory from the index.
-
-    Usage:
-      cli.py directory remove PATH
+    This does not unmount from docker-compose automatically.
     """
     api_url = ctx.obj["api_url"]
     output_format = ctx.obj["output"]
@@ -159,6 +264,13 @@ def remove_directory(ctx: typer.Context, path: str):
         typer.echo(f"Error removing directory: {resp.text}")
         raise typer.Exit(code=1)
 
+    # Optionally remove from mounted_paths if desired
+    # (Not requested, but you can uncomment to implement):
+    # mounted_paths = load_mounted_paths()
+    # if abs_path in mounted_paths:
+    #     mounted_paths.remove(abs_path)
+    #     save_mounted_paths(mounted_paths)
+
     if output_format == "human":
         typer.echo("Directory removed successfully.")
     else:
@@ -167,12 +279,6 @@ def remove_directory(ctx: typer.Context, path: str):
 
 @directory_app.command("list")
 def list_directories(ctx: typer.Context):
-    """
-    List all currently added directories.
-
-    Usage:
-      cli.py directory list
-    """
     api_url = ctx.obj["api_url"]
     output_format = ctx.obj["output"]
     resp = requests.get(f"{api_url}/directory")
@@ -200,12 +306,6 @@ def list_directories(ctx: typer.Context):
 
 @directory_app.command("describe")
 def directory_detail(ctx: typer.Context, did: int):
-    """
-    Show details of a specific directory by its ID.
-
-    Usage:
-      cli.py directory describe DID
-    """
     api_url = ctx.obj["api_url"]
     output_format = ctx.obj["output"]
     resp = requests.get(f"{api_url}/directory/{did}")
@@ -239,16 +339,9 @@ def search(
         image_size: int = typer.Option(512, help="Image size"),
         include_base_images: bool = typer.Option(False, help="Include generated base images in output")
 ):
-    """
-    Search for images based on a given prompt.
-
-    Usage:
-      cli.py search run "A cat on a sofa" [--n 20 --k 4 --image-size 512 --include-base-images]
-    """
     api_url = ctx.obj["api_url"]
     output_format = ctx.obj["output"]
 
-    # Create query
     q_resp = requests.post(f"{api_url}/query", json={"q": prompt})
     if q_resp.status_code != 200:
         typer.echo(f"Error creating query: {q_resp.text}")
@@ -256,7 +349,6 @@ def search(
     q_data = q_resp.json()
     qid = q_data.get("qid")
 
-    # Perform search
     s_resp = requests.get(f"{api_url}/search/{qid}", params={
         "n": n,
         "k": k,
@@ -276,9 +368,39 @@ def search(
         if include_base_images and "base_images" in results:
             typer.echo("Base Images (encoded):")
             for base_img in results["base_images"]:
-                typer.echo(f"- {base_img[:50]}...")  # Just show a snippet
+                typer.echo(f"- {base_img[:50]}...")
     else:
         print_output(results, output_format)
+
+
+@service_app.command("start")
+def service_start(ctx: typer.Context):
+    """
+    Start the Needle services.
+    """
+    typer.echo("Starting Needle services...")
+    start_containers()
+    typer.echo("Services started.")
+
+
+@service_app.command("stop")
+def service_stop(ctx: typer.Context):
+    """
+    Stop the Needle services.
+    """
+    typer.echo("Stopping Needle services...")
+    stop_containers()
+    typer.echo("Services stopped.")
+
+
+@service_app.command("restart")
+def service_restart(ctx: typer.Context):
+    """
+    Restart the Needle services.
+    """
+    typer.echo("Restarting Needle services...")
+    restart_containers()
+    typer.echo("Services restarted.")
 
 
 if __name__ == "__main__":

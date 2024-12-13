@@ -92,7 +92,7 @@ def save_mounted_paths(paths):
         json.dump(paths, f, indent=2)
 
 
-def update_docker_compose(new_path, service_name="api"):
+def update_docker_compose(new_path, service_name="backend"):
     docker_compose_path = get_compose_file()
 
     # Load docker-compose.yml
@@ -101,7 +101,7 @@ def update_docker_compose(new_path, service_name="api"):
 
     # Ensure structure
     if "services" not in compose_data or service_name not in compose_data["services"]:
-        typer.echo("Error: 'api' service not found in docker-compose.yml.")
+        typer.echo("Error: 'backend' service not found in docker-compose.yml.")
         raise typer.Exit(code=1)
 
     service = compose_data["services"][service_name]
@@ -111,13 +111,13 @@ def update_docker_compose(new_path, service_name="api"):
         service["volumes"] = []
 
     # Determine a mount point inside the container
-    dir_name = os.path.basename(new_path.rstrip("/"))
-    container_path = f"/app/data/{dir_name}"
+    # dir_name = os.path.basename(new_path.rstrip("/"))
+    # container_path = f"/app/data/{dir_name}"
 
     # Check if this path is already mounted
     host_mounts = [v.split(":")[0] for v in service["volumes"] if isinstance(v, str)]
     if new_path not in host_mounts:
-        service["volumes"].append(f"{new_path}:{container_path}")
+        service["volumes"].append(f"{new_path}:{new_path}")
 
     # Save changes back
     with open(docker_compose_path, "w") as f:

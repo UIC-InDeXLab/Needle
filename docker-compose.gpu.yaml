@@ -97,8 +97,8 @@ services:
     ports:
       - "8001:8000"
 
-  api:
-    image: merfanian/needle:v0.1.0
+  backend:
+    image: merfanian/needle:v0.2.0
     container_name: needle
     runtime: nvidia
     deploy:
@@ -126,4 +126,4 @@ services:
 
 networks:
   default:
-    name: milvus
+    name: needle

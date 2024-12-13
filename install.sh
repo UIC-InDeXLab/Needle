@@ -34,7 +34,7 @@ HAS_GPU=false
 if command -v nvidia-smi &> /dev/null; then
     echo -e "${GREEN}nvidia-smi found, checking Docker GPU access...${NC}"
     # Test if Docker can run GPU-enabled containers
-    if docker run --rm --gpus all nvidia/cuda nvidia-smi &> /dev/null; then
+    if docker run --rm --gpus all nvidia/cuda:11.0.3-base-ubuntu20.04 nvidia-smi &> /dev/null; then
         echo -e "${GREEN}Docker GPU support detected.${NC}"
         HAS_GPU=true
     else

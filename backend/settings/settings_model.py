@@ -46,13 +46,19 @@ class AppSettings(BaseModel):
     num_watcher_workers: int = Field(4)
 
 
-class GeneratorsSettings(BaseModel):
-    sdxl_url: str = Field("0.0.0.0:8003")
-    dalle_url: str = Field("0.0.0.0:8004")
-    replicate_url: str = Field("0.0.0.0:8005")
-    runwayml_url: str = Field("0.0.0.0:8006")
-    default_model: str = Field("sdxl-turbo")
+class IndexSettings(BaseModel):
+    index_type: str = Field("HNSW")
+    metric_type: str = Field("COSINE")
 
+
+class GeneratorsSettings(BaseModel):
+    host: str = Field("0.0.0.0")
+    port: int = Field(8001)
+    default_engine: str = Field("sdxl_lightning")
+
+    @property
+    def url(self) -> str:
+        return f"http://{self.host}:{self.port}"
 
 
 class Settings(BaseSettings):
@@ -60,7 +66,7 @@ class Settings(BaseSettings):
     postgres: PostgresSettings = PostgresSettings()
     milvus: MilvusSettings = MilvusSettings()
     app: AppSettings = AppSettings()
-    engines: GeneratorsSettings = GeneratorsSettings()
+    generators: GeneratorsSettings = GeneratorsSettings()
 
     # JSON config
     json_config: Optional[JSONConfig] = None

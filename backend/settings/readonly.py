@@ -23,7 +23,7 @@ class ReadOnlySettings:
         logger.info(f"Postgres Settings: {cls._instance._settings.postgres}")
         logger.info(f"Milvus Settings: {cls._instance._settings.milvus}")
         logger.info(f"App Settings: {cls._instance._settings.app}")
-        logger.info(f"Engine Loaded: {cls._instance._settings.engines}")
+        logger.info(f"Generators Settings: {cls._instance._settings.generators}")
         if cls._instance._settings.json_config:
             logger.info(f"JSON Config: {cls._instance._settings.json_config.dict()}")
 
@@ -40,8 +40,8 @@ class ReadOnlySettings:
         return self._settings.app
 
     @property
-    def engines(self):
-        return self._settings.engines
+    def generators(self):
+        return self._settings.generators
 
     @property
     def json_config(self):

@@ -1,26 +1,21 @@
-import asyncio
-import base64
-import io
 import os
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from typing import Dict, List
 
 import fastapi
-from PIL import Image as PImage
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.websockets import WebSocket, WebSocketDisconnect
 from pymilvus import Collection
 
-from core import embedder_manager, engine_manager, query_manager
+from core import embedder_manager, image_generator, query_manager
 from core.embedders import ImageEmbedder
 from core.query import Query
 from database import SessionLocal, Directory, Image
 from initialize import initialize
 from monitoring import directory_watcher, logger
 from settings import settings
-from utils import aggregate_rankings
+from utils import aggregate_rankings, pil_image_to_base64
 
 origins = ["http://localhost:3000", "http://127.0.0.1:3000", os.getenv("PUBLIC_IP", "http://127.0.0.1:3000")]
 
@@ -47,8 +42,8 @@ app.add_middleware(
 @app.post("/directory")
 async def add_directory(path: str = Body(..., embed=True)):
     try:
-        directory_watcher.add_directory(path)
-        return {"status": "Directory added successfully."}
+        did = directory_watcher.add_directory(path)
+        return {"status": "Directory added successfully.", "id": did}
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -111,7 +106,7 @@ async def search(qid: int, n: int = 20, k: int = 1, image_size: int = 512,
                  include_base_images: bool = False
                  ):
     if generator_engines is None:
-        generator_engines = [settings.engines.default_model]
+        generator_engines = [settings.generators.default_engine]
 
     query_object = query_manager.get_query(qid)
     query = query_object.query
@@ -119,16 +114,7 @@ async def search(qid: int, n: int = 20, k: int = 1, image_size: int = 512,
     generated_images = []
 
     if not query_object.generated_images:
-        def generate_from_engine(engine_name: str):
-            active_engine = engine_manager.get_engine_by_name(engine_name)
-            return active_engine.generate(prompt=query.strip(), image_size=image_size, k=k)
-
-        tasks = [asyncio.to_thread(generate_from_engine, engine_name) for engine_name in generator_engines]
-        results = await asyncio.gather(*tasks)
-
-        for result in results:
-            generated_images.extend(result)
-
+        generated_images.extend(image_generator.generate(query, generator_engines, k, image_size))
         query_object.generated_images.extend(generated_images)
     else:
         generated_images = query_object.generated_images
@@ -143,7 +129,7 @@ async def search(qid: int, n: int = 20, k: int = 1, image_size: int = 512,
         return {
             "results": [],
             "qid": qid,
-            "base_images": [base64.b64encode(image).decode('utf-8') for image in generated_images]
+            "base_images": [pil_image_to_base64(image) for image in generated_images]
         }
 
     # Create an expression for Milvus search
@@ -156,8 +142,7 @@ async def search(qid: int, n: int = 20, k: int = 1, image_size: int = 512,
         collection = Collection(name=collection_name)
         collection.load()
 
-        for i, image_data in enumerate(generated_images):
-            image = PImage.open(io.BytesIO(image_data)).convert("RGB")
+        for i, image in enumerate(generated_images):
             query_embedding = embedder.embed(image)
 
             search_params = {
@@ -191,53 +176,53 @@ async def search(qid: int, n: int = 20, k: int = 1, image_size: int = 512,
            "qid": qid}
 
     if include_base_images:
-        res["base_images"] = [base64.b64encode(image).decode('utf-8') for image in generated_images]
+        res["base_images"] = [pil_image_to_base64(image) for image in generated_images]
 
     return res
 
 
-@app.websocket("/feedback/{qid}")
-async def guide_image_feedback(websocket: WebSocket, qid: int):
-    await websocket.accept()
-
-    try:
-        data = await websocket.receive_json()
-        query_obj = query_manager.get_query(qid)
-        k = data.get("k", 4)
-        image_size = data.get("image_size", 512)
-        generator_engine = data.get("generator_engine", "runwayml")
-        logger.info(f"k={k} image_size={image_size} generator_engine={generator_engine}")
-        active_engine = engine_manager.get_engine_by_name(generator_engine)
-
-        if not query_obj.generated_images:
-            generated_images = active_engine.generate(prompt=query_obj.query.strip(), image_size=image_size, k=k)
-        else:
-            generated_images = query_obj.generated_images
-
-        base64_images = [base64.b64encode(image).decode('utf-8') for image in generated_images]
-
-        await websocket.send_json({"generated_images": base64_images})
-        rejected_count = 1
-
-        while rejected_count > 0:
-            feedback = await websocket.receive_json()
-            approved_images = feedback.get("approved", [])
-            query_obj.generated_images.extend([base64.b64decode(base64_image) for base64_image in approved_images])
-
-            rejected_count = len(feedback.get("rejected", []))
-
-            if rejected_count > 0:
-                regenerated_images = active_engine.generate(prompt=query_obj.query.strip(), image_size=image_size,
-                                                            k=rejected_count)
-                base64_regenerated_images = [base64.b64encode(image).decode('utf-8') for image in regenerated_images]
-                await websocket.send_json({"regenerated_images": base64_regenerated_images})
-            else:
-                break
-
-        await websocket.send_json({"status": "all_approved"})
-
-    except WebSocketDisconnect:
-        await websocket.close()
+# @app.websocket("/feedback/{qid}")
+# async def guide_image_feedback(websocket: WebSocket, qid: int):
+#     await websocket.accept()
+#
+#     try:
+#         data = await websocket.receive_json()
+#         query_obj = query_manager.get_query(qid)
+#         k = data.get("k", 4)
+#         image_size = data.get("image_size", 512)
+#         generator_engine = data.get("generator_engine", "runwayml")
+#         logger.info(f"k={k} image_size={image_size} generator_engine={generator_engine}")
+#         active_engine = engine_manager.get_engine_by_name(generator_engine)
+#
+#         if not query_obj.generated_images:
+#             generated_images = active_engine.generate(prompt=query_obj.query.strip(), image_size=image_size, k=k)
+#         else:
+#             generated_images = query_obj.generated_images
+#
+#         base64_images = [base64.b64encode(image).decode('utf-8') for image in generated_images]
+#
+#         await websocket.send_json({"generated_images": base64_images})
+#         rejected_count = 1
+#
+#         while rejected_count > 0:
+#             feedback = await websocket.receive_json()
+#             approved_images = feedback.get("approved", [])
+#             query_obj.generated_images.extend([base64.b64decode(base64_image) for base64_image in approved_images])
+#
+#             rejected_count = len(feedback.get("rejected", []))
+#
+#             if rejected_count > 0:
+#                 regenerated_images = active_engine.generate(prompt=query_obj.query.strip(), image_size=image_size,
+#                                                             k=rejected_count)
+#                 base64_regenerated_images = [base64.b64encode(image).decode('utf-8') for image in regenerated_images]
+#                 await websocket.send_json({"regenerated_images": base64_regenerated_images})
+#             else:
+#                 break
+#
+#         await websocket.send_json({"status": "all_approved"})
+#
+#     except WebSocketDisconnect:
+#         await websocket.close()
 
 
 @app.post("/search/{qid}/")

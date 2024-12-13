@@ -72,8 +72,8 @@ services:
       POSTGRES_USER: myuser
       POSTGRES_PASSWORD: mypassword
       POSTGRES_DB: mydb
-    ports:
-      - "5433:5432"  # Host port 5433 mapped to container 5432
+    #    ports: # Uncomment if you need direct access to postgres
+    #      - "5433:5432"
     volumes:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -82,34 +82,21 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
-
-  image-generator:
-    image: merfanian/fastapi-diffusion:v0.3.2
-    container_name: image-generator
-    runtime: nvidia
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [ gpu ]
+  sdxl-lightning:
+    image: fastapi-diffusion
+    container_name: sdxl-lightning
     environment:
-      USE_CUDA: true
+      ACTIVE_ENGINE: "SDXL_LIGHTNING"
     ports:
       - "8001:8000"
 
   api:
     image: merfanian/needle:v0.1.0
     container_name: needle
-    runtime: nvidia
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [ gpu ]
     depends_on:
       - postgres
       - standalone
-      - image-generator
+      - sdxl-lightning
     volumes:
       - /home/mahdi/Projects/Needle/ImageRetriever/resources:/resources
     environment:
@@ -120,8 +107,8 @@ services:
       POSTGRES__PORT: 5432
       MILVUS__HOST: standalone
       MILVUS__PORT: 19530
-      APP__USE_CUDA: true
-      ENGINES__SDXL_URL: "http://image-generator:8000"
+      APP__USE_CUDA: false
+      ENGINES__SDXL_URL: "http://sdxl-lightning:8000"
     ports:
       - "8000:8000"
     command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000" ]

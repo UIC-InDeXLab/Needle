@@ -37,28 +37,23 @@ class ImageChangeHandler(FileSystemEventHandler):
 
             dir_record = session.query(Directory).filter(Directory.id == self.directory_id).first()
             if dir_record.is_indexed:
-                # Directory is already indexed, so we need to embed this single new image now
+                # Directory is already indexed, so index this single new image now.
                 image = PImage.open(image_path).convert("RGB")
-                # For a single image, just do a quick embedding and insert
                 for embedder_name, embedder in self.embedders.items():
                     embedding = embedder.embed(image)
-                    collection_name = f"{embedder_name}"
-                    collection = Collection(name=collection_name)
-                    # Insert single image
+                    collection = Collection(name=embedder_name)
                     collection.insert([{
                         "directory_id": self.directory_id,
                         "image_path": image_path,
                         "embedding": embedding
                     }])
-                    # Flush once after all embedders are processed to reduce overhead
                 for embedder_name in self.embedders.keys():
-                    collection_name = f"{embedder_name}"
-                    collection = Collection(name=collection_name)
+                    collection = Collection(name=embedder_name)
                     collection.flush()
 
-                # Mark the image as indexed
                 image_record.is_indexed = True
                 session.commit()
+        session.close()
 
     def remove_image(self, image_path):
         session = SessionLocal()
@@ -68,14 +63,13 @@ class ImageChangeHandler(FileSystemEventHandler):
             session.commit()
 
         for embedder_name in self.embedders.keys():
-            collection_name = f"{embedder_name}"
-            collection = Collection(name=collection_name)
+            collection = Collection(name=embedder_name)
             collection.delete(expr=f"image_path == '{image_path}'")
-            # Defer flushes until after loop if desired
+
         for embedder_name in self.embedders.keys():
-            collection_name = f"{embedder_name}"
-            collection = Collection(name=collection_name)
+            collection = Collection(name=embedder_name)
             collection.flush()
+        session.close()
 
 
 def rename_path(path):
@@ -108,31 +102,45 @@ class DirectoryWatcher:
             existing_directory.is_indexed = False
             session.commit()
 
-        self.executor.submit(self._process_directory_in_background, path, directory_id)
-
         handler = ImageChangeHandler(directory_id)
         self.handlers[renamed_path] = handler
         watch = self.observer.schedule(handler, path, recursive=settings.app.recursive_indexing)
         self.watches[renamed_path] = watch
 
+        # Start the background indexing
+        self.executor.submit(self._process_directory_in_background, path, directory_id)
+
         session.close()
+        return directory_id
 
     def _process_directory_in_background(self, path, directory_id):
-        """Embed images of the directory in a background thread, set is_indexed=True when done if not already."""
+        """Embed images of the directory in a background thread, processing them in batches.
+           For each batch:
+           1. Find a batch of not-indexed images.
+           2. Compute their embeddings in parallel.
+           3. Insert the embeddings into Milvus and update Postgres.
+           4. Repeat until all images are indexed.
+        """
         session = SessionLocal()
         directory_record = session.query(Directory).filter(Directory.id == directory_id).first()
 
-        # 1. Sync all images in the DB first
+        # 1. Sync all images in the DB
         existing_images = set(
-            img.path for img in session.query(Image.path).filter(Image.directory_id == directory_id).all())
+            img.path for img in session.query(Image.path).filter(Image.directory_id == directory_id).all()
+        )
 
-        # Add any new images not in DB
-        # TODO: os.walk traverses recursively, we should traverse recursively or not by the value of setting.app.recursive_indexing
         to_add = []
-        for root, _, files in os.walk(path):
-            for file in files:
-                if file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                    full_path = os.path.join(root, file)
+        if settings.app.recursive_indexing:  # If recursive search is required
+            for root, _, files in os.walk(path):
+                for file in files:
+                    if file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                        full_path = os.path.join(root, file)
+                        if full_path not in existing_images:
+                            to_add.append(Image(path=full_path, directory_id=directory_id, is_indexed=False))
+        else:  # Non-recursive search
+            for file in os.listdir(path):
+                full_path = os.path.join(path, file)
+                if os.path.isfile(full_path) and file.lower().endswith(('.png', '.jpg', '.jpeg')):
                     if full_path not in existing_images:
                         to_add.append(Image(path=full_path, directory_id=directory_id, is_indexed=False))
 
@@ -140,73 +148,34 @@ class DirectoryWatcher:
             session.bulk_save_objects(to_add)
             session.commit()
 
-        # 2. Retrieve all images for the directory
-        images = session.query(Image).filter(Image.directory_id == directory_id).all()
-        not_indexed_images = [img for img in images if not img.is_indexed]
-
-        if not not_indexed_images:
-            # If no images need indexing, just mark the directory as indexed and return
-            directory_record.is_indexed = True
-            session.commit()
-            return
-
+        # 2. Retrieve all not indexed images
         embedders = embedder_manager.get_image_embedders()
 
-        # 3. Process embeddings in parallel
-        # We'll do:
-        # - Load all images
-        # - Embed in parallel
-        # - Batch insert into Milvus
-        futures = []
-        with ThreadPoolExecutor(max_workers=settings.app.num_embedding_workers) as pool:
-            for img_record in not_indexed_images:
-                if os.path.exists(img_record.path):
-                    # Submit a job to embed this image once per embedder, or embed once and store results
-                    # We only load the image once here:
-                    futures.append(pool.submit(self._embed_image, img_record.path, embedders))
+        batch_size = settings.app.batch_size
+        while True:
+            not_indexed_images = session.query(Image).filter(Image.directory_id == directory_id, Image.is_indexed == False).all()
+            if not not_indexed_images:
+                # All images are indexed
+                directory_record.is_indexed = True
+                session.commit()
+                break
 
-        # Gather results as [ (path, {embedder_name: embedding}) ]
-        all_embeddings = []
-        for f in as_completed(futures):
-            result = f.result()
-            if result is not None:
-                all_embeddings.append(result)
+            # Process images in batches
+            batch = not_indexed_images[:batch_size]
 
-        # 4. Batch insert into Milvus
-        # Organize embeddings by embedder to do bulk inserts
-        embedder_collections_data = {name: {"directory_id": [], "image_path": [], "embedding": []}
-                                     for name in embedders.keys()}
+            # 3. Embed images in parallel for this batch
+            with ThreadPoolExecutor(max_workers=settings.app.num_embedding_workers) as pool:
+                futures = {pool.submit(self._embed_image, img_record.path, embedders): img_record.path for img_record in batch}
 
-        count = 0
-        for (img_path, embeddings_dict) in all_embeddings:
-            for embedder_name, emb in embeddings_dict.items():
-                embedder_collections_data[embedder_name]["directory_id"].append(directory_id)
-                embedder_collections_data[embedder_name]["image_path"].append(img_path)
-                embedder_collections_data[embedder_name]["embedding"].append(emb)
-            count += 1
-            # If we reach a batch size, flush to Milvus and then continue
-            if count % settings.app.batch_size == 0:
-                self._batch_insert_to_milvus(embedder_collections_data)
-                # Reset for next batch
-                embedder_collections_data = {name: {"directory_id": [], "image_path": [], "embedding": []}
-                                             for name in embedders.keys()}
+                embeddings_batch = []
+                for f in as_completed(futures):
+                    result = f.result()
+                    if result is not None:
+                        embeddings_batch.append(result)
 
-        # Insert any remaining
-        if embedder_collections_data[embedders.keys().__iter__().__next__()]["directory_id"]:
-            self._batch_insert_to_milvus(embedder_collections_data)
-
-        # 5. Mark all these images as indexed in one go
-        indexed_paths = [record[0] for record in all_embeddings]
-        if indexed_paths:
-            session.query(Image).filter(Image.path.in_(indexed_paths)).update({"is_indexed": True},
-                                                                              synchronize_session=False)
-            session.commit()
-
-        # 6. Check if all images are indexed now
-        images = session.query(Image).filter(Image.directory_id == directory_id).all()
-        if all(img.is_indexed for img in images):
-            directory_record.is_indexed = True
-            session.commit()
+            # 4. Insert embeddings for this batch and update DB
+            if embeddings_batch:
+                self._insert_embeddings_batch(session, directory_id, embeddings_batch, embedders)
 
         session.close()
 
@@ -222,27 +191,41 @@ class DirectoryWatcher:
                 result[embedder_name] = embedding
             return (image_path, result)
 
-    def _batch_insert_to_milvus(self, embedder_collections_data):
-        # Insert data for each embedder in one go
-        for embedder_name, data in embedder_collections_data.items():
-            if not data["directory_id"]:
-                continue
-            collection_name = f"{embedder_name}"
-            collection = Collection(name=collection_name)
-            # Insert bulk data
-            entities = [
-                data["directory_id"],
-                data["image_path"],
-                data["embedding"]
-            ]
-            # The order of fields must match the schema order
-            collection.insert(entities)
+    def _insert_embeddings_batch(self, session, directory_id, embeddings_batch, embedders):
+        """Insert a batch of embeddings into Milvus, update their DB records, and commit."""
+        embedder_collections_data = {
+            name: {"directory_id": [], "image_path": [], "embedding": []}
+            for name in embedders.keys()
+        }
 
-        # Flush all collections after a bulk insert
-        for embedder_name in embedder_collections_data.keys():
-            collection_name = f"{embedder_name}"
-            collection = Collection(name=collection_name)
+        indexed_paths = []
+        for (img_path, embeddings_dict) in embeddings_batch:
+            indexed_paths.append(img_path)
+            for embedder_name, emb in embeddings_dict.items():
+                embedder_collections_data[embedder_name]["directory_id"].append(directory_id)
+                embedder_collections_data[embedder_name]["image_path"].append(img_path)
+                embedder_collections_data[embedder_name]["embedding"].append(emb)
+
+        # Insert data for each embedder
+        for embedder_name, data in embedder_collections_data.items():
+            if data["directory_id"]:
+                collection = Collection(name=embedder_name)
+                entities = [
+                    data["directory_id"],
+                    data["image_path"],
+                    data["embedding"]
+                ]
+                collection.insert(entities)
+
+        # Flush all after batch insert
+        for embedder_name in embedders.keys():
+            collection = Collection(name=embedder_name)
             collection.flush()
+
+        # Update DB to mark these images as indexed
+        session.query(Image).filter(Image.path.in_(indexed_paths)).update({"is_indexed": True},
+                                                                          synchronize_session=False)
+        session.commit()
 
     def remove_directory(self, path):
         session = SessionLocal()
@@ -253,14 +236,12 @@ class DirectoryWatcher:
 
         if directory_record:
             for embedder_name in embedder_manager.get_image_embedders().keys():
-                collection_name = f"{embedder_name}"
-                collection = Collection(name=collection_name)
+                collection = Collection(name=embedder_name)
                 # Delete all images for this directory in one go
                 collection.delete(expr=f"directory_id == {directory_record.id}")
             # Flush once after all deletions
             for embedder_name in embedder_manager.get_image_embedders().keys():
-                collection_name = f"{embedder_name}"
-                collection = Collection(name=collection_name)
+                collection = Collection(name=embedder_name)
                 collection.flush()
 
             session.query(Image).filter(Image.directory_id == directory_record.id).delete()
@@ -284,15 +265,13 @@ class DirectoryWatcher:
             ]
             schema = CollectionSchema(fields=fields, description=f"Collection for embedder: {collection_name}")
             collection = Collection(name=collection_name, schema=schema)
+            # TODO: Get index params from settings
             index_params = {
                 "index_type": "HNSW",
                 "metric_type": "COSINE",
                 "params": {"M": 48, "efConstruction": 200}
             }
-            collection.create_index(
-                field_name="embedding",
-                index_params=index_params
-            )
+            collection.create_index(field_name="embedding", index_params=index_params)
         else:
             collection = Collection(name=collection_name)
 

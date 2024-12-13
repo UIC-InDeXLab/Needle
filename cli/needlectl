@@ -7,6 +7,7 @@ import time
 import requests
 import typer
 import yaml
+from tqdm import tqdm
 
 app = typer.Typer(help="CLI interface for the Image Indexing and Searching FastAPI application.")
 
@@ -68,58 +69,78 @@ def add_directory(
         show_progress: bool = typer.Option(False, help="Show indexing progress")
 ):
     """
-    Add a directory to the index.
-
-    Usage:
-      cli.py directory add PATH [--show-progress]
+    Add a directory to the index and optionally show progress with an ETA.
     """
+
     api_url = ctx.obj["api_url"]
     output_format = ctx.obj["output"]
     abs_path = os.path.abspath(path)
 
+    # Add the directory
     resp = requests.post(f"{api_url}/directory", json={"path": str(abs_path)})
     if resp.status_code != 200:
         typer.echo(f"Error adding directory: {resp.text}, path: {abs_path}")
         raise typer.Exit(code=1)
 
+    did = resp.json()["id"]
+
+
     if output_format == "human":
-        typer.echo(f"Directory '{abs_path}' added successfully.")
+        typer.echo(f"Directory '{abs_path}' added successfully, directory id: {did}.")
     else:
-        print_output({"status": "Directory added successfully", "path": abs_path}, output_format)
+        print_output({"status": "Directory added successfully", "path": abs_path, "id": did}, output_format)
 
-    if show_progress:
-        dirs_resp = requests.get(f"{api_url}/directory")
-        if dirs_resp.status_code != 200:
-            typer.echo("Could not retrieve directories.")
+    # If not showing progress, return here
+    if not show_progress:
+        return
+
+
+    typer.echo("Indexing in progress...")
+
+    # Initialize progress bar
+    pbar = tqdm(total=100, desc="Indexing progress", unit="%")
+    start_time = time.time()
+    last_ratio = 0.0
+
+    while True:
+        d_resp = requests.get(f"{api_url}/directory/{did}")
+        if d_resp.status_code != 200:
+            typer.echo("Error checking directory status.")
+            pbar.close()
             raise typer.Exit(code=1)
 
-        directories = dirs_resp.json().get("directories", [])
-        directory = next((d for d in directories if d["path"] == abs_path), None)
-        if not directory:
-            typer.echo("Directory not found in listing.")
-            raise typer.Exit(code=1)
+        data = d_resp.json()
+        ratio = data["indexing_ratio"]  # between 0 and 1
 
-        did = directory["id"]
-        if output_format == "human":
-            typer.echo("Indexing in progress...")
+        # Update progress bar
+        pbar.n = int(ratio * 100)
+        pbar.refresh()
 
-        while True:
-            d_resp = requests.get(f"{api_url}/directory/{did}")
-            if d_resp.status_code != 200:
-                typer.echo("Error checking directory status.")
-                raise typer.Exit(code=1)
-
-            data = d_resp.json()
-            ratio = data["indexing_ratio"]
+        if ratio >= 1.0:
+            pbar.close()
             if output_format == "human":
-                typer.echo(f"Indexing ratio: {ratio * 100:.2f}%")
-            if ratio >= 1.0:
-                if output_format == "human":
-                    typer.echo("Indexing complete!")
-                else:
-                    print_output({"status": "Indexing complete", "directory_id": did}, output_format)
-                break
-            time.sleep(2)  # Polling interval
+                typer.echo("Indexing complete!")
+            else:
+                print_output({"status": "Indexing complete", "directory_id": did}, output_format)
+            break
+
+        # Estimate time remaining based on rate of progress
+        elapsed = time.time() - start_time
+        # If ratio > 0, we can try to estimate
+        if ratio > 0:
+            # Time per ratio unit
+            time_per_ratio = elapsed / ratio
+            remaining_ratio = 1.0 - ratio
+            eta = time_per_ratio * remaining_ratio
+        else:
+            # No progress yet, can't estimate
+            eta = 0.0
+
+        # Show ETA in the progress bar's postfix
+        pbar.set_postfix_str(f"ETA: {eta:.1f}s")
+
+        last_ratio = ratio
+        time.sleep(2)  # Polling interval
 
 
 @directory_app.command("remove")

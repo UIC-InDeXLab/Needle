@@ -110,8 +110,6 @@ services:
       - postgres
       - standalone
       - image-generator
-    volumes:
-      - /home/mahdi/Projects/Needle/ImageRetriever/resources:/resources
     environment:
       POSTGRES__USER: myuser
       POSTGRES__PASSWORD: mypassword

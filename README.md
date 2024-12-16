@@ -51,12 +51,12 @@ Needle is developed as part of the research presented in our paper:
 If you use Needle in your work, please cite our paper to support the project:
 
 ```bibtex  
-@article{needle2024,  
-  title={Needle: A Scalable Database for Multimodal Content Retrieval},  
-  author={Your Authors Here},  
-  journal={arXiv preprint arXiv:2412.00639},  
-  year={2024}  
-}  
+@article{erfanian2024needle,
+  title={Needle: A Generative-AI Powered Monte Carlo Method for Answering Complex Natural Language Queries on Multi-modal Data},
+  author={Erfanian, Mahdi and Dehghankar, Mohsen and Asudeh, Abolfazl},
+  journal={arXiv preprint arXiv:2412.00639},
+  year={2024}
+}
 ```  
 
 ---  

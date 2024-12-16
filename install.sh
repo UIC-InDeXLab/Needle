@@ -14,6 +14,7 @@ echo -e "${GREEN}Starting Needle Installation...${NC}"
 INSTALL_USER=${SUDO_USER:-$(whoami)}
 INSTALL_HOME=$(eval echo "~${INSTALL_USER}")
 NEEDLE_CONFIG_DIR="${INSTALL_HOME}/.needle"
+ENV_VAR="NEEDLE_DOCKER_COMPOSE_FILE"
 
 ### Step 1: Check Dependencies
 if ! command -v docker &> /dev/null; then
@@ -59,19 +60,12 @@ chmod -R u+rwX "${NEEDLE_CONFIG_DIR}"
 
 echo -e "${GREEN}docker-compose file stored at ${NEEDLE_CONFIG_DIR}/docker-compose.yaml.${NC}"
 
-### Step 4: Run docker-compose to start services (as the installing user)
-# Add the user to docker group if not already, so no sudo is required.
+### Step 4: Add user to docker group if not already
 if ! groups "${INSTALL_USER}" | grep -q "\bdocker\b"; then
     echo -e "${GREEN}Adding ${INSTALL_USER} to docker group...${NC}"
     sudo usermod -aG docker "${INSTALL_USER}"
     echo -e "${YELLOW}User added to docker group. Please log out and log back in or run 'newgrp docker' to apply.${NC}"
 fi
-
-# Use `sudo -u` to run docker compose as the INSTALL_USER if needed
-# Note: The user needs to re-login or `newgrp docker` first if they weren't already in docker group
-echo -e "${GREEN}Starting Needle stack with docker-compose...${NC}"
-sudo -u "${INSTALL_USER}" bash -c "docker compose -f \"${NEEDLE_CONFIG_DIR}/docker-compose.yaml\" up -d"
-echo -e "${GREEN}Needle services started.${NC}"
 
 ### Step 5: Download needlectl and make it accessible system-wide
 NEEDLECTL_URL="https://github.com/UIC-InDeXLab/Needle/releases/download/v0.1.0/needlectl"
@@ -83,19 +77,19 @@ sudo chmod +x "${NEEDLECTL_PATH}"
 
 echo -e "${GREEN}needlectl installed at ${NEEDLECTL_PATH}.${NC}"
 
-### Step 6: Set environment variable for docker-compose file
-ENV_FILE="/etc/environment"
-ENV_VAR="NEEDLE_DOCKER_COMPOSE_FILE"
-if grep -q "^${ENV_VAR}" "${ENV_FILE}" &>/dev/null; then
-    sudo sed -i "s|^${ENV_VAR}.*|${ENV_VAR}=${NEEDLE_CONFIG_DIR}/docker-compose.yaml|" "${ENV_FILE}"
-else
-    echo "${ENV_VAR}=${NEEDLE_CONFIG_DIR}/docker-compose.yaml" | sudo tee -a "${ENV_FILE}" > /dev/null
-fi
+### Step 6: Configure the environment variable in user's .bashrc
+BASHRC_FILE="${INSTALL_HOME}/.bashrc"
+LINE_TO_ADD="export ${ENV_VAR}=\"${NEEDLE_CONFIG_DIR}/docker-compose.yaml\""
 
-echo -e "${GREEN}Configured ${ENV_VAR} in ${ENV_FILE}.${NC}"
-echo -e "${GREEN}Reload your shell or source /etc/environment to ensure needlectl uses the correct docker-compose file.${NC}"
+if ! sudo -u "${INSTALL_USER}" grep -q "^export ${ENV_VAR}=" "${BASHRC_FILE}" 2>/dev/null; then
+    echo -e "${GREEN}Configuring ${ENV_VAR} in ${BASHRC_FILE}.${NC}"
+    sudo -u "${INSTALL_USER}" bash -c "echo '${LINE_TO_ADD}' >> '${BASHRC_FILE}'"
+else
+    echo -e "${YELLOW}${ENV_VAR} is already set in ${BASHRC_FILE}, skipping.${NC}"
+fi
 
 ### Step 7: Final message
 echo -e "${GREEN}Installation complete!${NC}"
 echo -e "${GREEN}You can now use 'needlectl' to manage the Needle environment.${NC}"
-echo -e "${YELLOW}If you were just added to the docker group, please log out and log in again or run 'newgrp docker'.${NC}"
+echo -e "${YELLOW}Run 'source ${BASHRC_FILE}' or open a new shell to ensure ${ENV_VAR} is set.${NC}"
+echo -e "${YELLOW}Then run 'needlectl service start' to start Needle services.${NC}"

@@ -39,6 +39,13 @@ app.add_middleware(
 )
 
 
+@app.get("/health")
+async def health_check():
+    # Perform any necessary health checks here, e.g. database ping.
+    # For now, simply return a successful response.
+    return {"status": "ok"}
+
+
 @app.post("/directory")
 async def add_directory(path: str = Body(..., embed=True)):
     try:

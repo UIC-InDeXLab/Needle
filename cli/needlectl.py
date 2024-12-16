@@ -122,6 +122,10 @@ def restart_containers():
     docker_compose_run("up", "-d")
 
 
+def restart_backend():
+    docker_compose_run("up", "-d", "backend")
+
+
 def start_containers():
     docker_compose_run("up", "-d")
 
@@ -160,12 +164,12 @@ def add_directory(
 
     update_docker_compose(abs_path)
 
-    typer.echo("Restarting containers...")
-    restart_containers()
+    typer.echo("Restarting backend container...")
+    restart_backend()
 
     typer.echo("Waiting for API to become available...")
-    if not wait_for_api(api_url):
-        typer.echo("API not available after restart.")
+    if not wait_for_api(api_url, timeout=120):
+        typer.echo("API not available after backend restart.")
         raise typer.Exit(code=1)
 
     resp = requests.post(f"{api_url}/directory", json={"path": str(abs_path)})
@@ -190,8 +194,8 @@ def add_directory(
     while True:
         d_resp = requests.get(f"{api_url}/directory/{did}")
         if d_resp.status_code != 200:
-            typer.echo("Error checking directory status.")
             pbar.close()
+            typer.echo("Error checking directory status.")
             raise typer.Exit(code=1)
 
         data = d_resp.json()
@@ -213,6 +217,8 @@ def add_directory(
             eta = (elapsed / ratio) * (1.0 - ratio)
         else:
             eta = 0.0
+
+        # Update ETA in the progress bar itself (no extra prints)
         pbar.set_postfix_str(f"ETA: {eta:.1f}s")
         time.sleep(2)
 
@@ -328,8 +334,11 @@ def search(ctx: typer.Context, prompt: str,
 
 @service_app.command("start")
 def service_start(ctx: typer.Context):
+    api_url = ctx.obj["api_url"]
+
     typer.echo("Starting Needle services...")
     start_containers()
+    wait_for_api(api_url + "/health", timeout=120)
     typer.echo("Services started.")
 
 
@@ -342,8 +351,10 @@ def service_stop(ctx: typer.Context):
 
 @service_app.command("restart")
 def service_restart(ctx: typer.Context):
+    api_url = ctx.obj["api_url"]
     typer.echo("Restarting Needle services...")
     restart_containers()
+    wait_for_api(api_url + "/health", timeout=120)
     typer.echo("Services restarted.")
 
 

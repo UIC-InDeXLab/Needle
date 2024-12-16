@@ -94,8 +94,6 @@ services:
             - capabilities: [ gpu ]
     environment:
       USE_CUDA: true
-    ports:
-      - "8001:8000"
 
   backend:
     image: merfanian/needle:v0.2.0
@@ -119,7 +117,9 @@ services:
       MILVUS__HOST: standalone
       MILVUS__PORT: 19530
       APP__USE_CUDA: true
-      ENGINES__SDXL_URL: "http://image-generator:8000"
+      GENERATORS__HOST: image-generator
+      GENERATORS__PORT: 8000
+
     ports:
       - "8000:8000"
     command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000" ]

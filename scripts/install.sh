@@ -46,10 +46,10 @@ fi
 
 ### Step 3: Download appropriate docker-compose file
 if [ "$HAS_GPU" = true ]; then
-    COMPOSE_URL="https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/docker-compose.gpu.yaml"
+    COMPOSE_URL="https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/docker/docker-compose.gpu.yaml"
     echo -e "${GREEN}Downloading GPU docker-compose configuration...${NC}"
 else
-    COMPOSE_URL="https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/docker-compose.cpu.yaml"
+    COMPOSE_URL="https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/docker/docker-compose.cpu.yaml"
     echo -e "${GREEN}Downloading CPU docker-compose configuration...${NC}"
 fi
 

@@ -21,7 +21,7 @@ Needle is an advanced system for Image retrieval, designed to empower researcher
 Installing Needle is quick and straightforward. Use the one-liner below:
 
 ```bash  
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install.sh | bash  
+curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install.sh | bash  
 ```  
 
 ### 🧹 Uninstallation
@@ -29,7 +29,7 @@ curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install.sh
 To uninstall Needle, run:
 
 ```bash  
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/uninstall.sh | bash  
+curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/uninstall.sh | bash  
 ```  
 
 ---

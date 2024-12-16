@@ -39,7 +39,6 @@ curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/uninstall.
 `needlectl` is the core command-line utility for interacting with Needle. It allows you to:
 - 🔎 Perform searches on multimedia datasets.
 - 🛠️ Add or update image datasets (directories) for retrieval.
-
 With `needlectl`, you can easily integrate Needle into your workflows for seamless and intuitive operation.
 More on `needlectl` in [here](https://github.com/UIC-InDeXLab/Needle/tree/main/cli)
 ---

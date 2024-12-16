@@ -10,7 +10,7 @@ import typer
 import yaml
 from tqdm import tqdm
 
-app = typer.Typer(help="CLI interface for the Needle")
+app = typer.Typer(help="command line interface for Needle")
 
 directory_app = typer.Typer(help="Manage directories.")
 search_app = typer.Typer(help="Perform searches.")
@@ -24,7 +24,7 @@ app.add_typer(service_app, name="service")
 @app.callback()
 def main(
         ctx: typer.Context,
-        api_url: str = typer.Option("http://127.0.0.1:8000", help="API URL of the backend FastAPI service."),
+        api_url: str = typer.Option("http://127.0.0.1:8000", help="API URL of the backend service."),
         output: str = typer.Option("human", help="Output format: human|json|yaml")
 ):
     ctx.obj = {
@@ -338,7 +338,7 @@ def service_start(ctx: typer.Context):
 
     typer.echo("Starting Needle services...")
     start_containers()
-    wait_for_api(api_url + "/health", timeout=120)
+    wait_for_api(api_url, timeout=120)
     typer.echo("Services started.")
 
 
@@ -354,7 +354,7 @@ def service_restart(ctx: typer.Context):
     api_url = ctx.obj["api_url"]
     typer.echo("Restarting Needle services...")
     restart_containers()
-    wait_for_api(api_url + "/health", timeout=120)
+    wait_for_api(api_url, timeout=120)
     typer.echo("Services restarted.")
 
 

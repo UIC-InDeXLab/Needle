@@ -5,7 +5,7 @@ python-dotenv
 pymilvus
 watchdog
 
-torch
+torch==2.5.1
 pillow
 requests
 transformers

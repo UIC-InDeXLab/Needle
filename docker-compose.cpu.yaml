@@ -90,7 +90,7 @@ services:
       USE_CUDA: true
 
   backend:
-    image: merfanian/needle:v0.2.0
+    image: merfanian/needle:v0.2.1
     container_name: needle
     depends_on:
       - postgres

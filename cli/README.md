@@ -111,12 +111,11 @@ Options:
 #### **`search run`**  
 Perform a search using a natural language prompt.  
 ```bash
-needlectl search run --prompt <query> [--n <int>] [--k <int>] [--image-size <int>] [--include-base-images]
+needlectl search run <query> [--n <int>] [--k <int>] [--image-size <int>] [--include-base-images]
 ```  
 Options:  
-- **`--prompt`**: The search query string.  
 - **`--n`**: Number of results to return (default: `20`).  
-- **`--k`**: Number of base (guide) images (default: `4`).  
+- **`--k`**: Number of base (guide) images to generate (default: `4`).  
 - **`--image-size`**: Size of the generated base images in pixels (default: `512`).  
 - **`--include-base-images`**: Include base images in the results.  
 

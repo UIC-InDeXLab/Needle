@@ -96,7 +96,7 @@ services:
       USE_CUDA: true
 
   backend:
-    image: merfanian/needle:v0.2.2
+    image: merfanian/needle:v0.3.0
     container_name: needle
     runtime: nvidia
     deploy:
@@ -119,7 +119,9 @@ services:
       APP__USE_CUDA: true
       GENERATORS__HOST: image-generator
       GENERATORS__PORT: 8000
-
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/.cache/torch:/app/.cache/torch
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/.cache/hf:/app/.cache/hf
     ports:
       - "8000:8000"
     command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000" ]

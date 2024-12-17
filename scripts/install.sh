@@ -16,9 +16,19 @@ INSTALL_HOME=$(eval echo "~${INSTALL_USER}")
 NEEDLE_CONFIG_DIR="${INSTALL_HOME}/.needle"
 ENV_VAR="NEEDLE_DOCKER_COMPOSE_FILE"
 
+# Detect OS
+OS_TYPE="${OSTYPE}"
+if [[ "$OS_TYPE" == "darwin"* ]]; then
+    # macOS typically uses zsh by default
+    SHELL_RC_FILE="${INSTALL_HOME}/.zshrc"
+    echo -e "${YELLOW}Detected macOS. Will configure environment variables in ${SHELL_RC_FILE}.${NC}"
+else
+    SHELL_RC_FILE="${INSTALL_HOME}/.bashrc"
+fi
+
 ### Step 1: Check Dependencies
 if ! command -v docker &> /dev/null; then
-    echo -e "${RED}Error: Docker not installed. Please install Docker and re-run.${NC}"
+    echo -e "${RED}Error: Docker not installed. Please install Docker (e.g., Docker Desktop) and re-run.${NC}"
     exit 1
 fi
 
@@ -30,18 +40,23 @@ fi
 
 echo -e "${GREEN}Docker and docker compose found.${NC}"
 
-### Step 2: Check for GPU availability
+### Step 2: Check for GPU availability (skip on macOS)
 HAS_GPU=false
-if command -v nvidia-smi &> /dev/null; then
-    echo -e "${GREEN}nvidia-smi found, checking Docker GPU access...${NC}"
-    if docker run --rm --gpus all nvidia/cuda:11.0.3-base-ubuntu20.04 nvidia-smi &> /dev/null; then
-        echo -e "${GREEN}Docker GPU support detected.${NC}"
-        HAS_GPU=true
-    else
-        echo -e "${YELLOW}GPU detected but Docker GPU access not possible. Falling back to CPU mode.${NC}"
-    fi
+if [[ "$OS_TYPE" == "darwin"* ]]; then
+    echo -e "${YELLOW}On macOS, GPU checks are skipped. Using CPU mode.${NC}"
+    HAS_GPU=false
 else
-    echo -e "${YELLOW}No GPU detected, using CPU mode.${NC}"
+    if command -v nvidia-smi &> /dev/null; then
+        echo -e "${GREEN}nvidia-smi found, checking Docker GPU access...${NC}"
+        if docker run --rm --gpus all nvidia/cuda:11.0.3-base-ubuntu20.04 nvidia-smi &> /dev/null; then
+            echo -e "${GREEN}Docker GPU support detected.${NC}"
+            HAS_GPU=true
+        else
+            echo -e "${YELLOW}GPU detected but Docker GPU access not possible. Falling back to CPU mode.${NC}"
+        fi
+    else
+        echo -e "${YELLOW}No GPU detected, using CPU mode.${NC}"
+    fi
 fi
 
 ### Step 3: Download appropriate docker-compose file
@@ -60,11 +75,15 @@ chmod -R u+rwX "${NEEDLE_CONFIG_DIR}"
 
 echo -e "${GREEN}docker-compose file stored at ${NEEDLE_CONFIG_DIR}/docker-compose.yaml.${NC}"
 
-### Step 4: Add user to docker group if not already
-if ! groups "${INSTALL_USER}" | grep -q "\bdocker\b"; then
-    echo -e "${GREEN}Adding ${INSTALL_USER} to docker group...${NC}"
-    sudo usermod -aG docker "${INSTALL_USER}"
-    echo -e "${YELLOW}User added to docker group. Please log out and log back in or run 'newgrp docker' to apply.${NC}"
+### Step 4: Add user to docker group if not already (Skip for macOS)
+if [[ "$OS_TYPE" == "darwin"* ]]; then
+    echo -e "${YELLOW}On macOS, Docker Desktop does not require adding the user to a 'docker' group.${NC}"
+else
+    if ! groups "${INSTALL_USER}" | grep -q "\bdocker\b"; then
+        echo -e "${GREEN}Adding ${INSTALL_USER} to docker group...${NC}"
+        sudo usermod -aG docker "${INSTALL_USER}"
+        echo -e "${YELLOW}User added to docker group. Please log out and log back in or run 'newgrp docker' to apply.${NC}"
+    fi
 fi
 
 ### Step 5: Download needlectl and make it accessible system-wide
@@ -77,19 +96,19 @@ sudo chmod +x "${NEEDLECTL_PATH}"
 
 echo -e "${GREEN}needlectl installed at ${NEEDLECTL_PATH}.${NC}"
 
-### Step 6: Configure the environment variable in user's .bashrc
-BASHRC_FILE="${INSTALL_HOME}/.bashrc"
+### Step 6: Configure the environment variable in user's shell file
 LINE_TO_ADD="export ${ENV_VAR}=\"${NEEDLE_CONFIG_DIR}/docker-compose.yaml\""
 
-if ! sudo -u "${INSTALL_USER}" grep -q "^export ${ENV_VAR}=" "${BASHRC_FILE}" 2>/dev/null; then
-    echo -e "${GREEN}Configuring ${ENV_VAR} in ${BASHRC_FILE}.${NC}"
-    sudo -u "${INSTALL_USER}" bash -c "echo '${LINE_TO_ADD}' >> '${BASHRC_FILE}'"
+if ! sudo -u "${INSTALL_USER}" grep -q "^export ${ENV_VAR}=" "${SHELL_RC_FILE}" 2>/dev/null; then
+    echo -e "${GREEN}Configuring ${ENV_VAR} in ${SHELL_RC_FILE}.${NC}"
+    sudo -u "${INSTALL_USER}" bash -c "echo '${LINE_TO_ADD}' >> '${SHELL_RC_FILE}'"
 else
-    echo -e "${YELLOW}${ENV_VAR} is already set in ${BASHRC_FILE}, skipping.${NC}"
+    echo -e "${YELLOW}${ENV_VAR} is already set in ${SHELL_RC_FILE}, skipping.${NC}"
 fi
 
 ### Step 7: Final message
 echo -e "${GREEN}Installation complete!${NC}"
 echo -e "${GREEN}You can now use 'needlectl' to manage the Needle environment.${NC}"
-echo -e "${YELLOW}Run 'source ${BASHRC_FILE}' or open a new shell to ensure ${ENV_VAR} is set.${NC}"
+echo -e "${YELLOW}Run 'source ${SHELL_RC_FILE}' or open a new shell to ensure ${ENV_VAR} is set.${NC}"
 echo -e "${YELLOW}Then run 'needlectl service start' to start Needle services.${NC}"
+echo -e "${YELLOW}On macOS, ensure Docker Desktop is running before using 'needlectl'.${NC}"

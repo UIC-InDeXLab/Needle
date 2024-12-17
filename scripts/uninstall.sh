@@ -13,7 +13,16 @@ INSTALL_HOME=$(eval echo "~${INSTALL_USER}")
 NEEDLE_CONFIG_DIR="${INSTALL_HOME}/.needle"
 NEEDLECTL_PATH="/usr/local/bin/needlectl"
 ENV_VAR="NEEDLE_DOCKER_COMPOSE_FILE"
-BASHRC_FILE="${INSTALL_HOME}/.bashrc"
+
+# Detect OS and choose the correct shell config file
+OS_TYPE="${OSTYPE}"
+if [[ "$OS_TYPE" == "darwin"* ]]; then
+    # macOS typically uses zsh by default
+    SHELL_RC_FILE="${INSTALL_HOME}/.zshrc"
+    echo -e "${YELLOW}Detected macOS. Will remove environment variables from ${SHELL_RC_FILE}.${NC}"
+else
+    SHELL_RC_FILE="${INSTALL_HOME}/.bashrc"
+fi
 
 ### Step 1: Identify docker-compose file
 COMPOSE_FILE_PATH="${NEEDLE_CONFIG_DIR}/docker-compose.yaml"
@@ -24,7 +33,6 @@ fi
 ### Step 2: Bring down Docker services and remove volumes
 if [ -f "${COMPOSE_FILE_PATH}" ]; then
     echo -e "${GREEN}Bringing down Needle services and removing volumes...${NC}"
-    # We'll run `docker compose down -v` to remove volumes created by the stack.
     docker compose -f "${COMPOSE_FILE_PATH}" down -v || true
 fi
 
@@ -36,15 +44,16 @@ else
     echo -e "${YELLOW}needlectl not found at ${NEEDLECTL_PATH}, skipping removal.${NC}"
 fi
 
-### Step 4: Remove environment variable from .bashrc
-if sudo -u "${INSTALL_USER}" grep -q "^export ${ENV_VAR}=" "${BASHRC_FILE}" 2>/dev/null; then
-    echo -e "${GREEN}Removing ${ENV_VAR} from ${BASHRC_FILE}...${NC}"
-    sudo -u "${INSTALL_USER}" sed -i "/^export ${ENV_VAR}=/d" "${BASHRC_FILE}"
+### Step 4: Remove environment variable from shell config file
+if sudo -u "${INSTALL_USER}" grep -q "^export ${ENV_VAR}=" "${SHELL_RC_FILE}" 2>/dev/null; then
+    echo -e "${GREEN}Removing ${ENV_VAR} from ${SHELL_RC_FILE}...${NC}"
+    # Use a backup-aware sed command for macOS (it requires a suffix for -i):
+    sudo -u "${INSTALL_USER}" sed -i.bak "/^export ${ENV_VAR}=/d" "${SHELL_RC_FILE}" && sudo -u "${INSTALL_USER}" rm -f "${SHELL_RC_FILE}.bak"
 else
-    echo -e "${YELLOW}${ENV_VAR} not set in ${BASHRC_FILE}, skipping.${NC}"
+    echo -e "${YELLOW}${ENV_VAR} not set in ${SHELL_RC_FILE}, skipping.${NC}"
 fi
 
-### Step 5: Remove ~/.needle directory with sudo (in case root-owned files exist)
+### Step 5: Remove ~/.needle directory
 if [ -d "${NEEDLE_CONFIG_DIR}" ]; then
     echo -e "${GREEN}Removing configuration directory ${NEEDLE_CONFIG_DIR}...${NC}"
     sudo rm -rf "${NEEDLE_CONFIG_DIR}"

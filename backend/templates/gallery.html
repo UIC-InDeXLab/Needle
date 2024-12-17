@@ -1,38 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
+    <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Gallery Results</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet"/>
 </head>
 <body>
-<div class="search-bar">
-    <input type="text" value="{{ query }}" readonly />
-    <button disabled>Search</button>
-</div>
+<div class="container">
+    <header class="header">
+        <h1>Needle Search Results</h1>
+        <div class="search-bar">
+            <input type="text" value="{{ query }}" readonly placeholder="Search query..."/>
+            <button disabled>Search</button>
+        </div>
+    </header>
 
-{% if results and results|length > 0 %}
-<div class="gallery">
-    {% for image_path in results %}
-    <div class="image-container">
-        <a href="{{ request.url_for('get_file') }}?file_path={{ image_path }}" target="_blank">
-            <img src="{{ request.url_for('get_file') }}?file_path={{ image_path }}" alt="Result Image"/>
-        </a>
-    </div>
-    {% endfor %}
-</div>
-{% else %}
-<div class="no-results">No results found.</div>
-{% endif %}
+    {% if results and results|length > 0 %}
+    <section class="gallery">
+        {% for image_path in results %}
+        <div class="image-container">
+            <a href="{{ request.url_for('get_file') }}?file_path={{ image_path }}" target="_blank">
+                <img src="{{ request.url_for('get_file') }}?file_path={{ image_path }}" alt="Result Image"/>
+            </a>
+        </div>
+        {% endfor %}
+    </section>
+    {% else %}
+    <div class="no-results">No results found. Try another search!</div>
+    {% endif %}
 
-<div class="pagination">
-    {% if has_prev %}
-    <a href="{{ request.url_for('gallery', qid=qid) }}?page={{ page - 1 }}">Previous</a>
-    {% endif %}
-    {% if has_next %}
-    <a href="{{ request.url_for('gallery', qid=qid) }}?page={{ page + 1 }}">Next</a>
-    {% endif %}
+    <footer class="pagination">
+        {% if has_prev %}
+        <a href="{{ request.url_for('gallery', qid=qid) }}?page={{ page - 1 }}" class="btn">Previous</a>
+        {% endif %}
+        {% if has_next %}
+        <a href="{{ request.url_for('gallery', qid=qid) }}?page={{ page + 1 }}" class="btn">Next</a>
+        {% endif %}
+    </footer>
 </div>
 
 <script src="/static/scripts.js"></script>

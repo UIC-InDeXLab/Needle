@@ -12,7 +12,10 @@ Needle is an advanced system for Image retrieval, designed to empower researcher
 ---
 
 ## 🎥 Demonstration
-*(Add a GIF or video here showcasing Needle in action!)*
+
+In this demonstration, we demonstrate Needle's effectiveness on complex natural language queries. In default configuration, Needle generates 4 base images (k = 4) with image size 512x512. 
+
+![Demo](media/demo.gif)
 
 ---
 

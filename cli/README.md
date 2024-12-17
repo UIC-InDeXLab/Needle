@@ -154,9 +154,9 @@ needlectl service restart
    needlectl directory add /path/to/images --show-progress
    ```  
 
-2. Perform a search query with 10 results and 256px images:  
+2. Perform a search query with 10 results and 2 1024x1024 pixel images:  
    ```bash
-   needlectl search run --prompt "sunset over mountains" --n 10 --image-size 256
+   needlectl search run "sunset over mountains" --n 10 --image-size 1024 --k 2
    ```  
 
 3. Restart Needle services:  

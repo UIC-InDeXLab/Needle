@@ -4,8 +4,10 @@ from contextlib import asynccontextmanager
 from typing import Dict, List
 
 import fastapi
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pymilvus import Collection
 
 from core import embedder_manager, image_generator, query_manager
@@ -37,6 +39,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
 
 @app.get("/health")
@@ -110,7 +115,8 @@ async def create_query(q: str = Body(..., embed=True)):
 @app.get("/search/{qid}")
 async def search(qid: int, n: int = 20, k: int = 1, image_size: int = 512,
                  generator_engines: List[str] = fastapi.Query(None),
-                 include_base_images: bool = False
+                 include_base_images: bool = False,
+                 request: Request = None
                  ):
     if generator_engines is None:
         generator_engines = [settings.generators.default_engine]
@@ -136,7 +142,8 @@ async def search(qid: int, n: int = 20, k: int = 1, image_size: int = 512,
         return {
             "results": [],
             "qid": qid,
-            "base_images": [pil_image_to_base64(image) for image in generated_images]
+            "base_images": [pil_image_to_base64(image) for image in generated_images],
+            "preview_url": str(request.url_for("gallery", qid=qid))
         }
 
     # Create an expression for Milvus search
@@ -179,8 +186,13 @@ async def search(qid: int, n: int = 20, k: int = 1, image_size: int = 512,
         k=n
     )
 
-    res = {"results": top_images,
-           "qid": qid}
+    query_object.final_results = top_images
+
+    res = {
+        "results": top_images,
+        "qid": qid,
+        "preview_url": str(request.url_for("gallery", qid=qid))
+    }
 
     if include_base_images:
         res["base_images"] = [pil_image_to_base64(image) for image in generated_images]
@@ -258,10 +270,20 @@ async def post_search_feedback(qid: int, feedback: Dict[str, str] = None, eta: f
         logger.info(f"{embedder_name}={weight}")
     return {"successful": True}
 
-# @app.get("/image/{filename}")
-# async def download_image(filename: str):
-#     file_path = os.path.join(Configuration.instance().resources_dir, filename)
-#     if os.path.exists(file_path):
-#         return FileResponse(file_path)
-#     else:
-#         raise HTTPException(status_code=404, detail="File not found")
+
+from fastapi.responses import FileResponse
+
+
+@app.get("/file", name="get_file")
+async def get_file(file_path: str):
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        return FileResponse(file_path, media_type="application/octet-stream", filename=os.path.basename(file_path))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving file: {str(e)}")
+
+
+from routes.gallery import router as gallery_router
+
+app.include_router(gallery_router)

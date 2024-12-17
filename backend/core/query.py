@@ -11,6 +11,7 @@ class Query:
         self._embedders_results = {}
         self._generated_images = []
         self._id = Query._generate_id()
+        self._final_results = []
 
     @classmethod
     def _generate_id(cls):
@@ -28,6 +29,14 @@ class Query:
     @property
     def generated_images(self):
         return self._generated_images
+
+    @property
+    def final_results(self):
+        return self._final_results
+
+    @final_results.setter
+    def final_results(self, final_results):
+        self._final_results = final_results
 
     @property
     def embedder_results(self):

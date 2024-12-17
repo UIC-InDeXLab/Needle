@@ -322,6 +322,7 @@ def search(ctx: typer.Context, prompt: str,
 
     if output_format == "human":
         typer.echo("Search results:")
+        typer.echo(f"Preview url: {results.get('preview_url')}")
         for img_id in results.get("results", []):
             typer.echo(f"- {img_id}")
         if include_base_images and "base_images" in results:

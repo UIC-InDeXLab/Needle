@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Gallery Results</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+<div class="search-bar">
+    <input type="text" value="{{ query }}" readonly />
+    <button disabled>Search</button>
+</div>
+
+{% if results and results|length > 0 %}
+<div class="gallery">
+    {% for image_path in results %}
+    <div class="image-container">
+        <a href="{{ request.url_for('get_file') }}?file_path={{ image_path }}" target="_blank">
+            <img src="{{ request.url_for('get_file') }}?file_path={{ image_path }}" alt="Result Image"/>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="no-results">No results found.</div>
+{% endif %}
+
+<div class="pagination">
+    {% if has_prev %}
+    <a href="{{ request.url_for('gallery', qid=qid) }}?page={{ page - 1 }}">Previous</a>
+    {% endif %}
+    {% if has_next %}
+    <a href="{{ request.url_for('gallery', qid=qid) }}?page={{ page + 1 }}">Next</a>
+    {% endif %}
+</div>
+
+<script src="/static/scripts.js"></script>
+</body>
+</html>

@@ -21,7 +21,7 @@ In this demonstration, we demonstrate Needle's effectiveness on complex natural 
 
 ## ⚙️ Installation
 
-Installing Needle is quick and straightforward. Use the one-liner below:
+Installing Needle is quick and straightforward. Make sure you have [Docker](https://www.docker.com/get-started/) and [Docker Compose](https://docs.docker.com/compose/) installed, then, use the one-liner below to install Needle:
 
 ```bash  
 curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install.sh | bash  

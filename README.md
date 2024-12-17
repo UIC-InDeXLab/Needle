@@ -22,7 +22,11 @@ Installing Needle is quick and straightforward. Use the one-liner below:
 
 ```bash  
 curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install.sh | bash  
-```  
+```
+Then, you can start needle service using this command: 
+```bash
+needlectl service start
+```
 
 ### 🧹 Uninstallation
 

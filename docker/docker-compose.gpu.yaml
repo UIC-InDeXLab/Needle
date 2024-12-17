@@ -96,7 +96,7 @@ services:
       USE_CUDA: true
 
   backend:
-    image: merfanian/needle:v0.2.1
+    image: merfanian/needle:v0.2.2
     container_name: needle
     runtime: nvidia
     deploy:

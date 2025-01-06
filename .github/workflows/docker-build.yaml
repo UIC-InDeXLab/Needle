@@ -20,29 +20,25 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
 
-      - name: Build Docker Image
+      - name: Build Docker Image (short SHA tag)
         run: |
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
           docker build \
             -f backend/Dockerfile \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/needle:${{ github.sha }} \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/needle:sha-${SHORT_SHA} \
             ./backend
 
-      - name: Tag Image with Short Commit SHA
+      - name: Tag as latest
         run: |
           SHORT_SHA="${{ github.sha }}"
           SHORT_SHA="${SHORT_SHA:0:7}"
-          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/needle:${{ github.sha }} \
-            ${{ secrets.DOCKERHUB_USERNAME }}/needle:${SHORT_SHA}
-
-      - name: Tag Image as Latest
-        run: |
-          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/needle:${{ github.sha }} \
+          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/needle:sha-${SHORT_SHA} \
             ${{ secrets.DOCKERHUB_USERNAME }}/needle:latest
 
-      - name: Push All Tags
+      - name: Push Both Tags
         run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/needle:${{ github.sha }}
           SHORT_SHA="${{ github.sha }}"
           SHORT_SHA="${SHORT_SHA:0:7}"
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/needle:${SHORT_SHA}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/needle:sha-${SHORT_SHA}
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/needle:latest

@@ -17,7 +17,7 @@ python3 -m venv build_env
 source build_env/bin/activate
 
 # Install dependencies and PyInstaller
-pip install typer tqdm requests pyyaml pyinstaller
+pip install -r requirements.txt
 
 # Assuming needlectl.py is in the current directory
 pyinstaller --onefile needlectl.py

@@ -284,6 +284,43 @@ async def get_file(file_path: str):
         raise HTTPException(status_code=500, detail=f"Error retrieving file: {str(e)}")
 
 
+@app.get("/generators")
+async def get_generators():
+    # Assume image_generator.list_engines() returns a list of available generator names
+    return {"generators": image_generator.list_engines()}
+
+
+@app.get("/generator/{name}")
+async def describe_generator(name: str):
+    # Assume image_generator.get_engine_details(name) returns details about a generator
+    details = image_generator.get_engine_details(name)
+    if not details:
+        raise HTTPException(status_code=404, detail="Generator not found")
+    return {"name": name, "details": details}
+
+
+# Search logs endpoint
+@app.get("/search/logs")
+async def get_search_logs():
+    # Assume query_manager.list_queries() returns [(qid, query_str), ...]
+    queries = query_manager.list_queries()
+    return {"queries": [{"qid": qid, "query": qstr} for qid, qstr in queries]}
+
+
+# Service status/log endpoints
+@app.get("/service/status")
+async def service_status():
+    # This could check docker or internal states. For now, return a dummy status.
+    return {"status": "running"}
+
+
+@app.get("/service/log")
+async def service_log():
+    # Return a simple log snippet or instructions
+    # Real implementation might tail docker logs or read from a log file.
+    return {"log": "Service log not implemented yet."}
+
+
 from routes.gallery import router as gallery_router
 
 app.include_router(gallery_router)

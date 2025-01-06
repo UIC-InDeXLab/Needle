@@ -41,9 +41,11 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag: latest
+          makeLatest: 'true'
           name: "needlectl"
           artifact: release/needlectl
+          replacesArtifacts: 'true'
+          allowUpdates: 'true'
 
       # Add an optional step to clean up
       - name: Clean up

@@ -72,8 +72,6 @@ services:
       POSTGRES_USER: myuser
       POSTGRES_PASSWORD: mypassword
       POSTGRES_DB: mydb
-    ports:
-      - "5433:5432"  # Host port 5433 mapped to container 5432
     volumes:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -96,7 +94,7 @@ services:
       USE_CUDA: true
 
   backend:
-    image: merfanian/needle:v0.3.0
+    image: merfanian/needle:latest
     container_name: needle
     runtime: nvidia
     deploy:
@@ -120,8 +118,7 @@ services:
       GENERATORS__HOST: image-generator
       GENERATORS__PORT: 8000
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/.cache/torch:/app/.cache/torch
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/.cache/hf:/app/.cache/hf
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/.cache/:/root/.cache
     ports:
       - "8000:8000"
     command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000" ]

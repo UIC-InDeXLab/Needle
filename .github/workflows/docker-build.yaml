@@ -24,25 +24,25 @@ jobs:
         run: |
           docker build \
             -f backend/Dockerfile \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:${{ github.sha }} \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/needle:${{ github.sha }} \
             ./backend
 
       - name: Tag Image with Short Commit SHA
         run: |
           SHORT_SHA="${{ github.sha }}"
           SHORT_SHA="${SHORT_SHA:0:7}"
-          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:${{ github.sha }} \
+          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/needle:${{ github.sha }} \
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:${SHORT_SHA}
 
       - name: Tag Image as Latest
         run: |
-          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:${{ github.sha }} \
+          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/needle:${{ github.sha }} \
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:latest
 
       - name: Push All Tags
         run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:${{ github.sha }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/needle:${{ github.sha }}
           SHORT_SHA="${{ github.sha }}"
           SHORT_SHA="${SHORT_SHA:0:7}"
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:${SHORT_SHA}
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/needle:${SHORT_SHA}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/needle:latest

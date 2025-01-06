@@ -32,12 +32,12 @@ jobs:
           SHORT_SHA="${{ github.sha }}"
           SHORT_SHA="${SHORT_SHA:0:7}"
           docker tag ${{ secrets.DOCKERHUB_USERNAME }}/needle:${{ github.sha }} \
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:${SHORT_SHA}
+            ${{ secrets.DOCKERHUB_USERNAME }}/needle:${SHORT_SHA}
 
       - name: Tag Image as Latest
         run: |
           docker tag ${{ secrets.DOCKERHUB_USERNAME }}/needle:${{ github.sha }} \
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_REPO }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/needle:latest
 
       - name: Push All Tags
         run: |

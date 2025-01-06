@@ -1,19 +1,24 @@
 FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
 
-WORKDIR /app
-
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-ENV TORCH_HOME=/app/.cache/torch/hub
-ENV HF_HOME=/app/.cache/hf
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TORCH_HOME=/root/.cache/torch
+ENV HF_HOME=/root/.cache/huggingface
+ENV TRANSFORMERS_CACHE=$HF_HOME
 
-COPY requirements.txt ./
 
-RUN pip install --no-cache-dir -r requirements.txt
+WORKDIR /app
 
-COPY . .
+COPY requirements.txt /app/
+
+
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+
+COPY . /app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host=0.0.0.0", "--port=8000"]

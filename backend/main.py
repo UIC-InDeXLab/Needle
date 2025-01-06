@@ -1,21 +1,20 @@
 import os
-from collections import defaultdict
 from contextlib import asynccontextmanager
-from typing import Dict, List
+from typing import List
 
 import fastapi
 from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import FileResponse
 from pymilvus import Collection
 
 from core import embedder_manager, image_generator, query_manager
-from core.embedders import ImageEmbedder
 from core.query import Query
 from database import SessionLocal, Directory, Image
 from initialize import initialize
-from monitoring import directory_watcher, logger
+from monitoring import directory_watcher
 from settings import settings
 from utils import aggregate_rankings, pil_image_to_base64
 
@@ -46,9 +45,8 @@ templates = Jinja2Templates(directory="templates")
 
 @app.get("/health")
 async def health_check():
-    # Perform any necessary health checks here, e.g. database ping.
-    # For now, simply return a successful response.
-    return {"status": "ok"}
+    # TODO: Perform any necessary health checks here, e.g. database ping.
+    return {"status": "running"}
 
 
 @app.post("/directory")
@@ -200,78 +198,7 @@ async def search(qid: int, n: int = 20, k: int = 1, image_size: int = 512,
     return res
 
 
-# @app.websocket("/feedback/{qid}")
-# async def guide_image_feedback(websocket: WebSocket, qid: int):
-#     await websocket.accept()
-#
-#     try:
-#         data = await websocket.receive_json()
-#         query_obj = query_manager.get_query(qid)
-#         k = data.get("k", 4)
-#         image_size = data.get("image_size", 512)
-#         generator_engine = data.get("generator_engine", "runwayml")
-#         logger.info(f"k={k} image_size={image_size} generator_engine={generator_engine}")
-#         active_engine = engine_manager.get_engine_by_name(generator_engine)
-#
-#         if not query_obj.generated_images:
-#             generated_images = active_engine.generate(prompt=query_obj.query.strip(), image_size=image_size, k=k)
-#         else:
-#             generated_images = query_obj.generated_images
-#
-#         base64_images = [base64.b64encode(image).decode('utf-8') for image in generated_images]
-#
-#         await websocket.send_json({"generated_images": base64_images})
-#         rejected_count = 1
-#
-#         while rejected_count > 0:
-#             feedback = await websocket.receive_json()
-#             approved_images = feedback.get("approved", [])
-#             query_obj.generated_images.extend([base64.b64decode(base64_image) for base64_image in approved_images])
-#
-#             rejected_count = len(feedback.get("rejected", []))
-#
-#             if rejected_count > 0:
-#                 regenerated_images = active_engine.generate(prompt=query_obj.query.strip(), image_size=image_size,
-#                                                             k=rejected_count)
-#                 base64_regenerated_images = [base64.b64encode(image).decode('utf-8') for image in regenerated_images]
-#                 await websocket.send_json({"regenerated_images": base64_regenerated_images})
-#             else:
-#                 break
-#
-#         await websocket.send_json({"status": "all_approved"})
-#
-#     except WebSocketDisconnect:
-#         await websocket.close()
 
-
-@app.post("/search/{qid}/")
-async def post_search_feedback(qid: int, feedback: Dict[str, str] = None, eta: float = 0.05):
-    embedders = embedder_manager.get_image_embedders()
-    q: Query = query_manager.get_query(qid)
-
-    losses = defaultdict(float)
-    new_weights = []
-
-    for embedder_name, embedder in embedders.items():
-        embedder: ImageEmbedder
-        for j, result in enumerate(q.get_embedder_result_by_name(embedder_name)):
-            if result in feedback:
-                if str(feedback[result]).strip().lower() not in ['true', 't', '1']:
-                    losses[embedder_name] += 1 / (j + 1)
-
-        new_weights.append((embedder_name, embedder.weight * (1.0 - eta * losses.get(embedder_name, 0.0))))
-
-    weight_sum = sum([w for n, w in new_weights])
-    new_weights = [(n, w / weight_sum) for n, w in new_weights]
-
-    for embedder_name, weight in new_weights:
-        embedder: ImageEmbedder = embedder_manager.get_image_embedder_by_name(embedder_name)
-        embedder.weight = weight
-        logger.info(f"{embedder_name}={weight}")
-    return {"successful": True}
-
-
-from fastapi.responses import FileResponse
 
 
 @app.get("/file", name="get_file")
@@ -287,7 +214,7 @@ async def get_file(file_path: str):
 @app.get("/generators")
 async def get_generators():
     # Assume image_generator.list_engines() returns a list of available generator names
-    return {"generators": image_generator.list_engines()}
+    return {"generators": image_generator.get_available_engines()}
 
 
 @app.get("/generator/{name}")

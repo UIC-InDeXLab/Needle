@@ -29,6 +29,9 @@ class DockerComposeManager:
         self._docker_compose_run("down")
         self._docker_compose_run("up", "-d")
 
+    def log_services(self, service_name):
+        self._docker_compose_run("logs", service_name)
+
     def add_volume(self, service_name, volume_path):
         """
         Adds a volume to a specific service in the docker-compose file.

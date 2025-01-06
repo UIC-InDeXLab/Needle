@@ -47,9 +47,10 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ env.hash }}
-          name: "needlectl (${env.hash})"
+          name: "needlectl"
           artifacts: release/needlectl
           replacesArtifacts: 'true'
+          allowUpdates: 'true'
 
       # Add the "latest" tag to the same release
       - name: Create or Update "latest" Tag

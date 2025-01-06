@@ -50,10 +50,9 @@ jobs:
           name: "needlectl"
           artifacts: release/needlectl
           replacesArtifacts: 'true'
-          allowUpdates: 'true'
 
-      # Add the "latest" tag to the same release
-      - name: Create or Update "latest" Tag
+      # Add or update the "latest" tag to point to this release
+      - name: Add or Update "latest" Tag
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"

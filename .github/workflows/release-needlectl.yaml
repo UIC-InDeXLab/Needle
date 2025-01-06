@@ -16,6 +16,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # Get the commit hash
+      - name: Get commit hash
+        id: get_commit_hash
+        run: echo "hash=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
       # Set up Python environment
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -35,17 +40,24 @@ jobs:
           mkdir -p release
           mv needlectl/dist/needlectl release/
 
-      # Upload the binary as a GitHub release
-      - name: Create GitHub Release
-        id: create_release
+      # Create the release with commit hash as the tag
+      - name: Create Release with Commit Hash
+        id: create_release_commit_hash
         uses: ncipollo/release-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          makeLatest: 'true'
-          name: "needlectl"
-          artifact: release/needlectl
+          tag: ${{ env.hash }}
+          name: "needlectl (${env.hash})"
+          artifacts: release/needlectl
           replacesArtifacts: 'true'
-          allowUpdates: 'true'
+
+      # Add the "latest" tag to the same release
+      - name: Create or Update "latest" Tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag -f latest
+          git push origin --tags --force
 
       # Add an optional step to clean up
       - name: Clean up

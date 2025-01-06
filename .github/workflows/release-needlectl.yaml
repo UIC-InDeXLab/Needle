@@ -42,8 +42,8 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: latest
-          releaseName: "needlectl latest"
-          assets: release/needlectl
+          name: "needlectl latest"
+          artifact: release/needlectl
 
       # Add an optional step to clean up
       - name: Clean up

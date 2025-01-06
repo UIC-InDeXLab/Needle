@@ -1,0 +1,51 @@
+name: Build and Release needlectl
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - needlectl/**
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      # Install dependencies and build needlectl
+      - name: Build needlectl
+        run: |
+          cd needlectl
+          chmod +x build.sh
+          ./build.sh
+
+      # Archive the binary
+      - name: Archive the binary
+        run: |
+          mkdir -p release
+          mv needlectl/dist/needlectl release/
+
+      # Upload the binary as a GitHub release
+      - name: Create GitHub Release
+        id: create_release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: latest
+          releaseName: "needlectl latest"
+          assets: release/needlectl
+
+      # Add an optional step to clean up
+      - name: Clean up
+        run: |
+          rm -rf needlectl/dist needlectl/build needlectl/build_env release

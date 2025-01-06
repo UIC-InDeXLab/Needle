@@ -87,7 +87,7 @@ else
 fi
 
 ### Step 5: Download needlectl and make it accessible system-wide
-NEEDLECTL_URL="https://github.com/UIC-InDeXLab/Needle/releases/download/v0.1.0/needlectl"
+NEEDLECTL_URL="https://github.com/UIC-InDeXLab/Needle/releases/download/latest/needlectl"
 NEEDLECTL_PATH="/usr/local/bin/needlectl"
 
 echo -e "${GREEN}Downloading needlectl tool...${NC}"

@@ -1,4 +1,5 @@
 import logging
+import os
 
 from .settings_model import Settings
 
@@ -50,15 +51,12 @@ class ReadOnlySettings:
         return self._settings.json_config
 
     @property
-    def embedders(self):
-        return {
-            "image_embedders": [embedder.model_dump() for embedder in self.json_config.image_embedders],
-            "text_embedders": [embedder.model_dump() for embedder in self.json_config.text_embedders],
-        }
+    def image_embedders(self):
+        return self.json_config.image_embedders
 
     @property
-    def weights_path(self):
-        return self.json_config.weights_path
+    def weights_path(self) :
+        return os.path.join(self._settings.app.embedders_config_dir_path, "weights.json")
 
 
     def get_image_embedder_details(self, name: str):

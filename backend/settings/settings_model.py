@@ -12,7 +12,6 @@ class ImageEmbedder(BaseModel):
 
 
 class JSONConfig(BaseModel):
-    weights_path: str
     image_embedders: List[ImageEmbedder]
 
 
@@ -38,7 +37,7 @@ class MilvusSettings(BaseModel):
 
 
 class AppSettings(BaseModel):
-    embedders_config_path: str = Field("config.json")
+    embedders_config_dir_path: str = Field("./configs/balanced/")
     use_cuda: bool = Field(False)
     recursive_indexing: bool = Field(False)
     batch_size: int = Field(100)
@@ -79,7 +78,7 @@ class Settings(BaseSettings):
         """
         Load and parse the JSON configuration file specified in app.config_path.
         """
-        config_path = Path(self.app.embedders_config_path)
+        config_path = Path(self.app.embedders_config_dir_path, "config.json")
         if config_path.exists():
             with open(config_path, "r") as file:
                 json_data = json.load(file)

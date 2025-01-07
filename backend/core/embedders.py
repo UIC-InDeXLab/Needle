@@ -1,6 +1,5 @@
 import json
 import os
-from abc import ABC, abstractmethod
 
 import torch
 from timm import create_model, data
@@ -9,31 +8,34 @@ from core.singleton import Singleton
 from settings import settings
 
 
-class ImageEmbedder(ABC):
-    def __init__(self, device=torch.device("cpu")):
-        self.model = create_model(self.model_name, pretrained=True, num_classes=0).to(device)
+class ImageEmbedder:
+    def __init__(self, name, model_name, device=torch.device("cpu")):
+        self._name = name
+        self._model_name = model_name
+        self._device = device
+
+        self.model = create_model(model_name, pretrained=True, num_classes=0).to(device)
         self.model.eval()
-        self.device = device
+
         self.preprocess = self.get_preprocess()
         self._weight = 1.0
         self._embedding_dim = self._determine_embedding_dim()
-
-    @property
-    @abstractmethod
-    def name(self):
-        pass
 
     def get_preprocess(self):
         data_config = data.resolve_model_data_config(self.model)
         return data.create_transform(**data_config, is_training=False)
 
     @property
-    def model_name(self) -> str:
-        return settings.get_image_embedder_details(self.name)["model_name"]
+    def name(self) -> str:
+        return self._name
 
     @property
-    def path(self) -> str:
-        return settings.get_image_embedder_details(self.name)["path"].format(dataset=settings.dataset)
+    def model_name(self) -> str:
+        return self._model_name
+
+    @property
+    def device(self) -> torch.device:
+        return self._device
 
     def embed(self, img_binary):
         img_binary = self.preprocess(img_binary)
@@ -63,44 +65,16 @@ class ImageEmbedder(ABC):
         self._weight = value
 
 
-class SwinTransformerEmbedder(ImageEmbedder):
-    @property
-    def name(self):
-        return "swin_transformer"
-
-
-class RegNetEmbedder(ImageEmbedder):
-    @property
-    def name(self):
-        return "regnet"
-
-
-class VitEmbedder(ImageEmbedder):
-
-    @property
-    def name(self):
-        return "vit"
-
-
-class EvaEmbedder(ImageEmbedder):
-    @property
-    def name(self):
-        return "eva"
-
-
-_SUPPORTED_IMAGE_EMBEDDERS = [SwinTransformerEmbedder, RegNetEmbedder, VitEmbedder, EvaEmbedder]
-
-
 @Singleton
 class EmbedderManager:
     def __init__(self):
-        self._image_embedder_classes = _SUPPORTED_IMAGE_EMBEDDERS
         self._device = torch.device(
             "cuda" if torch.cuda.is_available() and settings.app.use_cuda else "cpu")
         self._image_embedders = {}
-        for e in self._image_embedder_classes:
-            embedder = e(device=self._device)
-            self._image_embedders[embedder.name] = embedder
+        for embedder_config in settings.image_embedders:
+            self._image_embedders[embedder_config.name] = ImageEmbedder(name=embedder_config.name,
+                                                                        model_name=embedder_config.model_name,
+                                                                        device=self._device)
 
         self._init_embedders_weights()
 

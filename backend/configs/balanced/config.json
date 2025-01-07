@@ -1,5 +1,4 @@
 {
-  "weights_path": "./weights.json",
   "image_embedders": [
     {
       "name": "swin_transformer",

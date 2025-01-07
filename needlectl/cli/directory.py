@@ -24,11 +24,11 @@ def add_directory(
     output_format = ctx.obj["output"]
     abs_path = os.path.abspath(path)
 
-    manager = DockerComposeManager()
-    manager.add_volume(service_name="backend", volume_path=abs_path)
-
-    typer.echo("Restarting backend container...")
-    manager.start_containers()
+    # manager = DockerComposeManager()
+    # manager.add_volume(service_name="backend", volume_path=abs_path)
+    #
+    # typer.echo("Restarting backend container...")
+    # manager.start_containers()
 
     client = BackendClient(api_url)
 

@@ -119,6 +119,7 @@ services:
       GENERATORS__PORT: 8000
     volumes:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/.cache/:/root/.cache
+      - ${HOME}:${HOME}:ro
     ports:
       - "8000:8000"
     command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000" ]

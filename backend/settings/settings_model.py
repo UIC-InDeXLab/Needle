@@ -9,9 +9,10 @@ from pydantic_settings import BaseSettings
 class ImageEmbedder(BaseModel):
     name: str
     model_name: str
+    weight: float
 
 
-class JSONConfig(BaseModel):
+class EmbeddersConfig(BaseModel):
     image_embedders: List[ImageEmbedder]
 
 
@@ -37,9 +38,9 @@ class MilvusSettings(BaseModel):
 
 
 class QuerySettings(BaseModel):
-    default_num_images_to_retrieve: int = Field(20)
-    default_num_images_to_generate: int = Field(4)
-    default_generated_image_size: int = Field(512)
+    num_images_to_retrieve: int = Field(20)
+    num_images_to_generate: int = Field(4)
+    generated_image_size: int = Field(512)
     include_base_images_in_preview: bool = Field(False)
 
 
@@ -51,7 +52,7 @@ class DirectorySettings(BaseModel):
 
 
 class ServiceSettings(BaseModel):
-    embedders_config_dir_path: str = Field("./configs/balanced/")
+    config_dir_path: str = Field()
     use_cuda: bool = Field(False)
 
 
@@ -74,20 +75,20 @@ class Settings(BaseSettings):
     query: QuerySettings = QuerySettings()
 
     # JSON config
-    json_config: Optional[JSONConfig] = None
+    embedders_config: Optional[EmbeddersConfig] = None
 
     class Config:
         env_file = ".env"
         env_nested_delimiter = "__"
 
-    def load_json_config(self):
+    def load_embedders_config(self):
         """
         Load and parse the JSON configuration file specified in app.config_path.
         """
-        config_path = Path(self.service.embedders_config_dir_path, "config.json")
+        config_path = Path(self.service.config_dir_path, "embedders.json")
         if config_path.exists():
             with open(config_path, "r") as file:
                 json_data = json.load(file)
-            self.json_config = JSONConfig(**json_data)
+            self.embedders_config = EmbeddersConfig(**json_data)
         else:
             raise FileNotFoundError(f"JSON config file not found at {config_path}")

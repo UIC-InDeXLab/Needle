@@ -114,9 +114,14 @@ services:
       POSTGRES__PORT: 5432
       MILVUS__HOST: standalone
       MILVUS__PORT: 19530
-      APP__USE_CUDA: true
+      SERVICE__USE_CUDA: true
+      SERVICE__EMBEDDERS_CONFIG_DIR_PATH: ${NEEDLE_HOME:-.}/configs/
       GENERATORS__HOST: image-generator
       GENERATORS__PORT: 8000
+    env_file:
+      - ${NEEDLE_HOME:-.}/configs/directory.env
+      - ${NEEDLE_HOME:-.}/configs/query.env
+      - ${NEEDLE_HOME:-.}/configs/service.env
     volumes:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/.cache/:/root/.cache
       - ${HOME}:${HOME}:ro

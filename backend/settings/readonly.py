@@ -1,5 +1,4 @@
 import logging
-import os
 
 from .settings_model import Settings
 
@@ -14,7 +13,7 @@ class ReadOnlySettings:
         if not cls._instance:
             cls._instance = super().__new__(cls)
             cls._instance._settings = Settings()
-            cls._instance._settings.load_json_config()
+            cls._instance._settings.load_embedders_config()
             cls._log_settings()
         return cls._instance
 
@@ -27,8 +26,8 @@ class ReadOnlySettings:
         logger.info(f"Directory Settings: {cls._instance._settings.directory}")
         logger.info(f"Query Settings: {cls._instance._settings.query}")
         logger.info(f"Generators Settings: {cls._instance._settings.generators}")
-        if cls._instance._settings.json_config:
-            logger.info(f"JSON Config: {cls._instance._settings.json_config.dict()}")
+        if cls._instance._settings.embedders_config:
+            logger.info(f"Embedders Config: {cls._instance._settings.embedders_config.dict()}")
 
     @property
     def postgres(self):
@@ -55,22 +54,13 @@ class ReadOnlySettings:
         return self._settings.generators
 
     @property
-    def json_config(self):
-        if not self._settings.json_config:
-            raise RuntimeError("JSON configuration is not loaded.")
-        return self._settings.json_config
-
-    @property
     def image_embedders(self):
-        return self.json_config.image_embedders
-
-    @property
-    def weights_path(self):
-        return os.path.join(self._settings.service.embedders_config_dir_path, "weights.json")
+        return self._settings.embedders_config.image_embedders
 
     def get_image_embedder_details(self, name: str):
         embedder = next(
-            (e for e in self.json_config.image_embedders if e.name.strip().lower() == name.strip().lower()),
+            (e for e in self._settings.embedders_config.image_embedders if
+             e.name.strip().lower() == name.strip().lower()),
             None
         )
         if not embedder:

@@ -26,7 +26,6 @@ async def lifespan(app: FastAPI):
     initialize()
     yield
     directory_watcher.finalize()
-    embedder_manager.finalize()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -111,9 +110,9 @@ async def create_query(q: str = Body(..., embed=True)):
 
 
 @app.get("/search/{qid}")
-async def search(qid: int, n: int = settings.query.default_num_images_to_retrieve,
-                 k: int = settings.query.default_num_images_to_generate,
-                 image_size: int = settings.query.default_generated_image_size,
+async def search(qid: int, n: int = settings.query.num_images_to_retrieve,
+                 k: int = settings.query.num_images_to_generate,
+                 image_size: int = settings.query.generated_image_size,
                  include_base_images_in_preview: bool = settings.query.include_base_images_in_preview,
                  generator_engines: List[str] = fastapi.Query(None),
                  request: Request = None

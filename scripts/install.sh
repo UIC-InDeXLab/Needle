@@ -13,8 +13,7 @@ echo -e "${GREEN}Starting Needle Installation...${NC}"
 # Identify the user to install for (the one who invoked sudo)
 INSTALL_USER=${SUDO_USER:-$(whoami)}
 INSTALL_HOME=$(eval echo "~${INSTALL_USER}")
-NEEDLE_CONFIG_DIR="${INSTALL_HOME}/.needle"
-ENV_VAR="NEEDLE_DOCKER_COMPOSE_FILE"
+NEEDLE_HOME_DIR="${INSTALL_HOME}/.needle"
 
 # Detect OS
 OS_TYPE="${OSTYPE}"
@@ -59,7 +58,36 @@ else
     fi
 fi
 
-### Step 3: Download appropriate docker-compose file
+### Step 3: Select Database Mode
+echo -e "${GREEN}Please select your preferred database mode:${NC}"
+echo "1) Fast     - Focuses on low latency and fast indexing"
+echo "2) Balanced - Balance between speed and accuracy"
+echo "3) Accurate - Focuses on higher query retrieval accuracy"
+
+while true; do
+    read -p "Enter your choice (1-3): " mode_choice
+    case $mode_choice in
+        1)
+            MODE="fast"
+            break
+            ;;
+        2)
+            MODE="balanced"
+            break
+            ;;
+        3)
+            MODE="accurate"
+            break
+            ;;
+        *)
+            echo -e "${RED}Invalid choice. Please enter 1, 2, or 3.${NC}"
+            ;;
+    esac
+done
+
+echo -e "${GREEN}Selected ${MODE} mode.${NC}"
+
+### Step 4: Download appropriate docker-compose file and configs
 if [ "$HAS_GPU" = true ]; then
     COMPOSE_URL="https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/docker/docker-compose.gpu.yaml"
     echo -e "${GREEN}Downloading GPU docker-compose configuration...${NC}"
@@ -68,14 +96,29 @@ else
     echo -e "${GREEN}Downloading CPU docker-compose configuration...${NC}"
 fi
 
-mkdir -p "${NEEDLE_CONFIG_DIR}"
-curl -fSL "${COMPOSE_URL}" -o "${NEEDLE_CONFIG_DIR}/docker-compose.yaml"
-chown -R "${INSTALL_USER}:${INSTALL_USER}" "${NEEDLE_CONFIG_DIR}"
-chmod -R u+rwX "${NEEDLE_CONFIG_DIR}"
+# Create necessary directories
+mkdir -p "${NEEDLE_HOME_DIR}/configs"
 
-echo -e "${GREEN}docker-compose file stored at ${NEEDLE_CONFIG_DIR}/docker-compose.yaml.${NC}"
+# Download docker-compose file
+curl -fSL "${COMPOSE_URL}" -o "${NEEDLE_HOME_DIR}/docker-compose.yaml"
 
-### Step 4: Add user to docker group if not already (Skip for macOS)
+# Download configuration files for selected mode
+echo -e "${GREEN}Downloading configuration files for ${MODE} mode...${NC}"
+CONFIG_BASE_URL="https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/configs/${MODE}"
+CONFIG_FILES=("service.env" "directory.env" "query.env", "embedders.json")
+
+for config_file in "${CONFIG_FILES[@]}"; do
+    echo -e "${GREEN}Downloading ${config_file}...${NC}"
+    curl -fSL "${CONFIG_BASE_URL}/${config_file}" -o "${NEEDLE_HOME_DIR}/configs/${config_file}"
+done
+
+# Set proper permissions
+chown -R "${INSTALL_USER}:${INSTALL_USER}" "${NEEDLE_HOME_DIR}"
+chmod -R u+rwX "${NEEDLE_HOME_DIR}"
+
+echo -e "${GREEN}Configuration files stored in ${NEEDLE_HOME_DIR}/configs${NC}"
+
+### Step 5: Add user to docker group if not already (Skip for macOS)
 if [[ "$OS_TYPE" == "darwin"* ]]; then
     echo -e "${YELLOW}On macOS, Docker Desktop does not require adding the user to a 'docker' group.${NC}"
 else
@@ -86,7 +129,7 @@ else
     fi
 fi
 
-### Step 5: Download needlectl and make it accessible system-wide
+### Step 6: Download needlectl and make it accessible system-wide
 NEEDLECTL_URL="https://github.com/UIC-InDeXLab/Needle/releases/download/latest/needlectl"
 NEEDLECTL_PATH="/usr/local/bin/needlectl"
 
@@ -96,19 +139,19 @@ sudo chmod +x "${NEEDLECTL_PATH}"
 
 echo -e "${GREEN}needlectl installed at ${NEEDLECTL_PATH}.${NC}"
 
-### Step 6: Configure the environment variable in user's shell file
-LINE_TO_ADD="export ${ENV_VAR}=\"${NEEDLE_CONFIG_DIR}/docker-compose.yaml\""
+### Step 7: Configure NEEDLE_HOME in user's shell file
+NEEDLE_HOME_VAR="export NEEDLE_HOME=\"${NEEDLE_HOME_DIR}\""
 
-if ! sudo -u "${INSTALL_USER}" grep -q "^export ${ENV_VAR}=" "${SHELL_RC_FILE}" 2>/dev/null; then
-    echo -e "${GREEN}Configuring ${ENV_VAR} in ${SHELL_RC_FILE}.${NC}"
-    sudo -u "${INSTALL_USER}" bash -c "echo '${LINE_TO_ADD}' >> '${SHELL_RC_FILE}'"
-else
-    echo -e "${YELLOW}${ENV_VAR} is already set in ${SHELL_RC_FILE}, skipping.${NC}"
+if ! sudo -u "${INSTALL_USER}" grep -q "^export NEEDLE_HOME=" "${SHELL_RC_FILE}" 2>/dev/null; then
+    echo -e "${GREEN}Configuring NEEDLE_HOME in ${SHELL_RC_FILE}.${NC}"
+    sudo -u "${INSTALL_USER}" bash -c "echo '${NEEDLE_HOME_VAR}' >> '${SHELL_RC_FILE}'"
 fi
 
-### Step 7: Final message
+### Step 8: Final message
 echo -e "${GREEN}Installation complete!${NC}"
 echo -e "${GREEN}You can now use 'needlectl' to manage the Needle environment.${NC}"
-echo -e "${YELLOW}Run 'source ${SHELL_RC_FILE}' or open a new shell to ensure ${ENV_VAR} is set.${NC}"
+echo -e "${YELLOW}Selected mode: ${MODE}${NC}"
+echo -e "${YELLOW}NEEDLE_HOME has been set to: ${NEEDLE_HOME_DIR}${NC}"
+echo -e "${YELLOW}Run 'source ${SHELL_RC_FILE}' or open a new shell to ensure NEEDLE_HOME is set.${NC}"
 echo -e "${YELLOW}Then run 'needlectl service start' to start Needle services.${NC}"
 echo -e "${YELLOW}On macOS, ensure Docker Desktop is running before using 'needlectl'.${NC}"

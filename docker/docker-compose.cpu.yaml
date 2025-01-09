@@ -10,7 +10,7 @@ services:
       - ETCD_QUOTA_BACKEND_BYTES=4294967296
       - ETCD_SNAPSHOT_COUNT=50000
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/etcd:/etcd
+      - ${NEEDLE_HOME:-.}/volumes/etcd:/etcd
     command: >
       etcd
       -advertise-client-urls=http://127.0.0.1:2379
@@ -32,7 +32,7 @@ services:
       - "9001:9001"
       - "9000:9000"
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/minio:/minio_data
+      - ${NEEDLE_HOME:-.}/volumes/minio:/minio_data
     command: minio server /minio_data --console-address ":9001"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
@@ -51,7 +51,7 @@ services:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/milvus:/var/lib/milvus
+      - ${NEEDLE_HOME:-.}/volumes/milvus:/var/lib/milvus
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:9091/healthz" ]
       interval: 30s
@@ -73,7 +73,7 @@ services:
       POSTGRES_PASSWORD: mypassword
       POSTGRES_DB: mydb
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/postgres_data:/var/lib/postgresql/data
+      - ${NEEDLE_HOME:-.}/volumes/postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U myuser -d mydb" ]
       interval: 5s
@@ -102,11 +102,16 @@ services:
       POSTGRES__PORT: 5432
       MILVUS__HOST: standalone
       MILVUS__PORT: 19530
-      APP__USE_CUDA: false
+      SERVICE__USE_CUDA: false
+      SERVICE__EMBEDDERS_CONFIG_DIR_PATH: ${NEEDLE_HOME:-.}/configs/
       GENERATORS__HOST: image-generator
       GENERATORS__PORT: 8000
+    env_file:
+      - ${NEEDLE_HOME:-.}/configs/directory.env
+      - ${NEEDLE_HOME:-.}/configs/query.env
+      - ${NEEDLE_HOME:-.}/configs/service.env
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/.cache/:/root/.cache
+      - ${NEEDLE_HOME:-.}/volumes/.cache/:/root/.cache
       - ${HOME}:${HOME}:ro
     ports:
       - "8000:8000"

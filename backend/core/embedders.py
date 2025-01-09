@@ -1,6 +1,3 @@
-import json
-import os
-
 import torch
 from timm import create_model, data
 
@@ -9,10 +6,11 @@ from settings import settings
 
 
 class ImageEmbedder:
-    def __init__(self, name, model_name, device=torch.device("cpu")):
+    def __init__(self, name, model_name, weight, device=torch.device("cpu")):
         self._name = name
         self._model_name = model_name
         self._device = device
+        self._weight = weight
 
         self.model = create_model(model_name, pretrained=True, num_classes=0).to(device)
         self.model.eval()
@@ -60,10 +58,6 @@ class ImageEmbedder:
     def weight(self):
         return self._weight
 
-    @weight.setter
-    def weight(self, value):
-        self._weight = value
-
 
 @Singleton
 class EmbedderManager:
@@ -72,35 +66,15 @@ class EmbedderManager:
             "cuda" if torch.cuda.is_available() and settings.service.use_cuda else "cpu")
         self._image_embedders = {}
         for embedder_config in settings.image_embedders:
-            self._image_embedders[embedder_config.name] = ImageEmbedder(name=embedder_config.name,
-                                                                        model_name=embedder_config.model_name,
-                                                                        device=self._device)
-
-        self._init_embedders_weights()
+            self._image_embedders[embedder_config.name] = ImageEmbedder(
+                name=embedder_config.name,
+                model_name=embedder_config.model_name,
+                weight=embedder_config.weight if embedder_config.weight is not None
+                else 1 / len(settings.image_embedders),
+                device=self._device)
 
     def get_image_embedders(self):
         return self._image_embedders
 
     def get_image_embedder_by_name(self, name) -> ImageEmbedder:
         return self._image_embedders[name]
-
-    def _init_embedders_weights(self):
-        path = settings.weights_path
-        weights = dict()
-        default_weight = 1 / len(self._image_embedders)
-        if os.path.exists(path):
-            with open(path, 'r+') as file:
-                weights = json.load(file)
-                # logger.info("Embedder weights loaded from file")
-
-        for embedder_name, embedder in self._image_embedders.items():
-            embedder.weight = weights.get(embedder_name, default_weight)
-
-    def _save_embedder_weights(self):
-        weights = {name: embedder.weight for name, embedder in self._image_embedders.items()}
-        with open(settings.weights_path, 'w+') as f:
-            json.dump(weights, f)
-        # logger.info("Embedder weights dumped to the file")
-
-    def finalize(self):
-        self._save_embedder_weights()

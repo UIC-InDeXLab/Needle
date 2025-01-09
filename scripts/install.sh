@@ -105,7 +105,7 @@ curl -fSL "${COMPOSE_URL}" -o "${NEEDLE_HOME_DIR}/docker-compose.yaml"
 # Download configuration files for selected mode
 echo -e "${GREEN}Downloading configuration files for ${MODE} mode...${NC}"
 CONFIG_BASE_URL="https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/configs/${MODE}"
-CONFIG_FILES=("service.env" "directory.env" "query.env", "embedders.json")
+CONFIG_FILES=("service.env" "directory.env" "query.env" "embedders.json")
 
 for config_file in "${CONFIG_FILES[@]}"; do
     echo -e "${GREEN}Downloading ${config_file}...${NC}"

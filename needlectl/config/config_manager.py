@@ -5,7 +5,7 @@ from typing import Dict, Any
 
 import typer
 
-from config.utils import get_config_file
+from utils import get_config_file
 from tui.editors import EnvConfigEditor, ConfigEditorBase, GeneratorConfigEditor
 
 

@@ -4,10 +4,11 @@ import subprocess
 import typer
 import yaml
 
+from utils import get_compose_file
 
 class DockerComposeManager:
     def __init__(self):
-        self.docker_compose_path = os.getenv("NEEDLE_DOCKER_COMPOSE_FILE", "docker-compose.yml")
+        self.docker_compose_path = get_compose_file()
         if not os.path.isfile(self.docker_compose_path):
             typer.echo("Error: docker-compose file not found.")
             raise typer.Exit(code=1)

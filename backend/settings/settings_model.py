@@ -52,7 +52,7 @@ class DirectorySettings(BaseModel):
 
 
 class ServiceSettings(BaseModel):
-    config_dir_path: str = Field()
+    config_dir_path: str = Field("./configs/")
     use_cuda: bool = Field(False)
 
 

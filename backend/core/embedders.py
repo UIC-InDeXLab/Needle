@@ -69,7 +69,7 @@ class ImageEmbedder:
 class EmbedderManager:
     def __init__(self):
         self._device = torch.device(
-            "cuda" if torch.cuda.is_available() and settings.app.use_cuda else "cpu")
+            "cuda" if torch.cuda.is_available() and settings.service.use_cuda else "cpu")
         self._image_embedders = {}
         for embedder_config in settings.image_embedders:
             self._image_embedders[embedder_config.name] = ImageEmbedder(name=embedder_config.name,

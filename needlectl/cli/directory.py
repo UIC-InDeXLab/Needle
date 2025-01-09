@@ -23,15 +23,7 @@ def add_directory(
     output_format = ctx.obj["output"]
     abs_path = os.path.abspath(path)
 
-    # manager = DockerComposeManager()
-    # manager.add_volume(service_name="backend", volume_path=abs_path)
-    #
-    # typer.echo("Restarting backend container...")
-    # manager.start_containers()
-
     client = BackendClient(api_url)
-
-    typer.echo("Waiting for API to become available...")
 
     try:
         client.wait_for_api()

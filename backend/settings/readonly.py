@@ -23,7 +23,9 @@ class ReadOnlySettings:
         logger.info("Settings Loaded:")
         logger.info(f"Postgres Settings: {cls._instance._settings.postgres}")
         logger.info(f"Milvus Settings: {cls._instance._settings.milvus}")
-        logger.info(f"App Settings: {cls._instance._settings.app}")
+        logger.info(f"Service Settings: {cls._instance._settings.service}")
+        logger.info(f"Directory Settings: {cls._instance._settings.directory}")
+        logger.info(f"Query Settings: {cls._instance._settings.query}")
         logger.info(f"Generators Settings: {cls._instance._settings.generators}")
         if cls._instance._settings.json_config:
             logger.info(f"JSON Config: {cls._instance._settings.json_config.dict()}")
@@ -37,8 +39,16 @@ class ReadOnlySettings:
         return self._settings.milvus
 
     @property
-    def app(self):
-        return self._settings.app
+    def service(self):
+        return self._settings.service
+
+    @property
+    def query(self):
+        return self._settings.query
+
+    @property
+    def directory(self):
+        return self._settings.directory
 
     @property
     def generators(self):
@@ -55,9 +65,8 @@ class ReadOnlySettings:
         return self.json_config.image_embedders
 
     @property
-    def weights_path(self) :
-        return os.path.join(self._settings.app.embedders_config_dir_path, "weights.json")
-
+    def weights_path(self):
+        return os.path.join(self._settings.service.embedders_config_dir_path, "weights.json")
 
     def get_image_embedder_details(self, name: str):
         embedder = next(

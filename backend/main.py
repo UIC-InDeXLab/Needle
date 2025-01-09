@@ -5,9 +5,9 @@ from typing import List
 import fastapi
 from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import FileResponse
 from pymilvus import Collection
 
 from core import embedder_manager, image_generator, query_manager
@@ -111,14 +111,13 @@ async def create_query(q: str = Body(..., embed=True)):
 
 
 @app.get("/search/{qid}")
-async def search(qid: int, n: int = 20, k: int = 1, image_size: int = 512,
+async def search(qid: int, n: int = settings.query.default_num_images_to_retrieve,
+                 k: int = settings.query.default_num_images_to_generate,
+                 image_size: int = settings.query.default_generated_image_size,
+                 include_base_images_in_preview: bool = settings.query.include_base_images_in_preview,
                  generator_engines: List[str] = fastapi.Query(None),
-                 include_base_images: bool = False,
                  request: Request = None
                  ):
-    if generator_engines is None:
-        generator_engines = [settings.generators.default_engine]
-
     query_object = query_manager.get_query(qid)
     query = query_object.query
 
@@ -192,16 +191,13 @@ async def search(qid: int, n: int = 20, k: int = 1, image_size: int = 512,
         "preview_url": str(request.url_for("gallery", qid=qid))
     }
 
-    if include_base_images:
+    if include_base_images_in_preview:
         res["base_images"] = [pil_image_to_base64(image) for image in generated_images]
 
     return res
 
 
-
-
-
-@app.get("/file", name="get_file")
+@app.get("/file")
 async def get_file(file_path: str):
     if not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="File not found")

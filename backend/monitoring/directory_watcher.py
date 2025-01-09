@@ -82,7 +82,7 @@ class DirectoryWatcher:
         self.observer = Observer()
         self.handlers = {}
         self.watches = {}
-        self.executor = ThreadPoolExecutor(max_workers=settings.app.num_watcher_workers)
+        self.executor = ThreadPoolExecutor(max_workers=settings.directory.num_watcher_workers)
 
     def add_directory(self, path):
         session = SessionLocal()
@@ -104,7 +104,7 @@ class DirectoryWatcher:
 
         handler = ImageChangeHandler(directory_id)
         self.handlers[renamed_path] = handler
-        watch = self.observer.schedule(handler, path, recursive=settings.app.recursive_indexing)
+        watch = self.observer.schedule(handler, path, recursive=settings.directory.recursive_indexing)
         self.watches[renamed_path] = watch
 
         # Start the background indexing
@@ -130,7 +130,7 @@ class DirectoryWatcher:
         )
 
         to_add = []
-        if settings.app.recursive_indexing:  # If recursive search is required
+        if settings.directory.recursive_indexing:  # If recursive search is required
             for root, _, files in os.walk(path):
                 for file in files:
                     if file.lower().endswith(('.png', '.jpg', '.jpeg')):
@@ -151,7 +151,7 @@ class DirectoryWatcher:
         # 2. Retrieve all not indexed images
         embedders = embedder_manager.get_image_embedders()
 
-        batch_size = settings.app.batch_size
+        batch_size = settings.directory.batch_size
         while True:
             not_indexed_images = session.query(Image).filter(Image.directory_id == directory_id, Image.is_indexed == False).all()
             if not not_indexed_images:
@@ -164,7 +164,7 @@ class DirectoryWatcher:
             batch = not_indexed_images[:batch_size]
 
             # 3. Embed images in parallel for this batch
-            with ThreadPoolExecutor(max_workers=settings.app.num_embedding_workers) as pool:
+            with ThreadPoolExecutor(max_workers=settings.directory.num_embedding_workers) as pool:
                 futures = {pool.submit(self._embed_image, img_record.path, embedders): img_record.path for img_record in batch}
 
                 embeddings_batch = []

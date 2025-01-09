@@ -1,108 +1,55 @@
-import os
-import shutil
-import subprocess
-import tempfile
+import json
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Any
 
 import typer
 
-
-def get_storage_dir():
-    home = os.path.expanduser("~")
-    storage_dir = os.path.join(home, ".needle")
-    if not os.path.exists(storage_dir):
-        os.makedirs(storage_dir, exist_ok=True)
-    return storage_dir
+from config.utils import get_config_file
+from tui.editors import EnvConfigEditor, ConfigEditorBase, GeneratorConfigEditor
 
 
-def get_config_file(filename) -> Path:
-    return Path(os.path.join(get_storage_dir(), "config", filename))
-
-
-def get_compose_file():
-    docker_compose_path = os.getenv("NEEDLE_DOCKER_COMPOSE_FILE")
-    if not docker_compose_path or not os.path.isfile(docker_compose_path):
-        typer.echo("Error: NEEDLE_DOCKER_COMPOSE_FILE not set or file not found.")
-        raise typer.Exit(code=1)
-    return docker_compose_path
-
-
-class ConfigManager:
-
+class ConfigManager(ABC):
     def __init__(self, service_name: str):
         self.service_name = service_name
-        self.config_file = get_config_file(f"{service_name}.env")
-        if not self.config_file.exists():
-            self.config_file.touch()
 
-    def load_config(self) -> Dict[str, str]:
-        config = {}
-        with self.config_file.open("r") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    key, _, value = line.partition("=")
-                    config[key.strip()] = value.strip()
-        return config
+    @property
+    @abstractmethod
+    def editor(self) -> ConfigEditorBase:
+        pass
 
-    def save_config(self, config: Dict[str, str]) -> None:
-        # Overwrite the file
-        with self.config_file.open("w") as f:
-            for k, v in config.items():
-                f.write(f"{k}={v}\n")
+    @property
+    @abstractmethod
+    def config_file(self) -> Path:
+        pass
+
+    @abstractmethod
+    def load(self) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def save(self, config: Dict[str, str]):
+        pass
 
     def show(self) -> None:
-        config = self.load_config()
+        config = self.load()
         for k, v in config.items():
             print(f"{k}={v}")
 
-    def edit(self) -> None:
-        # Use the user's editor to edit the config file
-        editor = os.environ.get("EDITOR", "vi")
-        # Create a temporary copy of the config file to edit
-        with tempfile.NamedTemporaryFile(suffix=".env", delete=False) as tmp:
-            temp_path = tmp.name
-            shutil.copy(self.config_file, temp_path)
+    def edit(self):
+        self.editor.run()
 
-        subprocess.call([editor, temp_path])
-
-        # After editing, read back the updated config and overwrite the original
-        updated_config = {}
-        with open(temp_path, "r") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    key, _, value = line.partition("=")
-                    updated_config[key.strip()] = value.strip()
-
-        # Save changes
-        self.save_config(updated_config)
-        os.remove(temp_path)
-
-    def set(self, key: str, value: str) -> None:
-        config = self.load_config()
-        config[key] = value
-        self.save_config(config)
-
-    def apply(self) -> None:
+    def apply(self):
         from docker.docker_compose_manager import DockerComposeManager
         manager = DockerComposeManager()
         manager.start_containers()
 
-    def handle(self, action, key, value):
+    def handle(self, action):
         if action == "show":
             self.show()
 
         elif action == "edit":
             self.edit()
-
-        elif action == "set":
-            if key is None or value is None:
-                typer.echo("Please provide --key and --value for 'set' action.")
-                raise typer.Exit(code=1)
-            self.set(key, value)
-            typer.echo(f"Set {key} to {value}.")
 
         elif action == "apply":
             typer.echo("Applying new configuration and restarting services...")
@@ -110,4 +57,78 @@ class ConfigManager:
             typer.echo("Configuration applied.")
 
         else:
-            typer.echo("Invalid action. Use show|set|edit|apply")
+            typer.echo("Invalid action. Use show|edit|apply")
+
+
+class EnvConfigManager(ConfigManager):
+
+    @property
+    def config_file(self) -> Path:
+        return get_config_file(f"{self.service_name}.env")
+
+    @property
+    def editor(self) -> ConfigEditorBase:
+        return EnvConfigEditor(self.load(), self.save)
+
+    def load(self) -> Dict[str, Any]:
+        config = {}
+        if not self.config_file.exists():
+            return config
+
+        with self.config_file.open() as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if '=' not in line:
+                    continue
+
+                key, value = line.split('=', 1)
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+
+                # Try to determine the type
+                if value.lower() in ('true', 'false'):
+                    config[key] = value.lower() == 'true'
+                elif value.isdigit():
+                    config[key] = int(value)
+                else:
+                    config[key] = value
+
+        return config
+
+    def save(self, config: Dict[str, Any]) -> None:
+        lines = []
+        for key, value in config.items():
+            if isinstance(value, bool):
+                value_str = str(value).lower()
+            elif isinstance(value, (int, float)):
+                value_str = str(value)
+            else:
+                # Add quotes for string values
+                value_str = f'"{value}"'
+            lines.append(f"{key}={value_str}")
+
+        with self.config_file.open('w') as f:
+            f.write('\n'.join(lines) + '\n')
+
+
+class GeneratorConfigManager(ConfigManager):
+    @property
+    def editor(self) -> ConfigEditorBase:
+        return GeneratorConfigEditor(self.load(), self.save)
+
+    @property
+    def config_file(self) -> Path:
+        return get_config_file(f"{self.service_name}.json")
+
+    def load(self):
+        try:
+            with self.config_file.open('r') as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []
+
+    def save(self, config: Dict[str, str]):
+        with self.config_file.open("w") as f:
+            json.dump(config, f, indent=2)

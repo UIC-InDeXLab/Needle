@@ -4,7 +4,7 @@ import typer
 
 from backend.api_client import BackendClient
 from cli.utils import print_result
-from config.config_manager import ConfigManager
+from config.config_manager import EnvConfigManager
 from docker.docker_compose_manager import DockerComposeManager
 
 service_app = typer.Typer(help="Manage Needle services.")
@@ -73,9 +73,8 @@ def service_log_cmd(ctx: typer.Context):
 
 @service_app.command("config")
 def service_config(
-        action: str = typer.Argument(..., help="show|set|edit|apply"),
-        key: str = typer.Option(None, help="The configuration key to set"),
-        value: str = typer.Option(None, help="The value to set for the key")
+        ctx: typer.Context,
+        action: str = typer.Argument(..., help="show|edit|apply"),
 ):
-    manager = ConfigManager(service_name="service")
-    manager.handle(action=action, key=key, value=value)
+    manager = EnvConfigManager(service_name="service")
+    manager.handle(action=action)

@@ -1,0 +1,81 @@
+/* styles/base.css */
+Screen {
+    layout: grid;
+    grid-size: 1;
+    padding: 2;
+}
+
+DataTable {
+    height: 1fr;
+    border: solid $primary-darken-2;
+    background: $surface;
+}
+
+DataTable > .datatable--header {
+    background: $primary-darken-1;
+    color: $text;
+    text-style: bold;
+    padding: 1;
+}
+
+DataTable > .datatable--cursor {
+    background: $accent;
+    color: $text;
+}
+
+ScrollableContainer {
+    height: 1fr;
+    border: solid $primary-lighten-2;
+}
+
+Footer {
+    dock: bottom;
+    height: auto;
+    background: $primary-background;
+    color: $text;
+    padding: 0 1;
+}
+
+/* Edit Value Modal */
+#dialog {
+    padding: 1 2;
+    width: 60;
+    height: auto;
+    border: thick $primary;
+    background: $surface;
+}
+
+#title {
+    text-align: center;
+    padding-bottom: 1;
+    border-bottom: solid $primary;
+}
+
+#value-input {
+    margin: 1 0;
+    width: 100%;
+}
+
+Button {
+    margin: 1 1;
+}
+
+Button:hover {
+    background: $accent;
+}
+
+/* Make the modal appear centered */
+ModalScreen {
+    align: center middle;
+}
+
+/* Status indicators */
+.value-true {
+    color: #2ecc71;
+    text-style: bold;
+}
+
+.value-false {
+    color: #e74c3c;
+    text-style: bold;
+}

@@ -2,7 +2,7 @@ import typer
 
 from backend.api_client import BackendClient
 from cli.utils import print_result
-from config.config_manager import ConfigManager
+from config.config_manager import EnvConfigManager
 
 query_app = typer.Typer(help="Query the database.")
 
@@ -24,9 +24,8 @@ def search_log(ctx: typer.Context):
 
 @query_app.command("config")
 def search_config(
-        action: str = typer.Argument(..., help="show|set|edit|apply"),
-        key: str = typer.Option(None, help="The configuration key to set"),
-        value: str = typer.Option(None, help="The value to set for the key")
+        ctx: typer.Context,
+        action: str = typer.Argument(..., help="show|edit|apply")
 ):
-    manager = ConfigManager(service_name="search")
-    manager.handle(action, key, value)
+    manager = EnvConfigManager(service_name="query")
+    manager.handle(action)

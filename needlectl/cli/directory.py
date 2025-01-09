@@ -8,8 +8,7 @@ from tqdm import tqdm
 
 from backend.api_client import BackendClient
 from cli.utils import print_result
-from config.config_manager import ConfigManager
-from docker.docker_compose_manager import DockerComposeManager
+from config.config_manager import EnvConfigManager
 
 directory_app = typer.Typer(help="Manage directories.")
 
@@ -103,9 +102,8 @@ def directory_detail(ctx: typer.Context, did: int):
 
 @directory_app.command("config")
 def directory_config(
-        action: str = typer.Argument(..., help="show|set|edit|apply"),
-        key: str = typer.Option(None, help="The configuration key to set"),
-        value: str = typer.Option(None, help="The value to set for the key")
+        ctx: typer.Context,
+        action: str = typer.Argument(..., help="show|edit|apply"),
 ):
-    manager = ConfigManager(service_name="directory")
-    manager.handle(action, key, value)
+    manager = EnvConfigManager(service_name="directory")
+    manager.handle(action)

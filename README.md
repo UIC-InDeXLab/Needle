@@ -24,7 +24,7 @@ In this demonstration, we demonstrate Needle's effectiveness on complex natural 
 Installing Needle is quick and straightforward. Make sure you have [Docker](https://www.docker.com/get-started/) and [Docker Compose](https://docs.docker.com/compose/) installed, then, use the one-liner below to install Needle:
 
 ```bash  
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install.sh -o install.sh && bash install.sh && rm install.sh 
+curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install.sh -o install.sh && bash install.sh && rm install.sh 
 ```
 Then, you can start needle service using this command: 
 ```bash

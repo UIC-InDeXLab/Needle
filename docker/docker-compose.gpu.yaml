@@ -110,8 +110,8 @@ services:
       MILVUS__PORT: 19530
       SERVICE__USE_CUDA: true
       SERVICE__CONFIG_DIR_PATH: ${NEEDLE_HOME:-.}/configs/
-      GENERATORS__HOST: image-generator-hub
-      GENERATORS__PORT: 8000
+      GENERATOR__HOST: image-generator-hub
+      GENERATOR__PORT: 8000
     env_file:
       - ${NEEDLE_HOME:-.}/configs/directory.env
       - ${NEEDLE_HOME:-.}/configs/query.env

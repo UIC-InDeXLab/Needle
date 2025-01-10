@@ -25,7 +25,7 @@ class ReadOnlySettings:
         logger.info(f"Service Settings: {cls._instance._settings.service}")
         logger.info(f"Directory Settings: {cls._instance._settings.directory}")
         logger.info(f"Query Settings: {cls._instance._settings.query}")
-        logger.info(f"Generators Settings: {cls._instance._settings.generators}")
+        logger.info(f"Generators Settings: {cls._instance._settings.generator}")
         if cls._instance._settings.embedders_config:
             logger.info(f"Embedders Config: {cls._instance._settings.embedders_config.dict()}")
 
@@ -51,7 +51,7 @@ class ReadOnlySettings:
 
     @property
     def generators(self):
-        return self._settings.generators
+        return self._settings.generator
 
     @property
     def image_embedders(self):

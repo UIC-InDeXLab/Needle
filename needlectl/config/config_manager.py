@@ -1,12 +1,12 @@
 import json
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 import typer
 
-from utils import get_config_file
 from tui.editors import EnvConfigEditor, ConfigEditorBase, GeneratorConfigEditor
+from utils import get_config_file
 
 
 class ConfigManager(ABC):
@@ -24,7 +24,7 @@ class ConfigManager(ABC):
         pass
 
     @abstractmethod
-    def load(self) -> Dict[str, Any]:
+    def load(self):
         pass
 
     @abstractmethod
@@ -122,7 +122,7 @@ class GeneratorConfigManager(ConfigManager):
     def config_file(self) -> Path:
         return get_config_file(f"{self.service_name}.json")
 
-    def load(self):
+    def load(self) -> List[Dict[str, Any]]:
         try:
             with self.config_file.open('r') as f:
                 return json.load(f)
@@ -132,3 +132,31 @@ class GeneratorConfigManager(ConfigManager):
     def save(self, config: Dict[str, str]):
         with self.config_file.open("w") as f:
             json.dump(config, f, indent=2)
+
+    @property
+    def request_representation(self):
+        generators: List[Dict[str, Any]] = self.load()
+        request_data = []
+
+        for generator in generators:
+            if not generator.get("enabled") or not generator.get("activated"):
+                # Skip any generator that isn't both enabled and activated
+                continue
+
+            # Build the 'params' dict
+            required_params = generator.get("required_params", [])
+            param_values = generator.get("param_values", {})
+
+            # For each required param, grab the stored value if available, else empty string
+            params_dict = {}
+            for param_info in required_params:
+                param_name = param_info["name"]
+                params_dict[param_name] = param_values.get(param_name, "")
+
+            # Append the processed generator to our final list
+            request_data.append({
+                "name": generator["name"],
+                "params": params_dict
+            })
+
+        return request_data

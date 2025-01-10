@@ -81,11 +81,9 @@ services:
       retries: 5
       start_period: 5s
 
-  image-generator:
-    image: merfanian/fastapi-diffusion:v0.3.2
-    container_name: image-generator
-    environment:
-      USE_CUDA: true
+  image-generator-hub:
+    image: merfanian/image-generator-hub:latest
+    container_name: image-generator-hub
 
   backend:
     image: merfanian/needle:latest
@@ -93,7 +91,7 @@ services:
     depends_on:
       - postgres
       - standalone
-      - image-generator
+      - image-generator-hub
     environment:
       POSTGRES__USER: myuser
       POSTGRES__PASSWORD: mypassword
@@ -104,7 +102,7 @@ services:
       MILVUS__PORT: 19530
       SERVICE__USE_CUDA: false
       SERVICE__EMBEDDERS_CONFIG_DIR_PATH: ${NEEDLE_HOME:-.}/configs/
-      GENERATORS__HOST: image-generator
+      GENERATORS__HOST: image-generator-hub
       GENERATORS__PORT: 8000
     env_file:
       - ${NEEDLE_HOME:-.}/configs/directory.env

@@ -17,10 +17,8 @@ def aggregate_rankings(rankers_results, weights, k):
     return ranked_results[:k]
 
 
-def decode_base64_image(data_uri: str) -> Image.Image:
-    # data_uri format: "data:image/png;base64,<BASE64_STRING>"
-    header, encoded = data_uri.split(',', 1)  # split into header and base64 data
-    img_data = base64.b64decode(encoded)
+def decode_base64_image(data: str) -> Image.Image:
+    img_data = base64.b64decode(data)
     return Image.open(BytesIO(img_data)).convert("RGB")
 
 

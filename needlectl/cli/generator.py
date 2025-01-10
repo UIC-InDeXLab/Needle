@@ -16,12 +16,17 @@ def generator_list(ctx: typer.Context):
     print_result(result, ctx.obj["output"])
 
 
-@generator_app.command("describe")
-def generator_describe(ctx: typer.Context, name: str):
-    """Describe a specific generator."""
+def _create_template_generator_config(ctx: typer.Context):
+    config_manager = GeneratorConfigManager("generator")
     client = BackendClient(ctx.obj["api_url"])
-    result = client.describe_generator(name)
-    print_result(result, ctx.obj["output"])
+
+    generators = client.list_generators()
+
+    for gen in generators:
+        gen["enabled"] = False
+        gen["activated"] = False
+
+    config_manager.save(generators)
 
 
 @generator_app.command("config")
@@ -30,4 +35,8 @@ def generator_config(
         action: str = typer.Argument("show", help="Action to perform: edit|show|apply")
 ):
     manager = GeneratorConfigManager("generator")
+
+    if not manager.config_file.exists():
+        _create_template_generator_config(ctx)
+
     manager.handle(action)

@@ -41,6 +41,8 @@ class QuerySettings(BaseModel):
     num_images_to_retrieve: int = Field(20)
     num_images_to_generate: int = Field(4)
     generated_image_size: int = Field(512)
+    num_engines_to_use: int = Field(1)
+    use_fallback: bool = Field(True)
     include_base_images_in_preview: bool = Field(False)
 
 
@@ -70,7 +72,7 @@ class Settings(BaseSettings):
     postgres: PostgresSettings = PostgresSettings()
     milvus: MilvusSettings = MilvusSettings()
     service: ServiceSettings = ServiceSettings()
-    generators: ImageGeneratorSettings = ImageGeneratorSettings()
+    generator: ImageGeneratorSettings = ImageGeneratorSettings()
     directory: DirectorySettings = DirectorySettings()
     query: QuerySettings = QuerySettings()
 

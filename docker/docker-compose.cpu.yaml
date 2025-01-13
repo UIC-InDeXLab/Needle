@@ -101,7 +101,7 @@ services:
       MILVUS__HOST: standalone
       MILVUS__PORT: 19530
       SERVICE__USE_CUDA: false
-      SERVICE__EMBEDDERS_CONFIG_DIR_PATH: ${NEEDLE_HOME:-.}/configs/
+      SERVICE__CONFIG_DIR_PATH: ${NEEDLE_HOME:-.}/configs/
       GENERATOR__HOST: image-generator-hub
       GENERATOR__PORT: 8000
     env_file:

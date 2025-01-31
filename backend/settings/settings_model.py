@@ -51,6 +51,7 @@ class DirectorySettings(BaseModel):
     num_embedding_workers: int = Field(4)
     batch_size: int = Field(50)
     recursive_indexing: bool = Field(False)
+    consistency_check_interval: int = Field(1800)
 
 
 class ServiceSettings(BaseModel):

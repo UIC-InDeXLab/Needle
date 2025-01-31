@@ -66,13 +66,11 @@ class ImageIndexer:
             image_paths = self._get_image_paths(path)
             logger.info(f"Found {len(image_paths)} images in directory {path}")
 
-            existing_paths = {img.path for img in session.query(Image.path).filter(Image.path.in_(image_paths)).all()}
-            new_images = [Image(...) for path in image_paths if path not in existing_paths]
-            # new_images = [
-            #     Image(path=img_path, directory_id=directory.id, is_indexed=False)
-            #     for img_path in image_paths
-            #     if not session.query(Image).filter(Image.path == img_path).first()
-            # ]
+            new_images = [
+                Image(path=img_path, directory_id=directory.id, is_indexed=False)
+                for img_path in image_paths
+                if not session.query(Image).filter(Image.path == img_path).first()
+            ]
             session.bulk_save_objects(new_images)
             session.commit()
             logger.info(f"Added {len(new_images)} new images to database for directory {path}")
@@ -215,7 +213,7 @@ class ImageIndexer:
             if directory:
                 # Remove from Milvus
                 logger.debug(f"Deleting Milvus entries for directory ID {directory.id}")
-                for embedder_name in self.embedders:
+                for embedder_name in self.embedders.keys():
                     collection = Collection(embedder_name)
                     result = collection.delete(f"directory_id == {directory.id}")
                     logger.info(f"Deleted {result.delete_count} entries from {embedder_name} collection")
@@ -436,7 +434,7 @@ class ImageIndexer:
             image = session.query(Image).filter(Image.path == path).first()
             if image:
                 # Remove from Milvus
-                for embedder_name in self.embedders:
+                for embedder_name in self.embedders.keys():
                     collection = Collection(embedder_name)
                     collection.delete(f"image_path == '{path}'")
                     collection.flush()
@@ -451,7 +449,7 @@ class ImageIndexer:
         ).all()
 
         # Check against Milvus
-        for embedder_name in self.embedders:
+        for embedder_name in self.embedders.keys():
             collection = Collection(embedder_name)
             try:
                 # Get all expected paths for this directory
@@ -562,7 +560,7 @@ class ImageChangeHandler(FileSystemEventHandler):
         try:
             image = session.query(Image).filter(Image.path == path).first()
             if image:
-                for embedder_name in self.embedders:
+                for embedder_name in self.embedders.keys():
                     collection = Collection(embedder_name)
                     collection.delete(f"image_path == '{path}'")
                     collection.flush()
@@ -581,7 +579,7 @@ class ImageChangeHandler(FileSystemEventHandler):
                 image.is_indexed = False
 
                 # Batch delete from Milvus
-                for embedder_name in self.embedders:
+                for embedder_name in self.embedders.keys():
                     collection = Collection(embedder_name)
                     result = collection.delete(f"directory_id == {self.directory_id} && image_path == '{path}'")
                     logger.info(f"Removed {result.delete_count} embeddings from {embedder_name} for {path}")
@@ -606,7 +604,7 @@ class ImageChangeHandler(FileSystemEventHandler):
             if image:
                 # Batch update Milvus entries
                 move_data = []
-                for embedder_name in self.embedders:
+                for embedder_name in self.embedders.keys():
                     collection = Collection(embedder_name)
                     # Batch retrieve and delete
                     res = collection.query(

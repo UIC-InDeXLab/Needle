@@ -1,7 +1,7 @@
 from .logger import logger
 
-from .directory_watcher import DirectoryWatcher
+from .directory_watcher import ImageIndexer
 
-directory_watcher = DirectoryWatcher.instance()
+directory_watcher = ImageIndexer.instance()
 
 __all__ = ["directory_watcher", "logger"]

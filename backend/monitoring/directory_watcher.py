@@ -1,288 +1,369 @@
+import logging
 import os
+import queue
 import threading
 import time
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import List, Dict
 
 from PIL import Image as PImage
-from pymilvus import utility, FieldSchema, CollectionSchema, DataType, Collection
+from pymilvus import Collection
+from sqlalchemy.orm import Session
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from core import embedder_manager
+from core.embedders import EmbedderManager
 from core.singleton import Singleton
-from database import SessionLocal, Directory, Image
+from database.database_manager import SessionLocal, Directory, Image
 from settings import settings
 
-
-class ImageChangeHandler(FileSystemEventHandler):
-    def __init__(self, directory_id):
-        self.directory_id = directory_id
-        self.embedders = embedder_manager.get_image_embedders()
-
-    def on_created(self, event):
-        if not event.is_directory and event.src_path.lower().endswith(('.png', '.jpg', '.jpeg')):
-            self.add_image(event.src_path)
-
-    def on_deleted(self, event):
-        if not event.is_directory and event.src_path.lower().endswith(('.png', '.jpg', '.jpeg')):
-            self.remove_image(event.src_path)
-
-    def add_image(self, image_path):
-        session = SessionLocal()
-        existing_image = session.query(Image).filter(Image.path == image_path).first()
-        if not existing_image:
-            image_record = Image(path=image_path, directory_id=self.directory_id, is_indexed=False)
-            session.add(image_record)
-            session.commit()
-
-            dir_record = session.query(Directory).filter(Directory.id == self.directory_id).first()
-            if dir_record.is_indexed:
-                # Directory is already indexed, so index this single new image now.
-                image = PImage.open(image_path).convert("RGB")
-                for embedder_name, embedder in self.embedders.items():
-                    embedding = embedder.embed(image)
-                    collection = Collection(name=embedder_name)
-                    collection.insert([{
-                        "directory_id": self.directory_id,
-                        "image_path": image_path,
-                        "embedding": embedding
-                    }])
-                for embedder_name in self.embedders.keys():
-                    collection = Collection(name=embedder_name)
-                    collection.flush()
-
-                image_record.is_indexed = True
-                session.commit()
-        session.close()
-
-    def remove_image(self, image_path):
-        session = SessionLocal()
-        image_record = session.query(Image).filter(Image.path == image_path).first()
-        if image_record:
-            session.delete(image_record)
-            session.commit()
-
-        for embedder_name in self.embedders.keys():
-            collection = Collection(name=embedder_name)
-            collection.delete(expr=f"image_path == '{image_path}'")
-
-        for embedder_name in self.embedders.keys():
-            collection = Collection(name=embedder_name)
-            collection.flush()
-        session.close()
-
-
-def rename_path(path):
-    return path.replace("/", "_").replace("\\", "_")
+# Configure logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 @Singleton
-class DirectoryWatcher:
+class ImageIndexer:
     def __init__(self):
         self.observer = Observer()
         self.handlers = {}
-        self.watches = {}
-        self.executor = ThreadPoolExecutor(max_workers=settings.directory.num_watcher_workers)
+        self.embedders = EmbedderManager.instance().get_image_embedders()
+        self.consistency_check_interval = 3600
+        self.index_queue = queue.PriorityQueue()
+        self.processing_paths = set()
+        self.queue_lock = threading.Lock()
+        self.index_workers = ThreadPoolExecutor(max_workers=settings.directory.num_watcher_workers)
+        logger.info("ImageIndexer initialized with indexing queue")
 
-    def add_directory(self, path):
-        session = SessionLocal()
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"The path {path} does not exist.")
-
-        renamed_path = rename_path(path)
-
-        existing_directory = session.query(Directory).filter(Directory.path == path).first()
-        if not existing_directory:
-            directory_record = Directory(path=path, is_indexed=False)
-            session.add(directory_record)
-            session.commit()
-            directory_id = directory_record.id
-        else:
-            directory_id = existing_directory.id
-            existing_directory.is_indexed = False
-            session.commit()
-
-        handler = ImageChangeHandler(directory_id)
-        self.handlers[renamed_path] = handler
-        watch = self.observer.schedule(handler, path, recursive=settings.directory.recursive_indexing)
-        self.watches[renamed_path] = watch
-
-        # Start the background indexing
-        self.executor.submit(self._process_directory_in_background, path, directory_id)
-
-        session.close()
-        return directory_id
-
-    def _process_directory_in_background(self, path, directory_id):
-        """Embed images of the directory in a background thread, processing them in batches.
-           For each batch:
-           1. Find a batch of not-indexed images.
-           2. Compute their embeddings in parallel.
-           3. Insert the embeddings into Milvus and update Postgres.
-           4. Repeat until all images are indexed.
+    def add_directory(self, path: str) -> int:
         """
+        Add directory to tracking and queue for background indexing
+        """
+
+        logger.info(f"Attempting to add directory: {path}")
+        if not os.path.exists(path):
+            logger.error(f"Directory not found: {path}")
+            raise FileNotFoundError(f"Path {path} does not exist")
+
         session = SessionLocal()
-        directory_record = session.query(Directory).filter(Directory.id == directory_id).first()
-
-        # 1. Sync all images in the DB
-        existing_images = set(
-            img.path for img in session.query(Image.path).filter(Image.directory_id == directory_id).all()
-        )
-
-        to_add = []
-        if settings.directory.recursive_indexing:  # If recursive search is required
-            for root, _, files in os.walk(path):
-                for file in files:
-                    if file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                        full_path = os.path.join(root, file)
-                        if full_path not in existing_images:
-                            to_add.append(Image(path=full_path, directory_id=directory_id, is_indexed=False))
-        else:  # Non-recursive search
-            for file in os.listdir(path):
-                full_path = os.path.join(path, file)
-                if os.path.isfile(full_path) and file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                    if full_path not in existing_images:
-                        to_add.append(Image(path=full_path, directory_id=directory_id, is_indexed=False))
-
-        if to_add:
-            session.bulk_save_objects(to_add)
-            session.commit()
-
-        # 2. Retrieve all not indexed images
-        embedders = embedder_manager.get_image_embedders()
-
-        batch_size = settings.directory.batch_size
-        while True:
-            not_indexed_images = session.query(Image).filter(Image.directory_id == directory_id, Image.is_indexed == False).all()
-            if not not_indexed_images:
-                # All images are indexed
-                directory_record.is_indexed = True
+        try:
+            # Check if directory already exists
+            directory = session.query(Directory).filter(Directory.path == path).first()
+            if not directory:
+                logger.info(f"Creating new directory entry: {path}")
+                directory = Directory(path=path, is_indexed=False)
+                session.add(directory)
                 session.commit()
-                break
+                session.refresh(directory)
+                logger.debug(f"Created directory ID {directory.id} for path {path}")
 
-            # Process images in batches
-            batch = not_indexed_images[:batch_size]
+            # Find and add all images to database as non-indexed
+            image_paths = self._get_image_paths(path)
+            logger.info(f"Found {len(image_paths)} images in directory {path}")
 
-            # 3. Embed images in parallel for this batch
-            with ThreadPoolExecutor(max_workers=settings.directory.num_embedding_workers) as pool:
-                futures = {pool.submit(self._embed_image, img_record.path, embedders): img_record.path for img_record in batch}
+            existing_paths = {img.path for img in session.query(Image.path).filter(Image.path.in_(image_paths)).all()}
+            new_images = [Image(...) for path in image_paths if path not in existing_paths]
+            # new_images = [
+            #     Image(path=img_path, directory_id=directory.id, is_indexed=False)
+            #     for img_path in image_paths
+            #     if not session.query(Image).filter(Image.path == img_path).first()
+            # ]
+            session.bulk_save_objects(new_images)
+            session.commit()
+            logger.info(f"Added {len(new_images)} new images to database for directory {path}")
 
-                embeddings_batch = []
-                for f in as_completed(futures):
-                    result = f.result()
-                    if result is not None:
-                        embeddings_batch.append(result)
 
-            # 4. Insert embeddings for this batch and update DB
-            if embeddings_batch:
-                self._insert_embeddings_batch(session, directory_id, embeddings_batch, embedders)
+            self._add_to_index_queue(directory.id, path, priority=1)
+            logger.debug(f"Added directory {directory.id} to indexing queue")
 
-        session.close()
+            # Setup file system watcher
+            handler = ImageChangeHandler(directory.id, directory.path, self.embedders)
+            watch = self.observer.schedule(handler, path, recursive=True)
+            self.handlers[path] = (handler, watch)
+            logger.info(f"Started filesystem monitoring for {path}")
 
-    def _embed_image(self, image_path, embedders):
-        # Load image once
-        if not os.path.exists(image_path):
-            return None
-        with PImage.open(image_path).convert("RGB") as img:
-            result = {}
-            # Compute embeddings for all embedders
-            for embedder_name, embedder in embedders.items():
-                embedding = embedder.embed(img)
-                result[embedder_name] = embedding
-            return (image_path, result)
+            return directory.id
 
-    def _insert_embeddings_batch(self, session, directory_id, embeddings_batch, embedders):
-        """Insert a batch of embeddings into Milvus, update their DB records, and commit."""
-        embedder_collections_data = {
-            name: {"directory_id": [], "image_path": [], "embedding": []}
-            for name in embedders.keys()
-        }
+        except Exception as e:
+            logger.error(f"Error adding directory {path}: {str(e)}", exc_info=True)
+            session.rollback()
+            raise RuntimeError(f"Error adding directory: {e}")
+        finally:
+            session.close()
 
-        indexed_paths = []
-        for (img_path, embeddings_dict) in embeddings_batch:
-            indexed_paths.append(img_path)
-            for embedder_name, emb in embeddings_dict.items():
-                embedder_collections_data[embedder_name]["directory_id"].append(directory_id)
-                embedder_collections_data[embedder_name]["image_path"].append(img_path)
-                embedder_collections_data[embedder_name]["embedding"].append(emb)
+    def _add_to_index_queue(self, directory_id: int, path: str, priority=0):
+        with self.queue_lock:
+            if (directory_id, path) not in self.processing_paths:
+                self.index_queue.put((priority, (directory_id, path)))
+                self.processing_paths.add((directory_id, path))
+                self.index_workers.submit(self._process_index_queue)
 
-        # Insert data for each embedder
-        for embedder_name, data in embedder_collections_data.items():
-            if data["directory_id"]:
-                collection = Collection(name=embedder_name)
-                entities = [
-                    data["directory_id"],
-                    data["image_path"],
-                    data["embedding"]
-                ]
-                collection.insert(entities)
 
-        # Flush all after batch insert
-        for embedder_name in embedders.keys():
-            collection = Collection(name=embedder_name)
-            collection.flush()
+    def _process_index_queue(self):
+        while not self.index_queue.empty():
+            try:
+                priority, (directory_id, path) = self.index_queue.get_nowait()
+                self._background_directory_indexing(directory_id, path)
+            finally:
+                with self.queue_lock:
+                    self.processing_paths.discard((directory_id, path))
 
-        # Update DB to mark these images as indexed
-        session.query(Image).filter(Image.path.in_(indexed_paths)).update({"is_indexed": True},
-                                                                          synchronize_session=False)
-        session.commit()
-
-    def remove_directory(self, path):
+    def _background_directory_indexing(self, directory_id: int, dir_path: str):
+        """Background indexing process for a directory"""
+        logger.info(f"Starting background indexing for directory {dir_path} (ID: {directory_id})")
         session = SessionLocal()
+        try:
+            non_indexed_images = session.query(Image).filter(
+                Image.directory_id == directory_id,
+                Image.is_indexed == False
+            ).all()
 
-        renamed_path = rename_path(path)
+            total_images = len(non_indexed_images)
+            if total_images == 0:
+                logger.info(f"No images to index in directory {dir_path}")
+                return
 
-        directory_record = session.query(Directory).filter(Directory.path == path).first()
+            logger.info(f"Found {total_images} unindexed images in directory {dir_path}")
+            batch_size = settings.directory.batch_size
+            processed = 0
 
-        if directory_record:
-            for embedder_name in embedder_manager.get_image_embedders().keys():
-                collection = Collection(name=embedder_name)
-                # Delete all images for this directory in one go
-                collection.delete(expr=f"directory_id == {directory_record.id}")
-            # Flush once after all deletions
-            for embedder_name in embedder_manager.get_image_embedders().keys():
-                collection = Collection(name=embedder_name)
-                collection.flush()
+            for i in range(0, len(non_indexed_images), batch_size):
+                batch = non_indexed_images[i:i + batch_size]
+                batch_paths = [img.path for img in batch]
+                logger.debug(f"Processing batch {i // batch_size + 1} with {len(batch)} images")
 
-            session.query(Image).filter(Image.directory_id == directory_record.id).delete()
+                embeddings = self._compute_batch_embeddings(batch_paths)
+                logger.debug(f"Computed embeddings for {len(embeddings)} images")
+
+                # Update Milvus and mark as indexed
+                for img_path, emb_dict in embeddings.items():
+                    image = session.query(Image).filter(Image.path == img_path).first()
+                    if image:
+                        image.is_indexed = True
+
+                session.commit()
+
+            # Mark directory as fully indexed
+            directory = session.query(Directory).get(directory_id)
+            directory.is_indexed = True
             session.commit()
+            logger.info(f"Completed indexing for directory {dir_path}. Marked as indexed.")
 
-            session.delete(directory_record)
-            session.commit()
-
-        self.handlers.pop(renamed_path, None)
-        watch = self.watches.pop(renamed_path, None)
-        if watch:
-            self.observer.unschedule(watch)
-        session.close()
-
-    def create_collection_for_embedder(self, collection_name, embedder):
-        if not utility.has_collection(collection_name):
-            fields = [
-                FieldSchema(name="directory_id", dtype=DataType.INT64, is_primary=False),
-                FieldSchema(name="image_path", dtype=DataType.VARCHAR, max_length=500, is_primary=True),
-                FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=embedder.embedding_dim)
-            ]
-            schema = CollectionSchema(fields=fields, description=f"Collection for embedder: {collection_name}")
-            collection = Collection(name=collection_name, schema=schema)
-            # TODO: Get index params from settings
-            index_params = {
-                "index_type": "HNSW",
-                "metric_type": "COSINE",
-                "params": {"M": 48, "efConstruction": 200}
-            }
-            collection.create_index(field_name="embedding", index_params=index_params)
-        else:
-            collection = Collection(name=collection_name)
-
-        collection.load()
+        except Exception as e:
+            logger.error(f"Background indexing failed for directory {dir_path}: {str(e)}", exc_info=True)
+            session.rollback()
+        finally:
+            session.close()
 
     def start(self):
-        thread = threading.Thread(target=self._run_observer)
-        thread.daemon = True
+        """
+        Start indexer by queueing background indexing for all tracked directories
+        """
+        logger.info("Starting ImageIndexer service")
+
+        session = SessionLocal()
+        try:
+            # Retrieve all tracked directories
+            directories = session.query(Directory).all()
+            logger.info(f"Found {len(directories)} tracked directories")
+
+            for directory in directories:
+                if not os.path.exists(directory.path):
+                    # Remove directory if path no longer exists
+                    logger.warning(f"Directory path missing: {directory.path}. Removing from tracking.")
+                    self.remove_directory(directory.path)
+                    continue
+
+                # Queue background indexing
+                logger.debug(f"Initializing directory {directory.path} (ID: {directory.id})")
+                threading.Thread(
+                    target=self._background_directory_indexing,
+                    args=(directory.id, directory.path),
+                    daemon=True
+                ).start()
+
+                # Setup file system watcher
+                handler = ImageChangeHandler(directory.id, directory.path, self.embedders)
+                watch = self.observer.schedule(handler, directory.path, recursive=True)
+                self.handlers[directory.path] = (handler, watch)
+
+            # Start watching all directories
+            self.start_watching()
+            self._start_consistency_checker()
+            logger.info("Started filesystem observers and consistency checker")
+        except Exception as e:
+            logger.error(f"Indexer initialization failed: {str(e)}", exc_info=True)
+        finally:
+            session.close()
+
+    def remove_directory(self, path: str):
+        """
+        Remove directory from monitoring and delete its indexed data
+
+        Args:
+            path (str): Directory path to remove
+        """
+        logger.info(f"Removing directory: {path}")
+        session = SessionLocal()
+        try:
+            directory = session.query(Directory).filter(Directory.path == path).first()
+            if directory:
+                # Remove from Milvus
+                logger.debug(f"Deleting Milvus entries for directory ID {directory.id}")
+                for embedder_name in self.embedders:
+                    collection = Collection(embedder_name)
+                    result = collection.delete(f"directory_id == {directory.id}")
+                    logger.info(f"Deleted {result.delete_count} entries from {embedder_name} collection")
+                    collection.flush()
+
+                # Remove from database
+                session.query(Image).filter(Image.directory_id == directory.id).delete()
+                session.delete(directory)
+                session.commit()
+
+            # Stop watching
+            if path in self.handlers:
+                handler, watch = self.handlers[path]
+                self.observer.unschedule(watch)
+                del self.handlers[path]
+                logger.debug(f"Stopped filesystem monitoring for {path}")
+
+        except Exception as e:
+            logger.error(f"Error removing directory {path}: {str(e)}", exc_info=True)
+            session.rollback()
+        finally:
+            session.close()
+
+    def _background_index(self, path: str, directory_id: int):
+        """
+        Background indexing process for a directory
+
+        Args:
+            path (str): Directory path
+            directory_id (int): Directory database ID
+        """
+
+        session = SessionLocal()
+        try:
+            image_paths = self._get_image_paths(path)
+            self._index_images(session, directory_id, image_paths)
+        finally:
+            session.close()
+
+    def _get_image_paths(self, path: str) -> List[str]:
+        image_paths = []
+        for entry in os.scandir(path):
+            if entry.is_dir(follow_symlinks=False) and settings.directory.recursive_indexing:
+                image_paths.extend(self._get_image_paths(entry.path))
+            elif entry.is_file() and entry.name.lower().endswith(('.png', '.jpg', '.jpeg')):
+                image_paths.append(entry.path)
+        return image_paths
+
+    def _index_images(self, session: Session, directory_id: int, image_paths: List[str]):
+        """
+        Index images in batches using GPU
+        """
+        logger.info(f"Indexing {len(image_paths)} images for directory ID {directory_id}")
+
+        batch_size = settings.directory.batch_size
+        for i in range(0, len(image_paths), batch_size):
+            batch = image_paths[i:i + batch_size]
+            logger.debug(f"Processing batch {i // batch_size + 1} with {len(batch)} images")
+
+            embeddings = self._compute_batch_embeddings(batch)
+            logger.debug(f"Computed embeddings for {len(embeddings)} images in batch")
+
+            # Group embeddings by embedder
+            embedder_data = defaultdict(list)
+            for path, emb_dict in embeddings.items():
+                existing = session.query(Image).filter(Image.path == path).first()
+                if not existing:
+                    image = Image(path=path, directory_id=directory_id, is_indexed=False)
+                    session.add(image)
+
+                for embedder_name, embedding in emb_dict.items():
+                    embedder_data[embedder_name].append({
+                        "directory_id": directory_id,
+                        "image_path": path,
+                        "embedding": embedding
+                    })
+
+            # Batch insert to Milvus
+            for embedder_name, data in embedder_data.items():
+                collection = Collection(embedder_name)
+                collection.insert(data)
+                collection.flush()
+                logger.info(f"Inserted {len(data)} embeddings into {embedder_name} collection")
+
+            # Mark images as indexed after successful Milvus insertion
+            for path in embeddings.keys():
+                image = session.query(Image).filter(Image.path == path).first()
+                if image:
+                    image.is_indexed = True
+
+            session.commit()
+            logger.debug(f"Completed processing batch {i // batch_size + 1}")
+
+    def _compute_batch_embeddings(self, image_paths: List[str]) -> Dict[str, Dict[str, List[float]]]:
+        """
+        Compute embeddings for a batch of images using available GPUs
+
+        Args:
+            image_paths (List[str]): Paths of images to embed
+
+        Returns:
+            Dict with image paths and their embeddings
+        """
+        logger.debug(f"Computing embeddings for {len(image_paths)} images")
+        embeddings = {}
+        success_count = 0
+        fail_count = 0
+        with ThreadPoolExecutor(max_workers=settings.directory.num_embedding_workers) as executor:
+            futures = {
+                executor.submit(self._embed_single_image, path): path
+                for path in image_paths
+            }
+
+            for future in as_completed(futures):
+                path = futures[future]
+                try:
+                    embeddings[path] = future.result()
+                    success_count += 1
+                except Exception as e:
+                    fail_count += 1
+                    logger.error(f"Failed to embed {path}: {str(e)}", exc_info=True)
+
+        logger.info(f"Embedding complete: {success_count} successes, {fail_count} failures")
+        return embeddings
+
+    def _embed_single_image(self, image_path: str) -> Dict[str, List[float]]:
+        """
+        Embed a single image using all available embedders
+
+        Args:
+            image_path (str): Path to image file
+
+        Returns:
+            Dict of embedder names and their embeddings
+        """
+        image = PImage.open(image_path).convert("RGB")
+        return {
+            name: embedder.embed(image)
+            for name, embedder in self.embedders.items()
+        }
+
+    def start_watching(self):
+        """Start file system monitoring"""
+        thread = threading.Thread(target=self._run_observer, daemon=True)
         thread.start()
 
     def _run_observer(self):
+        """Run file system observer"""
         self.observer.start()
         try:
             while True:
@@ -291,5 +372,270 @@ class DirectoryWatcher:
             self.observer.stop()
         self.observer.join()
 
-    def finalize(self):
-        self.observer.stop()
+    def _start_consistency_checker(self):
+        def run():
+            while True:
+                time.sleep(self.consistency_check_interval)
+                self.run_consistency_check()
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def run_consistency_check(self):
+        logger.info("Starting system-wide consistency check")
+        session = SessionLocal()
+        try:
+            directories = session.query(Directory).all()
+            logger.info(f"Checking consistency for {len(directories)} directories")
+            for directory in directories:
+                self._check_directory_consistency(session, directory)
+
+            logger.info("Completed system-wide consistency check")
+        except Exception as e:
+            logger.error(f"Consistency check failed: {str(e)}", exc_info=True)
+
+        finally:
+            session.close()
+
+    def _check_directory_consistency(self, session: Session, directory: Directory):
+        logger.info(f"Checking consistency for directory {directory.path} (ID: {directory.id})")
+        # Check directory existence
+        if not os.path.exists(directory.path):
+            logger.warning(f"Directory path missing: {directory.path}. Removing from system.")
+            self.remove_directory(directory.path)
+            return
+
+        # Get current filesystem state
+        fs_paths = set(self._get_image_paths(directory.path))
+
+        # Get database state
+        db_images = session.query(Image).filter(
+            Image.directory_id == directory.id
+        ).all()
+        db_paths = {img.path for img in db_images}
+
+        # Find discrepancies
+        new_paths = fs_paths - db_paths
+        deleted_paths = db_paths - fs_paths
+
+        logger.info(f"Consistency check results for {directory.path}:")
+        logger.info(f" - New files detected: {len(new_paths)}")
+        logger.info(f" - Missing files detected: {len(deleted_paths)}")
+
+        # Handle new files
+        for path in new_paths:
+            if not session.query(Image).filter(Image.path == path).first():
+                session.add(Image(
+                    path=path,
+                    directory_id=directory.id,
+                    is_indexed=False
+                ))
+        session.commit()
+
+        # Handle deleted files
+        for path in deleted_paths:
+            image = session.query(Image).filter(Image.path == path).first()
+            if image:
+                # Remove from Milvus
+                for embedder_name in self.embedders:
+                    collection = Collection(embedder_name)
+                    collection.delete(f"image_path == '{path}'")
+                    collection.flush()
+                # Remove from DB
+                session.delete(image)
+        session.commit()
+
+        # Verify Milvus consistency
+        indexed_images = session.query(Image).filter(
+            Image.directory_id == directory.id,
+            Image.is_indexed == True
+        ).all()
+
+        # Check against Milvus
+        for embedder_name in self.embedders:
+            collection = Collection(embedder_name)
+            try:
+                # Get all expected paths for this directory
+                expected_paths = {img.path for img in indexed_images}
+
+                # Batch query Milvus in pages
+                milvus_paths = set()
+                query_iterator = collection.query_iterator(
+                    expr=f"directory_id == {directory.id}",
+                    output_fields=["image_path"],
+                    batch_size=1000
+                )
+
+                while True:
+                    res = query_iterator.next()
+                    if not res:
+                        break
+                    milvus_paths.update(item["image_path"] for item in res)
+
+                # Find discrepancies
+                missing_paths = expected_paths - milvus_paths
+                extra_paths = milvus_paths - expected_paths
+
+                logger.info(f"Milvus ({embedder_name}) consistency:")
+                logger.info(f" - Missing entries: {len(missing_paths)}")
+                logger.info(f" - Extra entries: {len(extra_paths)}")
+
+                # Handle missing entries
+                if missing_paths:
+                    session.query(Image).filter(
+                        Image.path.in_(missing_paths)
+                    ).update({Image.is_indexed: False})
+                    session.commit()
+                    self._background_directory_indexing(directory.id, directory.path)
+
+                # Handle extra entries (orphaned in Milvus)
+                if extra_paths:
+                    for path in extra_paths:
+                        collection.delete(f"directory_id == {directory.id} && image_path == '{path}'")
+                    collection.flush()
+
+            except Exception as e:
+                logger.error(f"Milvus query failed for {embedder_name}: {str(e)}", exc_info=True)
+
+
+class ImageChangeHandler(FileSystemEventHandler):
+    def __init__(self, directory_id: int, directory_path: str, embedders: Dict):
+        self.directory_id = directory_id
+        self.directory_path = directory_path
+        self.embedders = embedders
+        logger.debug(f"Created handler for directory {directory_path} (ID: {directory_id})")
+
+    def on_created(self, event):
+        if not event.is_directory and self._is_image(event.src_path):
+            logger.info(f"Detected new image: {event.src_path}")
+            self._handle_new_image(event.src_path)
+
+    def on_deleted(self, event):
+        if not event.is_directory and self._is_image(event.src_path):
+            logger.info(f"Detected deleted image: {event.src_path}")
+            self._handle_deleted_image(event.src_path)
+
+    def on_modified(self, event):
+        if not event.is_directory and self._is_image(event.src_path):
+            logger.info(f"Detected modified image: {event.src_path}")
+            self._handle_modified_image(event.src_path)
+
+    def on_moved(self, event):
+        src_path = event.src_path
+        dest_path = event.dest_path
+
+        if not event.is_directory and self._is_image(dest_path):
+            logger.info(f"Detected moved image: {src_path} -> {dest_path}")
+            # Check if moved within same directory
+            dest_dir = os.path.dirname(dest_path)
+            if os.path.commonpath([dest_dir, self.directory_path]) == self.directory_path:
+                self._handle_moved_image(src_path, dest_path)
+            else:
+                # Handle as deletion from original directory
+                self._handle_deleted_image(src_path)
+
+    def _is_image(self, path: str) -> bool:
+        return path.lower().endswith(('.png', '.jpg', '.jpeg'))
+
+    def _handle_new_image(self, path: str):
+        session = SessionLocal()
+        try:
+            existing = session.query(Image).filter(Image.path == path).first()
+            if not existing:
+                logger.debug(f"Creating new database entry for {path}")
+                # Create image record
+                image = Image(path=path, directory_id=self.directory_id, is_indexed=False)
+                session.add(image)
+                session.commit()
+                logger.info(f"Added new image to database: {path}")
+                indexer = ImageIndexer()
+                indexer._add_to_index_queue(self.directory_id, path, priority=0)
+                logger.debug(f"Added new image to indexing queue: {path}")
+
+        except Exception as e:
+            logger.error(f"Error handling new image {path}: {str(e)}", exc_info=True)
+            session.rollback()
+        finally:
+            session.close()
+
+    def _handle_deleted_image(self, path: str):
+        session = SessionLocal()
+        try:
+            image = session.query(Image).filter(Image.path == path).first()
+            if image:
+                for embedder_name in self.embedders:
+                    collection = Collection(embedder_name)
+                    collection.delete(f"image_path == '{path}'")
+                    collection.flush()
+                session.delete(image)
+                session.commit()
+        finally:
+            session.close()
+
+    def _handle_modified_image(self, path: str):
+        session = SessionLocal()
+        try:
+            image = session.query(Image).filter(Image.path == path).first()
+            if image and image.is_indexed:
+                logger.info(f"Re-indexing modified image: {path}")
+                # Mark as unindexed and delete existing embeddings
+                image.is_indexed = False
+
+                # Batch delete from Milvus
+                for embedder_name in self.embedders:
+                    collection = Collection(embedder_name)
+                    result = collection.delete(f"directory_id == {self.directory_id} && image_path == '{path}'")
+                    logger.info(f"Removed {result.delete_count} embeddings from {embedder_name} for {path}")
+                    collection.flush()
+
+                session.commit()
+
+                # Queue for re-indexing
+                indexer = ImageIndexer.instance()
+                indexer._background_directory_indexing(self.directory_id, self.directory_path)
+
+        except Exception as e:
+            session.rollback()
+            print(f"Error handling modified image {path}: {e}")
+        finally:
+            session.close()
+
+    def _handle_moved_image(self, src_path: str, dest_path: str):
+        session = SessionLocal()
+        try:
+            image = session.query(Image).filter(Image.path == src_path).first()
+            if image:
+                # Batch update Milvus entries
+                move_data = []
+                for embedder_name in self.embedders:
+                    collection = Collection(embedder_name)
+                    # Batch retrieve and delete
+                    res = collection.query(
+                        expr=f"directory_id == {self.directory_id} and image_path == '{src_path}'",
+                        output_fields=["embedding"]
+                    )
+                    if res:
+                        move_data.extend([{
+                            "embedder": embedder_name,
+                            "embeddings": [item["embedding"] for item in res]
+                        }])
+                        collection.delete(f"directory_id == {self.directory_id} and image_path == '{src_path}'")
+
+                # Batch insert new entries
+                for data in move_data:
+                    collection = Collection(data["embedder"])
+                    collection.insert([{
+                        "directory_id": self.directory_id,
+                        "image_path": dest_path,
+                        "embedding": emb
+                    } for emb in data["embeddings"]])
+                    collection.flush()
+
+                # Update database after successful Milvus operations
+                image.path = dest_path
+                session.commit()
+
+        except Exception as e:
+            session.rollback()
+            print(f"Error handling moved image {src_path}: {e}")
+        finally:
+            session.close()

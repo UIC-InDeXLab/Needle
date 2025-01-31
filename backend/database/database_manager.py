@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String, Integer, ForeignKey, Boolean
+from sqlalchemy import create_engine, Column, String, Integer, ForeignKey, Boolean, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from settings import settings
@@ -27,6 +27,12 @@ class Image(Base):
     is_indexed = Column(Boolean, default=False)
 
     directory = relationship("Directory", back_populates="images")
+
+    __table_args__ = (
+        Index('ix_image_path', 'path'),
+        Index('ix_directory_id', 'directory_id'),
+        Index('ix_is_indexed', 'is_indexed')
+    )
 
 
 Base.metadata.create_all(bind=engine)

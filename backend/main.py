@@ -27,7 +27,7 @@ origins = ["http://localhost:3000", "http://127.0.0.1:3000", os.getenv("PUBLIC_I
 async def lifespan(app: FastAPI):
     initialize()
     yield
-    directory_watcher.finalize()
+    # directory_watcher.finalize()
 
 
 app = FastAPI(lifespan=lifespan)

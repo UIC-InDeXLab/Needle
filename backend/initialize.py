@@ -44,7 +44,3 @@ def initialize():
 
     directory_watcher.start()
 
-    session = SessionLocal()
-    directories = session.query(Directory).all()
-    for directory in directories:
-        directory_watcher.add_directory(directory.path)

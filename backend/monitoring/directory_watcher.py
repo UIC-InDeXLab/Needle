@@ -147,26 +147,35 @@ class DirectoryIndexer:
 
         batch_size = settings.directory.batch_size
         for i in range(0, total_images, batch_size):
-            batch = unindexed_images[i:i+batch_size]
+            batch = unindexed_images[i:i + batch_size]
             batch_paths = [img.path for img in batch]
             logger.debug(f"Processing batch {i // batch_size + 1} with {len(batch)} images")
+
+            # Compute embeddings for the current batch
             embeddings = self.embedder_service.compute_batch_embeddings(
                 batch_paths, settings.directory.num_embedding_workers
             )
 
-            # For each image, update Milvus and mark as indexed
+            # Accumulate Milvus entries for each embedder in this batch
+            embedder_batches = {}
             for img in batch:
                 if img.path in embeddings:
                     for embedder_name, emb in embeddings[img.path].items():
-                        self.milvus_repo.insert_entries(embedder_name, [{
+                        embedder_batches.setdefault(embedder_name, []).append({
                             "directory_id": directory_id,
                             "image_path": img.path,
                             "embedding": emb
-                        }])
+                        })
+                    # Mark the image as indexed in the DB
                     img.is_indexed = True
+
+            # Insert all embeddings for each embedder in one batch call
+            for embedder_name, entries in embedder_batches.items():
+                self.milvus_repo.insert_entries(embedder_name, entries)
+
             session.commit()
 
-        # Mark directory as fully indexed
+        # Mark the directory as fully indexed
         directory = session.query(Directory).get(directory_id)
         directory.is_indexed = True
         session.commit()

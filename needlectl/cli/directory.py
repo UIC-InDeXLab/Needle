@@ -74,7 +74,8 @@ def add_directory(
 @directory_app.command("remove")
 def remove_directory(ctx: typer.Context, path: str):
     client = BackendClient(ctx.obj["api_url"])
-    result = client.remove_directory(path)
+    abs_path = os.path.abspath(path)
+    result = client.remove_directory(abs_path)
     print_result(result, ctx.obj["output"])
 
 

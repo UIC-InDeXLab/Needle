@@ -62,13 +62,13 @@ def service_log_cmd(ctx: typer.Context):
     # Try the backend endpoint first:
     client = BackendClient(ctx.obj["api_url"])
     manager = DockerComposeManager()
-    try:
-        result = client.get_service_log()
-        print_result(result, ctx.obj["output"])
-    except:
+    # try:
+    #     result = client.get_service_log()
+    #     print_result(result, ctx.obj["output"])
+    # except:
         # fallback to docker compose logs
-        typer.echo("Falling back to docker compose logs")
-        manager.log_services("backend")
+    typer.echo("Falling back to docker compose logs")
+    manager.log_services("backend")
 
 
 @service_app.command("config")

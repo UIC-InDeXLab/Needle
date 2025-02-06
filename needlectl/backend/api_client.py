@@ -19,6 +19,11 @@ class BackendClient:
         response = requests.post(url, json=data)
         return self._handle_response(response)
 
+    def _put(self, endpoint: str, data: Optional[Dict[str, Any]] = None) -> Any:
+        url = f"{self.base_url}{endpoint}"
+        response = requests.put(url, json=data)
+        return self._handle_response(response)
+
     def _delete(self, endpoint: str, json: Optional[Dict[str, Any]] = None) -> Any:
         url = f"{self.base_url}{endpoint}"
         response = requests.delete(url, json=json)
@@ -63,6 +68,9 @@ class BackendClient:
         Returns DirectoryDetailResponse with directory info, image paths, indexing ratio, etc.
         """
         return self._get(f"/directory/{did}")
+
+    def update_directory(self, did: int, is_enabled: bool):
+        return self._put(f"/directory/{did}", data={"is_enabled": is_enabled})
 
     # -------------------------------------------------------------------------
     # Generators

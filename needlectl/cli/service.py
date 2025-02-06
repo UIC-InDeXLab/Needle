@@ -66,15 +66,13 @@ def service_log_cmd(ctx: typer.Context):
     #     result = client.get_service_log()
     #     print_result(result, ctx.obj["output"])
     # except:
-        # fallback to docker compose logs
+    # fallback to docker compose logs
     typer.echo("Falling back to docker compose logs")
     manager.log_services("backend")
 
 
 @service_app.command("config")
 def service_config(
-        ctx: typer.Context,
-        action: str = typer.Argument(..., help="show|edit|apply"),
-):
+        ctx: typer.Context):
     manager = EnvConfigManager(service_name="service")
-    manager.handle(action=action)
+    manager.handle()

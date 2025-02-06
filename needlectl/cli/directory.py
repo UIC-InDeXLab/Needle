@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from backend.api_client import BackendClient
 from cli.utils import print_result
-from config.config_manager import EnvConfigManager
+from config.config_manager import EnvConfigManager, DirectoryConfigManager
 
 directory_app = typer.Typer(help="Manage directories.")
 
@@ -86,6 +86,13 @@ def list_directories(ctx: typer.Context):
     print_result(result, ctx.obj["output"])
 
 
+@directory_app.command("modify")
+def modify_directories(ctx: typer.Context):
+    client = BackendClient(ctx.obj["api_url"])
+    manager = DirectoryConfigManager(service_name="directory", backend_client=client)
+    manager.handle()
+
+
 @directory_app.command("describe")
 def directory_detail(ctx: typer.Context, did: int):
     client = BackendClient(ctx.obj["api_url"])
@@ -96,7 +103,6 @@ def directory_detail(ctx: typer.Context, did: int):
 @directory_app.command("config")
 def directory_config(
         ctx: typer.Context,
-        action: str = typer.Argument(..., help="show|edit|apply"),
 ):
     manager = EnvConfigManager(service_name="directory")
-    manager.handle(action)
+    manager.handle()

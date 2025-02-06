@@ -400,3 +400,45 @@ class GeneratorConfigEditor(ConfigEditorBase):
                     self.config_data[row + 1], self.config_data[row]
                 self.refresh_table()
                 table.move_cursor(row=row + 1)
+
+
+class DirectoryConfigEditor(ConfigEditorBase):
+    """
+    Editor for directory configuration.
+    Expects self.config_data to be a list of dictionaries with keys:
+      - id (int or str)
+      - path (str)
+      - is_indexed (bool)
+      - is_enabled (bool)
+    Allows toggling only the 'is_enabled' flag.
+    """
+    BINDINGS = [
+        *ConfigEditorBase.BINDINGS,
+        Binding("space", "toggle_enabled", "Toggle Enabled"),
+    ]
+
+    def on_mount(self) -> None:
+        table = self.query_one(DataTable)
+        table.add_columns("ID", "Path", "Indexed", "Enabled")
+        self.refresh_table()
+
+    def refresh_table(self) -> None:
+        table = self.query_one(DataTable)
+        table.clear()
+        for directory in self.config_data:
+            id_str = str(directory.get("id", ""))
+            path_str = directory.get("path", "")
+            indexed_str = "✓" if directory.get("is_indexed") else "✗"
+            enabled_str = "✓" if directory.get("is_enabled") else "✗"
+            table.add_row(id_str, path_str, indexed_str, enabled_str)
+
+    def action_toggle_enabled(self) -> None:
+        table = self.query_one(DataTable)
+        if table.cursor_coordinate is None:
+            return
+        row = table.cursor_coordinate.row
+        if 0 <= row < len(self.config_data):
+            directory = self.config_data[row]
+            directory["is_enabled"] = not directory.get("is_enabled", False)
+            self.refresh_table()
+            table.move_cursor(row=row)

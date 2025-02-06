@@ -5,13 +5,15 @@ from typing import Dict, Any, List
 
 import typer
 
-from tui.editors import EnvConfigEditor, ConfigEditorBase, GeneratorConfigEditor
+from backend.api_client import BackendClient
+from tui.editors import EnvConfigEditor, ConfigEditorBase, GeneratorConfigEditor, DirectoryConfigEditor
 from utils import get_config_file
 
 
 class ConfigManager(ABC):
     def __init__(self, service_name: str):
         self.service_name = service_name
+        self._is_modified = False
 
     @property
     @abstractmethod
@@ -23,44 +25,51 @@ class ConfigManager(ABC):
     def config_file(self) -> Path:
         pass
 
+    @property
+    @abstractmethod
+    def requires_restart(self):
+        pass
+
+    @property
+    def is_modified(self) -> bool:
+        return self._is_modified
+
+    @is_modified.setter
+    def is_modified(self, value):
+        self._is_modified = value
+
     @abstractmethod
     def load(self):
         pass
 
     @abstractmethod
-    def save(self, config: Dict[str, str]):
+    def save(self, config):
         pass
 
-    def show(self) -> None:
-        config = self.load()
-        for k, v in config.items():
-            print(f"{k}={v}")
-
     def edit(self):
+        self.is_modified = False
         self.editor.run()
 
     def apply(self):
-        from docker.docker_compose_manager import DockerComposeManager
-        manager = DockerComposeManager()
-        manager.start_containers()
+        if self.requires_restart:
+            typer.echo("Restarting...")
+            from docker.docker_compose_manager import DockerComposeManager
+            manager = DockerComposeManager()
+            manager.start_containers()
 
-    def handle(self, action):
-        if action == "show":
-            self.show()
-
-        elif action == "edit":
-            self.edit()
-
-        elif action == "apply":
-            typer.echo("Applying new configuration and restarting services...")
+    def handle(self):
+        self.edit()
+        if self.is_modified:
+            typer.echo("Applying new configuration...")
             self.apply()
             typer.echo("Configuration applied.")
 
-        else:
-            typer.echo("Invalid action. Use show|edit|apply")
-
 
 class EnvConfigManager(ConfigManager):
+
+    @property
+    def requires_restart(self):
+        return True
 
     @property
     def config_file(self) -> Path:
@@ -98,6 +107,7 @@ class EnvConfigManager(ConfigManager):
         return config
 
     def save(self, config: Dict[str, Any]) -> None:
+        self.is_modified = True
         lines = []
         for key, value in config.items():
             if isinstance(value, bool):
@@ -115,6 +125,10 @@ class EnvConfigManager(ConfigManager):
 
 class GeneratorConfigManager(ConfigManager):
     @property
+    def requires_restart(self):
+        return False
+
+    @property
     def editor(self) -> ConfigEditorBase:
         return GeneratorConfigEditor(self.load(), self.save)
 
@@ -130,6 +144,7 @@ class GeneratorConfigManager(ConfigManager):
             return []
 
     def save(self, config: Dict[str, str]):
+        self.is_modified = True
         with self.config_file.open("w") as f:
             json.dump(config, f, indent=2)
 
@@ -160,3 +175,34 @@ class GeneratorConfigManager(ConfigManager):
             })
 
         return request_data
+
+
+class DirectoryConfigManager(ConfigManager):
+
+    def __init__(self, service_name: str, backend_client: BackendClient):
+        super().__init__(service_name)
+        self.client = backend_client
+        self._original_config = self.load()
+
+    @property
+    def editor(self) -> ConfigEditorBase:
+        return DirectoryConfigEditor(self._original_config, self.save)
+
+    @property
+    def config_file(self) -> Path:
+        raise NotImplementedError()
+
+    @property
+    def requires_restart(self):
+        return False
+
+    def load(self):
+        return self.client.list_directories()["directories"]
+
+    def save(self, config: List):
+        self.is_modified = True
+
+        for directory in config:
+            self.client.update_directory(did=directory["id"], is_enabled=directory["is_enabled"])
+        # Update the stored original configuration.
+        self._original_config = config

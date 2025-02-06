@@ -31,12 +31,10 @@ def _create_template_generator_config(ctx: typer.Context):
 
 @generator_app.command("config")
 def generator_config(
-        ctx: typer.Context,
-        action: str = typer.Argument("show", help="Action to perform: edit|show|apply")
-):
+        ctx: typer.Context):
     manager = GeneratorConfigManager("generator")
 
     if not manager.config_file.exists():
         _create_template_generator_config(ctx)
 
-    manager.handle(action)
+    manager.handle()

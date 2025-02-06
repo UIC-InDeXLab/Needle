@@ -37,8 +37,6 @@ def search_log(ctx: typer.Context):
 
 @query_app.command("config")
 def search_config(
-        ctx: typer.Context,
-        action: str = typer.Argument(..., help="show|edit|apply")
-):
+        ctx: typer.Context):
     manager = EnvConfigManager(service_name="query")
-    manager.handle(action)
+    manager.handle()

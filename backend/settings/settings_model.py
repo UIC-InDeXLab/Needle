@@ -48,7 +48,6 @@ class QuerySettings(BaseModel):
 
 class DirectorySettings(BaseModel):
     num_watcher_workers: int = Field(4)
-    num_embedding_workers: int = Field(4)
     batch_size: int = Field(50)
     recursive_indexing: bool = Field(False)
     consistency_check_interval: int = Field(1800)

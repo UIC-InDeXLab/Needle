@@ -1,9 +1,8 @@
 from pymilvus import connections
 from pymilvus import utility, FieldSchema, CollectionSchema, DataType, Collection
 
-from core import EmbedderManager
-from database.database_manager import SessionLocal, Directory
-from monitoring import directory_watcher
+from core import embedder_manager
+from indexing import image_indexing_service
 from settings import settings
 
 
@@ -36,11 +35,11 @@ def create_collection_for_embedder(collection_name, embedder):
 def initialize():
     connect_to_milvus()
 
-    embedders = EmbedderManager.instance().get_image_embedders()
+    embedders = embedder_manager.get_image_embedders()
 
     for embedder_name, embedder in embedders.items():
         collection_name = f"{embedder_name}"
         create_collection_for_embedder(collection_name, embedder)
 
-    directory_watcher.start()
+    image_indexing_service.start()
 

@@ -1,8 +1,8 @@
 import torch
 from timm import create_model, data
-
 from core.singleton import Singleton
 from settings import settings
+import torch.nn as nn
 
 
 class ImageEmbedder:
@@ -12,39 +12,45 @@ class ImageEmbedder:
         self._device = device
         self._weight = weight
 
-        self.model = create_model(model_name, pretrained=True, num_classes=0).to(device)
+        # Create and move the model to the device.
+        model = create_model(model_name, pretrained=True, num_classes=0).to(device)
+
+        # Wrap the model with DataParallel if more than one GPU is available.
+        if torch.cuda.is_available() and torch.cuda.device_count() > 1 and settings.service.use_cuda:
+            self.model = nn.DataParallel(model)
+        else:
+            self.model = model
+
         self.model.eval()
 
+        # Use the unwrapped model for configuration
         self.preprocess = self.get_preprocess()
-        self._weight = 1.0
         self._embedding_dim = self._determine_embedding_dim()
 
     def get_preprocess(self):
-        data_config = data.resolve_model_data_config(self.model)
+        # Unwrap the model if wrapped in DataParallel
+        model_for_config = self.model.module if hasattr(self.model, 'module') else self.model
+        data_config = data.resolve_model_data_config(model_for_config)
         return data.create_transform(**data_config, is_training=False)
 
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
-    def model_name(self) -> str:
-        return self._model_name
-
-    @property
-    def device(self) -> torch.device:
-        return self._device
-
     def embed(self, img_binary):
-        img_binary = self.preprocess(img_binary)
-        img_binary = img_binary.unsqueeze(0).to(self.device)
+        # Preprocess the image and add batch dimension.
+        img_tensor = self.preprocess(img_binary)
+        img_tensor = img_tensor.unsqueeze(0).to(self.device)
         with torch.no_grad():
-            embedding = self.model(img_binary).squeeze(0).cpu().numpy()
+            # DataParallel will split the batch across GPUs.
+            embedding = self.model(img_tensor).squeeze(0).cpu().numpy()
         return embedding
 
     def _determine_embedding_dim(self):
-        # Generate a dummy image tensor to determine the output dimension of the embedder
-        dummy_input = torch.zeros((3, 224, 224)).to(self.device)  # Assuming the input size is 3x224x224
+        # Unwrap the model to get the proper configuration.
+        model_for_config = self.model.module if hasattr(self.model, 'module') else self.model
+        data_config = data.resolve_model_data_config(model_for_config)
+        # Get the expected input size from the configuration; defaults to (3,224,224)
+        input_size = data_config.get("input_size", (3, 224, 224))
+
+        # Create a dummy input tensor with the correct size.
+        dummy_input = torch.zeros(input_size).to(self.device)
         dummy_input = self.preprocess(dummy_input).unsqueeze(0).to(self.device)
         with torch.no_grad():
             embedding = self.model(dummy_input).squeeze(0).cpu().numpy()
@@ -57,6 +63,10 @@ class ImageEmbedder:
     @property
     def weight(self):
         return self._weight
+
+    @property
+    def device(self):
+        return self._device
 
 
 @Singleton

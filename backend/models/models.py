@@ -15,6 +15,7 @@ class Directory(Base):
     id = Column(Integer, primary_key=True, index=True)
     path = Column(String, unique=True, index=True)
     is_indexed = Column(Boolean, default=False)
+    is_enabled = Column(Boolean, default=True)
 
     images = relationship("Image", back_populates="directory")
 

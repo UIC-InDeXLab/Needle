@@ -11,13 +11,13 @@ from pymilvus import Collection
 
 from core import embedder_manager, image_generator, query_manager
 from core.query import Query
-from database import SessionLocal, Directory, Image
+from models.models import SessionLocal, Directory, Image
 from initialize import initialize
 from models.schemas import AddDirectoryRequest, AddDirectoryResponse, HealthCheckResponse, DirectoryListResponse, \
     DirectoryModel, DirectoryDetailResponse, RemoveDirectoryResponse, RemoveDirectoryRequest, CreateQueryRequest, \
     CreateQueryResponse, GeneratorInfo, SearchLogsResponse, QueryLogEntry, \
     ServiceStatusResponse, ServiceLogResponse, SearchResponse, SearchRequest
-from monitoring import directory_watcher
+from indexing import image_indexing_service
 from utils import aggregate_rankings, pil_image_to_base64
 
 origins = ["http://localhost:3000", "http://127.0.0.1:3000", os.getenv("PUBLIC_IP", "http://127.0.0.1:3000")]
@@ -52,7 +52,7 @@ async def health_check():
 @app.post("/directory", response_model=AddDirectoryResponse)
 async def add_directory(request: AddDirectoryRequest):
     try:
-        did = directory_watcher.add_directory(request.path)
+        did = image_indexing_service.add_directory(request.path)
         return AddDirectoryResponse(status="directory added", id=did)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -106,7 +106,7 @@ async def get_directory(did: int):
 
 @app.delete("/directory", response_model=RemoveDirectoryResponse)
 async def remove_directory(request: RemoveDirectoryRequest):
-    directory_watcher.remove_directory(request.path)
+    image_indexing_service.remove_directory(request.path)
     return RemoveDirectoryResponse(status="Directory removed successfully.")
 
 
@@ -143,7 +143,8 @@ async def search(
     embedders = embedder_manager.get_image_embedders()
 
     with SessionLocal() as session:
-        indexed_directories = session.query(Directory.id).filter(Directory.is_indexed == True).all()
+        indexed_directories = session.query(Directory.id).filter(
+            Directory.is_indexed == True, Directory.is_enabled == True).all()
 
     indexed_directory_ids = [d[0] for d in indexed_directories]
     if not indexed_directory_ids:

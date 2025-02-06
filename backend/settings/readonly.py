@@ -1,9 +1,6 @@
-import logging
+from monitoring import logger
 
 from .settings_model import Settings
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("ReadOnlySettings")
 
 
 class ReadOnlySettings:

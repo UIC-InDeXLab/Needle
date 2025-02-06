@@ -16,7 +16,8 @@ from initialize import initialize
 from models.schemas import AddDirectoryRequest, AddDirectoryResponse, HealthCheckResponse, DirectoryListResponse, \
     DirectoryModel, DirectoryDetailResponse, RemoveDirectoryResponse, RemoveDirectoryRequest, CreateQueryRequest, \
     CreateQueryResponse, GeneratorInfo, SearchLogsResponse, QueryLogEntry, \
-    ServiceStatusResponse, ServiceLogResponse, SearchResponse, SearchRequest
+    ServiceStatusResponse, ServiceLogResponse, SearchResponse, SearchRequest, UpdateDirectoryResponse, \
+    UpdateDirectoryRequest
 from indexing import image_indexing_service
 from utils import aggregate_rankings, pil_image_to_base64
 
@@ -63,7 +64,7 @@ async def get_directories():
     with SessionLocal() as session:
         directories = session.query(Directory).all()
         directory_models = [
-            DirectoryModel(id=d.id, path=d.path, is_indexed=d.is_indexed)
+            DirectoryModel(id=d.id, path=d.path, is_indexed=d.is_indexed, is_enabled=d.is_enabled)
             for d in directories
         ]
     return DirectoryListResponse(directories=directory_models)
@@ -94,13 +95,39 @@ async def get_directory(did: int):
         directory_model = DirectoryModel(
             id=directory.id,
             path=directory.path,
-            is_indexed=directory.is_indexed
+            is_indexed=directory.is_indexed,
+            is_enabled=directory.is_enabled
         )
 
     return DirectoryDetailResponse(
         directory=directory_model,
         images=image_paths,
         indexing_ratio=ratio
+    )
+
+
+@app.put("/directory/{did}", response_model=UpdateDirectoryResponse)
+async def update_directory(did: int, request: UpdateDirectoryRequest):
+    with SessionLocal() as session:
+        directory = session.query(Directory).filter_by(id=did).first()
+        if not directory:
+            raise HTTPException(status_code=404, detail="Directory not found")
+
+        # Update only the is_enabled field
+        directory.is_enabled = request.is_enabled
+
+        session.commit()
+
+        updated_directory = DirectoryModel(
+            id=directory.id,
+            path=directory.path,
+            is_indexed=directory.is_indexed,
+            is_enabled=directory.is_enabled
+        )
+
+    return UpdateDirectoryResponse(
+        status="Directory updated successfully",
+        directory=updated_directory
     )
 
 

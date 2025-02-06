@@ -26,6 +26,7 @@ class DirectoryModel(BaseModel):
     id: int
     path: str
     is_indexed: bool
+    is_enabled: bool
 
 
 class DirectoryListResponse(BaseModel):
@@ -46,6 +47,15 @@ class RemoveDirectoryResponse(BaseModel):
     status: str
 
 
+class UpdateDirectoryRequest(BaseModel):
+    is_enabled: bool = Field(..., description="Flag indicating if the directory is enabled for search")
+
+
+class UpdateDirectoryResponse(BaseModel):
+    status: str
+    directory: 'DirectoryModel'
+
+
 class CreateQueryRequest(BaseModel):
     q: str = Field(..., description="Query string")
 
@@ -62,15 +72,18 @@ class EngineConfig(BaseModel):
 class GenerationConfig(BaseModel):
     engines: List[EngineConfig]
     num_engines_to_use: int = Field(settings.query.num_engines_to_use, description="Number of engines to use")
-    num_images: int = Field(settings.query.num_images_to_generate, description="Number of images to generate per engine")
+    num_images: int = Field(settings.query.num_images_to_generate,
+                            description="Number of images to generate per engine")
     image_size: int = Field(settings.query.generated_image_size, description="Image size in pixels")
     use_fallback: bool = Field(settings.query.use_fallback, description="Whether to use fallback engines on failure")
 
 
 class SearchRequest(BaseModel):
     qid: int = Field(..., description="Query ID to search for")
-    num_images_to_retrieve: int = Field(settings.query.num_images_to_retrieve, description="Number of images to retrieve from the search")
-    include_base_images_in_preview: bool = Field(settings.query.include_base_images_in_preview, description="Whether to include base images in the preview")
+    num_images_to_retrieve: int = Field(settings.query.num_images_to_retrieve,
+                                        description="Number of images to retrieve from the search")
+    include_base_images_in_preview: bool = Field(settings.query.include_base_images_in_preview,
+                                                 description="Whether to include base images in the preview")
     generation_config: GenerationConfig = Field(..., description="Configuration for image generation")
 
 

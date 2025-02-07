@@ -1,39 +1,45 @@
 name: Build & Push Docker Image
-
 on:
   push:
     branches: [ "main" ]
     paths:
       - 'backend/**'
-
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0  # Ensure full git history for tag discovery
 
-      # Retrieve the most recent tag for the backend (e.g. backend/v1.2.3)
+      # Modified tag retrieval to explicitly filter for backend version tags
       - name: Get previous backend tag
         id: get_prev_tag
-        uses: WyriHaximus/github-action-get-previous-tag@v1
-        with:
-          tag_prefix: "backend/v"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LATEST_TAG=$(git tag -l "backend/v*" --sort=-v:refname | head -n 1)
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No existing backend version tags found, using backend/v0.1.0"
+            echo "tag=backend/v0.1.0" >> $GITHUB_OUTPUT
+          else
+            echo "Found latest tag: $LATEST_TAG"
+            echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          fi
 
-      # Compute the next semantic version based on the previous tag.
-      # (This example assumes you want to bump the patch number;
-      # adjust if you need minor/major bumps based on commit messages.)
+      # Extract version number without prefix for semver calculation
+      - name: Extract version number
+        id: version
+        run: |
+          VERSION="${{ steps.get_prev_tag.outputs.tag }}"
+          VERSION=${VERSION#backend/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      # Compute next version using semver
       - name: Compute next backend version
         id: semver
         uses: WyriHaximus/github-action-next-semvers@v1
         with:
-          tag_prefix: "backend/v"
-          version: ${{ steps.get_prev_tag.outputs.tag }}
+          version: ${{ steps.version.outputs.version }}
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -41,7 +47,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
 
-      # Build the Docker image by passing the computed version as a build argument.
+      # Build the Docker image by passing the computed version as a build argument
       - name: Build Docker Image with semantic version
         run: |
           BACKEND_VERSION=${{ steps.semver.outputs.patch }}
@@ -52,15 +58,25 @@ jobs:
             -t ${{ secrets.DOCKERHUB_USERNAME }}/needle:backend-v${BACKEND_VERSION} \
             ./backend
 
-      # Optionally, tag the image as latest.
+      # Tag as latest
       - name: Tag as latest
         run: |
           BACKEND_VERSION=${{ steps.semver.outputs.patch }}
           docker tag ${{ secrets.DOCKERHUB_USERNAME }}/needle:backend-v${BACKEND_VERSION} \
             ${{ secrets.DOCKERHUB_USERNAME }}/needle:latest
 
+      # Push both version tag and latest tag
       - name: Push Both Tags
         run: |
           BACKEND_VERSION=${{ steps.semver.outputs.patch }}
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/needle:backend-v${BACKEND_VERSION}
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/needle:latest
+
+      # Create a new git tag for the backend version
+      - name: Create new backend version tag
+        run: |
+          BACKEND_VERSION=${{ steps.semver.outputs.patch }}
+          git tag backend/v${BACKEND_VERSION}
+          git push origin backend/v${BACKEND_VERSION}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

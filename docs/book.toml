@@ -4,3 +4,11 @@ language = "en"
 multilingual = false
 src = "src"
 title = "Needle"
+
+
+[output.html]
+default-theme = "rust"
+preferred-dark-theme = "rust"
+smart-punctuation = true
+git-repository-url = "https://github.com/UIC-IndexLab/Needle"
+git-repository-icon = "fa-github"

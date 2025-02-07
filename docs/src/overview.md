@@ -12,6 +12,12 @@ Needle is an image retrieval database with high accuracy that can easily handle 
 ![Needle Demo](media/needle-demo.gif)
 *Watch as Needle transforms natural language queries into precise image retrieval results in real time.*
 
+
+## Comparison to State-of-the-Art Methods
+Curious how Needle measures up against other cutting-edge approaches? Here, you'll soon find performance plots that compare Needle with alternative image retrieval methods.  
+
+TBD! 
+
 <!-- Call to Action -->
 ## Get Started Today!
 Ready to revolutionize your image retrieval process? 🚀  
@@ -19,4 +25,18 @@ Install and test Needle now to experience the future of multimodal search!
 
 > **Tip:** For detailed installation instructions, check out the [Getting Started](getting-started.md) section.
 
----
+## Cite us 
+
+For a deep dive into Needle’s theoretical guarantees and performance insights, please refer to our research paper.
+- [**Needle: A Generative-AI Powered Monte Carlo Method for Answering Complex Natural Language Queries on Multi-modal Data**](https://arxiv.org/abs/2412.00639)
+
+If you find Needle beneficial for your work, we kindly ask that you cite our work to help support continued innovation.
+
+```bibtex  
+@article{erfanian2024needle,
+  title={Needle: A Generative-AI Powered Monte Carlo Method for Answering Complex Natural Language Queries on Multi-modal Data},
+  author={Erfanian, Mahdi and Dehghankar, Mohsen and Asudeh, Abolfazl},
+  journal={arXiv preprint arXiv:2412.00639},
+  year={2024}
+}
+```  

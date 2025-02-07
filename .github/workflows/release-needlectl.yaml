@@ -1,26 +1,60 @@
 name: Build and Release needlectl
-
 on:
   push:
     branches:
       - main
     paths:
       - needlectl/**
-
 jobs:
   build-and-release:
     runs-on: ubuntu-20.04
-
     steps:
-      # Checkout the repository
+      # Checkout the repository with full history
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Ensure full git history for tag discovery
+
+      # Get version information
+      - name: Get version information
+        id: version
+        run: |
+          # Get the latest needlectl tag
+          LATEST_TAG=$(git tag -l "needlectl/v*" --sort=-v:refname | head -n 1)
+
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No existing tags found, using needlectl/v0.1.0"
+            echo "base_version=0.1.0" >> $GITHUB_OUTPUT
+            COMMIT_COUNT=$(git rev-list --count HEAD)
+          else
+            echo "Found latest tag: $LATEST_TAG"
+            # Extract version number without prefix
+            BASE_VERSION=${LATEST_TAG#needlectl/v}
+            echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
+            # Count commits since last tag
+            COMMIT_COUNT=$(git rev-list --count $LATEST_TAG..HEAD)
+          fi
+
+          # Split the base version
+          IFS='.' read -r major minor patch <<< "$BASE_VERSION"
+
+          # Calculate new version
+          NEW_PATCH=$((patch + COMMIT_COUNT))
+          NEW_VERSION="${major}.${minor}.${NEW_PATCH}"
+
+          echo "New version will be: $NEW_VERSION"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
       # Set up Python environment
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
+
+      # Create version.py file
+      - name: Create version file
+        run: |
+          echo "VERSION = '${{ steps.version.outputs.version }}'" > needlectl/cli/version.py
 
       # Install dependencies and build needlectl
       - name: Build needlectl
@@ -35,19 +69,28 @@ jobs:
           mkdir -p release
           mv needlectl/dist/needlectl release/
 
-      # Create or update the "latest" release
-      - name: Create or Update Latest Release
-        id: create_release
+      # Create versioned release
+      - name: Create Versioned Release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: needlectl/v${{ steps.version.outputs.version }}
+          name: "needlectl v${{ steps.version.outputs.version }}"
+          artifacts: release/needlectl
+          allowUpdates: false
+
+      # Update latest release
+      - name: Update Latest Release
         uses: ncipollo/release-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: latest
-          name: "needlectl"
+          name: "needlectl (latest)"
           artifacts: release/needlectl
-          replacesArtifacts: 'true'
-          allowUpdates: 'true'
+          replacesArtifacts: true
+          allowUpdates: true
 
-      # Add an optional step to clean up
+      # Clean up
       - name: Clean up
         run: |
           rm -rf needlectl/dist needlectl/build needlectl/build_env release

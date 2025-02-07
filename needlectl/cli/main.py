@@ -6,6 +6,7 @@ from cli.directory import directory_app
 from cli.generator import generator_app
 from cli.query import query_app
 from cli.service import service_app
+from cli.version import VERSION as NEEDLECTL_VERSION
 from docker.docker_compose_manager import DockerComposeManager
 
 app = typer.Typer(help="command line interface for Needle")
@@ -23,12 +24,15 @@ def get_backend_version() -> str:
     backend_version = manager.get_backend_version()
     return backend_version
 
+
 def version_callback(value: bool):
     """Callback for --version flag"""
     if value:
         backend_version = get_backend_version()
         typer.echo(f"Backend version: {backend_version}")
+        typer.echo(f"Needlectl version: {NEEDLECTL_VERSION}")
         raise typer.Exit()
+
 
 @app.callback()
 def main(

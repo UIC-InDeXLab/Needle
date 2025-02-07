@@ -13,6 +13,26 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Ensure full git history for tag discovery
+
+      # Retrieve the most recent tag for the backend (e.g. backend/v1.2.3)
+      - name: Get previous backend tag
+        id: get_prev_tag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
+        with:
+          tag_prefix: "backend/v"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Compute the next semantic version based on the previous tag.
+      # (This example assumes you want to bump the patch number;
+      # adjust if you need minor/major bumps based on commit messages.)
+      - name: Compute next backend version
+        id: semver
+        uses: WyriHaximus/github-action-next-semvers@v1
+        with:
+          version: ${{ steps.get_prev_tag.outputs.tag }}
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -20,25 +40,26 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
 
-      - name: Build Docker Image (short SHA tag)
+      # Build the Docker image by passing the computed version as a build argument.
+      - name: Build Docker Image with semantic version
         run: |
-          SHORT_SHA="${{ github.sha }}"
-          SHORT_SHA="${SHORT_SHA:0:7}"
+          BACKEND_VERSION=${{ steps.semver.outputs.patch }}
+          echo "Building image with version: ${BACKEND_VERSION}"
           docker build \
+            --build-arg BACKEND_VERSION=${BACKEND_VERSION} \
             -f backend/Dockerfile \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/needle:sha-${SHORT_SHA} \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/needle:backend-v${BACKEND_VERSION} \
             ./backend
 
+      # Optionally, tag the image as latest.
       - name: Tag as latest
         run: |
-          SHORT_SHA="${{ github.sha }}"
-          SHORT_SHA="${SHORT_SHA:0:7}"
-          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/needle:sha-${SHORT_SHA} \
+          BACKEND_VERSION=${{ steps.semver.outputs.patch }}
+          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/needle:backend-v${BACKEND_VERSION} \
             ${{ secrets.DOCKERHUB_USERNAME }}/needle:latest
 
       - name: Push Both Tags
         run: |
-          SHORT_SHA="${{ github.sha }}"
-          SHORT_SHA="${SHORT_SHA:0:7}"
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/needle:sha-${SHORT_SHA}
+          BACKEND_VERSION=${{ steps.semver.outputs.patch }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/needle:backend-v${BACKEND_VERSION}
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/needle:latest

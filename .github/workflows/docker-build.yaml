@@ -32,6 +32,7 @@ jobs:
         id: semver
         uses: WyriHaximus/github-action-next-semvers@v1
         with:
+          tag_prefix: "backend/v"
           version: ${{ steps.get_prev_tag.outputs.tag }}
 
       - name: Login to Docker Hub

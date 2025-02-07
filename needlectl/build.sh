@@ -20,7 +20,7 @@ source build_env/bin/activate
 pip install -r requirements.txt
 
 # Assuming needlectl.py is in the current directory
-pyinstaller --add-data "tui/styles/base.css:tui/styles" --onefile needlectl.py
+pyinstaller --add-data "tui/styles/base.css:tui/styles" --onefile needlectl.py --collect-submodules shellingham
 
 # Move the binary to system-wide location
 

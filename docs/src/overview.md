@@ -5,16 +5,20 @@
 *We have found the* ***Needle*** *in haystack!* 🪡🔍
 
 <!-- Description -->
-Needle is an image retrieval database with high accuracy that can easily handle complex queries in natural language. It is **Fast**, **Efficient**, and **Precise**, outperforming state-of-the-art methods. Born from high-end research, Needle is designed to be accessible to everyone while delivering top-notch performance. Whether you’re a researcher, developer, or an enthusiast, Needle opens up innovative ways to explore your image datasets. ✨
+Needle is an open-source image retrieval database with high accuracy that can easily handle complex queries in natural language. It is **Fast**, **Efficient**, and **Precise**, outperforming state-of-the-art methods. Born from high-end research, Needle is designed to be accessible to everyone while delivering top-notch performance. Whether you’re a researcher, developer, or an enthusiast, Needle opens up innovative ways to explore your image datasets. ✨
 
 <!-- Demonstration GIF -->
 ## See Needle in Action
-![Needle Demo](media/needle-demo.gif)
+
+<video controls>
+  <source src="media/needle-demo.mp4" type="video/mp4">
+</video>
+
 *Watch as Needle transforms natural language queries into precise image retrieval results in real time.*
 
 
 ## Comparison to State-of-the-Art Methods
-Curious how Needle measures up against other cutting-edge approaches? Here, you'll soon find performance plots that compare Needle with alternative image retrieval methods.  
+Curious how Needle measures up against other cutting-edge approaches? Here, you'll soon find performance plots that compare Needle with OPEN-AI CLIP image retrieval method for LVIS, Caltech256 and BDD100k.   
 
 TBD! 
 

@@ -20,7 +20,116 @@ Needle is an open-source image retrieval database with high accuracy that can ea
 ## Comparison to State-of-the-Art Methods
 Curious how Needle measures up against other cutting-edge approaches? Here, you'll soon find performance plots that compare Needle with OPEN-AI CLIP image retrieval method for LVIS, Caltech256 and BDD100k.   
 
-TBD! 
+<!DOCTYPE html>
+<div class="chart-container" style="font-family: system-ui, -apple-system, sans-serif;">
+    <div style="background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
+        <h3 style="margin-top: 0; color: #333;">User Preference Comparison</h3>
+        <h4 style="margin-top: 0; color: #333;">Which one do you prefer for your queries?</h4>
+        <div style="height: 400px;">
+            <canvas id="preferenceChart"></canvas>
+        </div>
+    </div>
+    <div style="background: white; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
+        <h3 style="margin-top: 0; color: #333;">Mean Average Precision Across Datasets</h3>
+        <div style="height: 400px;">
+            <canvas id="precisionChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Preference Data
+    const preferenceCtx = document.getElementById('preferenceChart').getContext('2d');
+    new Chart(preferenceCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Needle', 'CLIP', 'Both', 'Neither'],
+            datasets: [
+                {
+                    label: 'Needle',
+                    data: [52.52, 23.23, 14.15, 10.1],
+                    backgroundColor: '#bbddf5',
+                    borderColor: '#367ea4',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + context.raw + '%';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Score (%)'
+                    }
+                }
+            }
+        }
+    });
+
+    // Precision Data
+    const precisionCtx = document.getElementById('precisionChart').getContext('2d');
+    new Chart(precisionCtx, {
+        type: 'bar',
+        data: {
+            labels: ['LVIS', 'Caltech256', 'BDD100K', 'NoCaps', 'SentiCap'],
+            datasets: [
+                {
+                    label: 'Needle',
+                    data: [0.31, 0.95, 0.83, 0.37, 0.34],
+                    backgroundColor: '#bbddf5',
+                    borderColor: '#367ea4',
+                    borderWidth: 1
+                },
+                {
+                    label: 'CLIP',
+                    data: [0.16, 0.94, 0.76, 0.11, 0.24],
+                    backgroundColor: '#f9f0d6',
+                    borderColor: '#ffac33',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + context.raw.toFixed(2);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 1,
+                    title: {
+                        display: true,
+                        text: 'Mean Average Precision'
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
 
 <!-- Call to Action -->
 ## Get Started Today!

@@ -1,4 +1,20 @@
 
+<p align="center">
+  <img src="docs/src/media/needle-banner-transparent.png" width="300" style="border-radius: 20px;" alt="Needle Banner"/>
+</p>
+
+<p align="center">
+  <a href="https://uic-indexlab.github.io/Needle/overview.html">
+    <img src="https://img.shields.io/badge/doc-Homepage-blue" alt="Homepage">
+  </a>
+  <a href="https://arxiv.org/abs/2412.00639">
+    <img src="https://img.shields.io/badge/arXiv-Link-orange" alt="ArXiv">
+  </a>
+  <a href="https://www.youtube.com/watch?v=n-SXX_ry9-0&t=122s">
+    <img src="https://img.shields.io/badge/demo-Youtube-purple" alt="Youtube">
+  </a>
+</p>
+
 # 🪡 Needle: A Database for Image Content Retrieval
 
 Needle is a deployment-ready system for Image retrieval, designed to empower researchers and developers with a powerful tool for querying **images** using natural language descriptions. It’s based on the research presented in [our paper](https://arxiv.org/abs/2412.00639), introducing a novel approach to efficient and scalable retrieval.
@@ -13,9 +29,11 @@ Needle is a deployment-ready system for Image retrieval, designed to empower res
 
 ## 🎥 Demonstration
 
-In this demonstration, we demonstrate Needle's effectiveness on complex natural language queries. In default configuration, Needle generates 4 base images (k = 4) with image size 512x512. 
+Watch as Needle transforms natural language queries into precise image retrieval results in real time.
 
-![Demo](media/demo.gif)
+<p align="center">
+    <img src="media/needle_demo.gif"/>
+</p>
 
 ---
 
@@ -31,24 +49,10 @@ Then, you can start needle service using this command:
 needlectl service start
 ```
 
-### 🧹 Uninstallation
+### 📄 Documentation 
 
-To uninstall Needle, run:
+Checkout [Needle documentation](https://www.cs.uic.edu/~indexlab/Needle/) to learn more about Needle CLI and its capabilities.
 
-```bash  
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/uninstall.sh | bash  
-```  
-
----
-
-## 🔍 A Little About `needlectl`
-
-`needlectl` is the core command-line utility for interacting with Needle. It allows you to:
-- 🔎 Perform searches on multimedia datasets.
-- 🛠️ Add or update image datasets (directories) for retrieval.
-With `needlectl`, you can easily integrate Needle into your workflows for seamless and intuitive operation.
-More on `needlectl` in [here](https://github.com/UIC-InDeXLab/Needle/tree/main/cli)
----
 
 ## 📚 Reference
 

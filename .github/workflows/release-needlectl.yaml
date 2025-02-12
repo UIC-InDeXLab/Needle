@@ -1,96 +1,168 @@
 name: Build and Release needlectl
+
 on:
   push:
     branches:
       - main
     paths:
       - needlectl/**
+
 jobs:
-  build-and-release:
+  # A preparation job that computes the new version from git tags.
+  prepare:
     runs-on: ubuntu-20.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
-      # Checkout the repository with full history
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Ensure full git history for tag discovery
+          fetch-depth: 0  # full git history for tag discovery
 
-      # Get version information
       - name: Get version information
         id: version
         run: |
           # Get the latest needlectl tag
           LATEST_TAG=$(git tag -l "needlectl/v*" --sort=-v:refname | head -n 1)
-
           if [ -z "$LATEST_TAG" ]; then
             echo "No existing tags found, using needlectl/v0.1.0"
             echo "base_version=0.1.0" >> $GITHUB_OUTPUT
             COMMIT_COUNT=$(git rev-list --count HEAD)
           else
             echo "Found latest tag: $LATEST_TAG"
-            # Extract version number without prefix
+            # Remove the prefix to extract the version number
             BASE_VERSION=${LATEST_TAG#needlectl/v}
             echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
-            # Count commits since last tag
+            # Count commits since the tag
             COMMIT_COUNT=$(git rev-list --count $LATEST_TAG..HEAD)
           fi
-
-          # Split the base version
           IFS='.' read -r major minor patch <<< "$BASE_VERSION"
-
-          # Calculate new version
           NEW_PATCH=$((patch + COMMIT_COUNT))
           NEW_VERSION="${major}.${minor}.${NEW_PATCH}"
-
           echo "New version will be: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-      # Set up Python environment
+  # Build job for Linux using an Ubuntu runner.
+  build-linux:
+    runs-on: ubuntu-20.04
+    needs: prepare
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      # Create version.py file
       - name: Create version file
         run: |
-          echo "VERSION = '${{ steps.version.outputs.version }}'" > needlectl/cli/version.py
+          echo "VERSION = '${{ needs.prepare.outputs.version }}'" > needlectl/cli/version.py
 
-      # Install dependencies and build needlectl
-      - name: Build needlectl
+      - name: Build needlectl for Linux
         run: |
           cd needlectl
           chmod +x build.sh
           ./build.sh
 
-      # Archive the binary
-      - name: Archive the binary
+      - name: Archive Linux binary
         run: |
-          mkdir -p release
-          mv needlectl/dist/needlectl release/
+          mkdir -p release/linux
+          mv needlectl/dist/needlectl release/linux/
 
-      # Create versioned release
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: needlectl-linux
+          path: release/linux/needlectl
+
+  # Build job for macOS using a macOS runner.
+  build-macos:
+    runs-on: macos-latest
+    needs: prepare
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Create version file
+        run: |
+          echo "VERSION = '${{ needs.prepare.outputs.version }}'" > needlectl/cli/version.py
+
+      - name: Build needlectl for macOS
+        run: |
+          cd needlectl
+          chmod +x build.sh
+          # Pass the target architecture flag so that PyInstaller builds a universal2 binary.
+          ./build.sh --target-arch universal2
+
+      - name: Archive macOS binary
+        run: |
+          mkdir -p release/macos
+          mv needlectl/dist/needlectl release/macos/
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: needlectl-macos
+          path: release/macos/needlectl
+
+  # Release job that gathers both artifacts and creates/updates the GitHub release.
+  release:
+    needs: [build-linux, build-macos]
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: needlectl-linux
+          path: release/linux
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: needlectl-macos
+          path: release/macos
+
       - name: Create Versioned Release
         uses: ncipollo/release-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag: needlectl/v${{ steps.version.outputs.version }}
-          name: "needlectl v${{ steps.version.outputs.version }}"
-          artifacts: release/needlectl
+          tag: needlectl/v${{ needs.prepare.outputs.version }}
+          name: "needlectl v${{ needs.prepare.outputs.version }}"
+          artifacts: |
+            release/linux/needlectl
+            release/macos/needlectl
           allowUpdates: false
 
-      # Update latest release
       - name: Update Latest Release
         uses: ncipollo/release-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: latest
           name: "needlectl (latest)"
-          artifacts: release/needlectl
+          artifacts: |
+            release/linux/needlectl
+            release/macos/needlectl
           replacesArtifacts: true
           allowUpdates: true
 
-      # Clean up
+  # Cleanup job (optional) to remove build artifacts from the repository workspace.
+  clean:
+    runs-on: ubuntu-20.04
+    needs: [build-linux, build-macos]
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
       - name: Clean up
         run: |
           rm -rf needlectl/dist needlectl/build needlectl/build_env release

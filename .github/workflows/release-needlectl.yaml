@@ -1,5 +1,4 @@
 name: Build and Release needlectl
-
 on:
   push:
     branches:
@@ -8,7 +7,6 @@ on:
       - needlectl/**
 
 jobs:
-  # A preparation job that computes the new version from git tags.
   prepare:
     runs-on: ubuntu-20.04
     outputs:
@@ -17,32 +15,37 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # full git history for tag discovery
+          fetch-depth: 0  # Ensure full git history for tag discovery
 
       - name: Get version information
         id: version
         run: |
           # Get the latest needlectl tag
           LATEST_TAG=$(git tag -l "needlectl/v*" --sort=-v:refname | head -n 1)
+
           if [ -z "$LATEST_TAG" ]; then
             echo "No existing tags found, using needlectl/v0.1.0"
             echo "base_version=0.1.0" >> $GITHUB_OUTPUT
             COMMIT_COUNT=$(git rev-list --count HEAD)
           else
             echo "Found latest tag: $LATEST_TAG"
-            # Remove the prefix to extract the version number
+            # Extract version number without prefix
             BASE_VERSION=${LATEST_TAG#needlectl/v}
             echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
-            # Count commits since the tag
+            # Count commits since last tag
             COMMIT_COUNT=$(git rev-list --count $LATEST_TAG..HEAD)
           fi
+
+          # Split the base version
           IFS='.' read -r major minor patch <<< "$BASE_VERSION"
+
+          # Calculate new version
           NEW_PATCH=$((patch + COMMIT_COUNT))
           NEW_VERSION="${major}.${minor}.${NEW_PATCH}"
+
           echo "New version will be: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-  # Build job for Linux using an Ubuntu runner.
   build-linux:
     runs-on: ubuntu-20.04
     needs: prepare
@@ -73,12 +76,11 @@ jobs:
           mv needlectl/dist/needlectl release/linux/
 
       - name: Upload Linux artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: needlectl-linux
           path: release/linux/needlectl
 
-  # Build job for macOS using a macOS runner.
   build-macos:
     runs-on: macos-latest
     needs: prepare
@@ -110,24 +112,23 @@ jobs:
           mv needlectl/dist/needlectl release/macos/
 
       - name: Upload macOS artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: needlectl-macos
           path: release/macos/needlectl
 
-  # Release job that gathers both artifacts and creates/updates the GitHub release.
   release:
     needs: [build-linux, build-macos]
     runs-on: ubuntu-20.04
     steps:
       - name: Download Linux artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: needlectl-linux
           path: release/linux
 
       - name: Download macOS artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: needlectl-macos
           path: release/macos
@@ -155,7 +156,6 @@ jobs:
           replacesArtifacts: true
           allowUpdates: true
 
-  # Cleanup job (optional) to remove build artifacts from the repository workspace.
   clean:
     runs-on: ubuntu-20.04
     needs: [build-linux, build-macos]

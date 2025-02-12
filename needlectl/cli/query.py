@@ -19,7 +19,7 @@ def search_run(ctx: typer.Context, prompt: str, n: Optional[int] = None, m: Opti
 
     if not engine_configs:
         typer.echo(
-            "No enabled and activated generator has been found! use 'needlectl generator config edit' to edit generator configurations. ")
+            "No enabled and activated generator has been found! use 'needlectl generator config' to edit generator configurations. ")
         raise typer.Exit(code=1)
 
     result = client.run_search(prompt=prompt, engine_configs=engine_configs, num_images_to_retrieve=n,

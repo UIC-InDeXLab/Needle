@@ -132,22 +132,26 @@ else
 fi
 
 ### Step 6: Download needlectl and make it accessible system-wide
-# Choose the correct release asset based on the OS.
-if [[ "$OS_TYPE" == "darwin"* ]]; then
-    # For macOS, use the mac-specific binary
-    NEEDLECTL_URL="https://github.com/UIC-InDeXLab/Needle/releases/download/latest/needlectl-macos"
-else
-    # For Linux, use the Linux binary
-    NEEDLECTL_URL="https://github.com/UIC-InDeXLab/Needle/releases/download/latest/needlectl-linux"
-fi
-
 NEEDLECTL_PATH="/usr/local/bin/needlectl"
 
-echo -e "${GREEN}Downloading needlectl tool from ${NEEDLECTL_URL}...${NC}"
-sudo curl -fSL "${NEEDLECTL_URL}" -o "${NEEDLECTL_PATH}"
+# Choose the correct binary based on OS
+if [[ "$OS_TYPE" == "darwin"* ]]; then
+    BINARY_NAME="needlectl-macos"
+else
+    BINARY_NAME="needlectl-linux"
+fi
+
+NEEDLECTL_URL="https://github.com/UIC-InDeXLab/Needle/releases/download/latest/${BINARY_NAME}"
+
+echo -e "${GREEN}Downloading latest needlectl for your platform...${NC}"
+if ! curl -fSL "${NEEDLECTL_URL}" -o "${NEEDLECTL_PATH}"; then
+    echo -e "${RED}Error: Failed to download needlectl. Installation cannot continue.${NC}"
+    exit 1
+fi
+
 sudo chmod +x "${NEEDLECTL_PATH}"
 
-echo -e "${GREEN}needlectl installed at ${NEEDLECTL_PATH}.${NC}"
+echo -e "${GREEN}needlectl installed at ${NEEDLECTL_PATH}${NC}"
 
 ### Step 7: Configure NEEDLE_HOME in user's shell file
 NEEDLE_HOME_VAR="export NEEDLE_HOME=\"${NEEDLE_HOME_DIR}\""

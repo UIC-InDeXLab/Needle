@@ -132,10 +132,18 @@ else
 fi
 
 ### Step 6: Download needlectl and make it accessible system-wide
-NEEDLECTL_URL="https://github.com/UIC-InDeXLab/Needle/releases/download/latest/needlectl"
+# Choose the correct release asset based on the OS.
+if [[ "$OS_TYPE" == "darwin"* ]]; then
+    # For macOS, use the mac-specific binary
+    NEEDLECTL_URL="https://github.com/UIC-InDeXLab/Needle/releases/download/latest/needlectl-macos"
+else
+    # For Linux, use the Linux binary
+    NEEDLECTL_URL="https://github.com/UIC-InDeXLab/Needle/releases/download/latest/needlectl-linux"
+fi
+
 NEEDLECTL_PATH="/usr/local/bin/needlectl"
 
-echo -e "${GREEN}Downloading needlectl tool...${NC}"
+echo -e "${GREEN}Downloading needlectl tool from ${NEEDLECTL_URL}...${NC}"
 sudo curl -fSL "${NEEDLECTL_URL}" -o "${NEEDLECTL_PATH}"
 sudo chmod +x "${NEEDLECTL_PATH}"
 

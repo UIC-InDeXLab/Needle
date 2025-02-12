@@ -116,10 +116,12 @@ jobs:
         with:
           name: needlectl-macos
           path: release/macos/needlectl
-
+  
   release:
     needs: [build-linux, build-macos]
     runs-on: ubuntu-20.04
+    permissions:
+      contents: write  # grant permission to create/update releases
     steps:
       - name: Download Linux artifact
         uses: actions/download-artifact@v4
@@ -155,6 +157,7 @@ jobs:
             release/macos/needlectl
           replacesArtifacts: true
           allowUpdates: true
+
 
   clean:
     runs-on: ubuntu-20.04

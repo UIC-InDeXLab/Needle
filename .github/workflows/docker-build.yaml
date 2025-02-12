@@ -25,11 +25,15 @@ jobs:
             COMMIT_COUNT=$(git rev-list --count HEAD)
           else
             echo "Found latest tag: $LATEST_TAG"
+            # Extract version number without prefix
             BASE_VERSION=${LATEST_TAG#backend/v}
             echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
+            # Count commits since last tag
             COMMIT_COUNT=$(git rev-list --count $LATEST_TAG..HEAD)
           fi
+          # Split the base version
           IFS='.' read -r major minor patch <<< "$BASE_VERSION"
+          # Calculate new version
           NEW_PATCH=$((patch + COMMIT_COUNT))
           NEW_VERSION="${major}.${minor}.${NEW_PATCH}"
           echo "New version will be: $NEW_VERSION"
@@ -44,6 +48,10 @@ jobs:
       - name: Set up Docker Buildx
         run: |
           docker buildx create --use --name builder || docker buildx use builder
+
+      - name: Register QEMU
+        run: |
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
       - name: Build and Push Multi-Arch Docker Image
         run: |

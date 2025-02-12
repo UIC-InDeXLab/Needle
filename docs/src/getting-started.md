@@ -12,7 +12,7 @@ Before installing Needle, ensure that you have the following prerequisites insta
 
 > **Warning:** Make sure your user account is added to the Docker group so you can run Docker commands (e.g., `docker ps`) without needing root privileges.
 
-> **Note:** Currently, Needle is supported on **Linux** and **macOS**.
+> **Note:** Currently, Needle is supported only on **Linux**.
 
 ## Installation
 

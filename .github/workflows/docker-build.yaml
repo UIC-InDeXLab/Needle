@@ -4,6 +4,7 @@ on:
     branches: [ "main" ]
     paths:
       - 'backend/**'
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
@@ -13,33 +14,24 @@ jobs:
         with:
           fetch-depth: 0  # Ensure full git history for tag discovery
 
-      # Get latest tag and count commits since then
       - name: Get version information
         id: version
         run: |
           # Get the latest backend tag
           LATEST_TAG=$(git tag -l "backend/v*" --sort=-v:refname | head -n 1)
-
           if [ -z "$LATEST_TAG" ]; then
             echo "No existing tags found, using backend/v0.1.0"
             echo "base_version=0.1.0" >> $GITHUB_OUTPUT
             COMMIT_COUNT=$(git rev-list --count HEAD)
           else
             echo "Found latest tag: $LATEST_TAG"
-            # Extract version number without prefix
             BASE_VERSION=${LATEST_TAG#backend/v}
             echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
-            # Count commits since last tag
             COMMIT_COUNT=$(git rev-list --count $LATEST_TAG..HEAD)
           fi
-
-          # Split the base version
           IFS='.' read -r major minor patch <<< "$BASE_VERSION"
-
-          # Calculate new version
           NEW_PATCH=$((patch + COMMIT_COUNT))
           NEW_VERSION="${major}.${minor}.${NEW_PATCH}"
-
           echo "New version will be: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
@@ -49,22 +41,19 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
 
-      # Build the Docker image
-      - name: Build Docker Image with version
+      - name: Set up Docker Buildx
+        run: |
+          docker buildx create --use --name builder || docker buildx use builder
+
+      - name: Build and Push Multi-Arch Docker Image
         run: |
           BACKEND_VERSION=${{ steps.version.outputs.version }}
           echo "Building image with version: ${BACKEND_VERSION}"
-          docker build \
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
             --build-arg BACKEND_VERSION=${BACKEND_VERSION} \
             -f backend/Dockerfile \
             -t ${{ secrets.DOCKERHUB_USERNAME }}/needle:backend-v${BACKEND_VERSION} \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/needle:latest \
+            --push \
             ./backend
-
-      # Tag and push both versions
-      - name: Tag and Push Images
-        run: |
-          BACKEND_VERSION=${{ steps.version.outputs.version }}
-          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/needle:backend-v${BACKEND_VERSION} \
-            ${{ secrets.DOCKERHUB_USERNAME }}/needle:latest
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/needle:backend-v${BACKEND_VERSION}
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/needle:latest

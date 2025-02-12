@@ -1,7 +1,7 @@
 
 # 🪡 Needle: A Database for Image Content Retrieval
 
-Needle is an advanced system for Image retrieval, designed to empower researchers and developers with a powerful tool for querying **images** using natural language descriptions. It’s based on the research presented in [our paper](https://arxiv.org/abs/2412.00639), introducing a novel approach to efficient and scalable retrieval.
+Needle is an advanced deployment-ready system for Image retrieval, designed to empower researchers and developers with a powerful tool for querying **images** using natural language descriptions. It’s based on the research presented in [our paper](https://arxiv.org/abs/2412.00639), introducing a novel approach to efficient and scalable retrieval.
 
 🚀 **Why Needle?**
 - Seamlessly retrieve image content from large datasets.

@@ -20,9 +20,11 @@ OS_TYPE="${OSTYPE}"
 if [[ "$OS_TYPE" == "darwin"* ]]; then
     # macOS typically uses zsh by default
     SHELL_RC_FILE="${INSTALL_HOME}/.zshrc"
+    DEFAULT_GROUP="staff"
     echo -e "${YELLOW}Detected macOS. Will configure environment variables in ${SHELL_RC_FILE}.${NC}"
 else
     SHELL_RC_FILE="${INSTALL_HOME}/.bashrc"
+    DEFAULT_GROUP="${INSTALL_USER}"
 fi
 
 ### Step 1: Check Dependencies
@@ -113,7 +115,7 @@ for config_file in "${CONFIG_FILES[@]}"; do
 done
 
 # Set proper permissions
-chown -R "${INSTALL_USER}:${INSTALL_USER}" "${NEEDLE_HOME_DIR}"
+chown -R "${INSTALL_USER}:${DEFAULT_GROUP}" "${NEEDLE_HOME_DIR}"
 chmod -R u+rwX "${NEEDLE_HOME_DIR}"
 
 echo -e "${GREEN}Configuration files stored in ${NEEDLE_HOME_DIR}/configs${NC}"

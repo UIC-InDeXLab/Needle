@@ -73,13 +73,13 @@ jobs:
       - name: Archive Linux binary
         run: |
           mkdir -p release/linux
-          mv needlectl/dist/needlectl release/linux/
+          mv needlectl/dist/needlectl release/linux/needlectl-linux
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
           name: needlectl-linux
-          path: release/linux/needlectl
+          path: release/linux/needlectl-linux
 
   build-macos:
     runs-on: macos-latest
@@ -103,25 +103,24 @@ jobs:
         run: |
           cd needlectl
           chmod +x build.sh
-          # Pass the target architecture flag so that PyInstaller builds a universal2 binary.
           ./build.sh --target-arch universal2
 
       - name: Archive macOS binary
         run: |
           mkdir -p release/macos
-          mv needlectl/dist/needlectl release/macos/
+          mv needlectl/dist/needlectl release/macos/needlectl-macos
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: needlectl-macos
-          path: release/macos/needlectl
+          path: release/macos/needlectl-macos
   
   release:
-    needs: [build-linux, build-macos]
+    needs: [prepare, build-linux, build-macos]
     runs-on: ubuntu-20.04
     permissions:
-      contents: write  # grant permission to create/update releases
+      contents: write
     steps:
       - name: Download Linux artifact
         uses: actions/download-artifact@v4
@@ -135,33 +134,38 @@ jobs:
           name: needlectl-macos
           path: release/macos
 
-      - name: Create Versioned Release
-        uses: ncipollo/release-action@v1
+      - name: Set file permissions
+        run: |
+          chmod +x release/linux/needlectl-linux
+          chmod +x release/macos/needlectl-macos
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: needlectl/v${{ needs.prepare.outputs.version }}
           name: "needlectl v${{ needs.prepare.outputs.version }}"
-          artifacts: |
-            release/linux/needlectl
-            release/macos/needlectl
-          allowUpdates: false
+          tag_name: "needlectl/v${{ needs.prepare.outputs.version }}"
+          files: |
+            release/linux/needlectl-linux
+            release/macos/needlectl-macos
+          draft: false
+          prerelease: false
+          generate_release_notes: true
 
       - name: Update Latest Release
-        uses: ncipollo/release-action@v1
+        uses: softprops/action-gh-release@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: latest
           name: "needlectl (latest)"
-          artifacts: |
-            release/linux/needlectl
-            release/macos/needlectl
-          replacesArtifacts: true
-          allowUpdates: true
-
+          tag_name: "latest"
+          files: |
+            release/linux/needlectl-linux
+            release/macos/needlectl-macos
+          draft: false
+          prerelease: false
+          update_existing: true
 
   clean:
     runs-on: ubuntu-20.04
-    needs: [build-linux, build-macos]
+    needs: [release]
     if: always()
     steps:
       - name: Checkout code

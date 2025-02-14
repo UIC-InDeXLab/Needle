@@ -1,0 +1,34 @@
+{
+  "image_embedders": [
+    {
+      "name": "eva",
+      "model_name": "eva02_large_patch14_448.mim_m38m_ft_in22k_in1k",
+      "weight": 0.8497
+    },
+    {
+      "name": "regnet",
+      "model_name": "regnety_1280.swag_ft_in1k",
+      "weight": 0.8235
+    },
+    {
+      "name": "dino",
+      "model_name": "vit_large_patch14_reg4_dinov2.lvd142m",
+      "weight": 0.8235
+    },
+    {
+      "name": "clip",
+      "model_name": "vit_large_patch14_clip_336.openai_ft_in12k_in1k",
+      "weight": 0.8146
+    },
+    {
+      "name": "convnextv2",
+      "model_name": "convnextv2_large.fcmae_ft_in22k_in1k_384",
+      "weight": 0.8184
+    },
+    {
+      "name": "bevit",
+      "model_name": "beitv2_large_patch16_224.in1k_ft_in22k_in1k",
+      "weight": 0.7660
+    }
+  ]
+}

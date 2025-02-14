@@ -20,13 +20,13 @@ class NeedleLogger:
 
         logger = logging.getLogger(logger_name)
         if not logger.handlers:
-            logger.setLevel(logging.INFO)
+            logger.setLevel(logging.DEBUG)
 
             file_handler = logging.FileHandler(log_filename)
-            file_handler.setLevel(logging.INFO)
+            file_handler.setLevel(logging.DEBUG)
 
             console_handler = logging.StreamHandler()
-            console_handler.setLevel(logging.INFO)
+            console_handler.setLevel(logging.DEBUG)
 
             # Include the caller's filename in each log record via %(filename)s
             formatter = logging.Formatter('%(asctime)s - %(filename)s - %(levelname)s - %(message)s')

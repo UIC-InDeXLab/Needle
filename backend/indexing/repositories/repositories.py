@@ -64,16 +64,20 @@ class MilvusRepository:
     def delete_entries(self, embedder_name: str, expr: str):
         collection = Collection(embedder_name)
         result = collection.delete(expr)
-        collection.flush()
+        # collection.flush()
         logger.info(f"Deleted {result.delete_count} entries in Milvus collection '{embedder_name}' using expr {expr}")
         return result
 
     def insert_entries(self, embedder_name: str, entries: List[Dict]):
         collection = Collection(embedder_name)
         collection.insert(entries)
-        collection.flush()
+        # collection.flush()
         logger.debug(f"Inserted {len(entries)} entries into Milvus collection '{embedder_name}'")
 
     def query_entries(self, embedder_name: str, expr: str, output_fields: List[str], batch_size: int = 1000):
         collection = Collection(embedder_name)
         return collection.query_iterator(expr=expr, output_fields=output_fields, batch_size=batch_size)
+
+    def flush(self, embedder_name: str):
+        collection = Collection(embedder_name)
+        collection.flush()

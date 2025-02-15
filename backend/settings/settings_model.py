@@ -40,7 +40,7 @@ class MilvusSettings(BaseModel):
 class QuerySettings(BaseModel):
     num_images_to_retrieve: int = Field(20)
     num_images_to_generate: int = Field(4)
-    generated_image_size: int = Field(512)
+    generated_image_size: str = Field("MEDIUM")
     num_engines_to_use: int = Field(1)
     use_fallback: bool = Field(True)
     include_base_images_in_preview: bool = Field(False)

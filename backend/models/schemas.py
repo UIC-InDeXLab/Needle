@@ -74,7 +74,7 @@ class GenerationConfig(BaseModel):
     num_engines_to_use: int = Field(settings.query.num_engines_to_use, description="Number of engines to use")
     num_images: int = Field(settings.query.num_images_to_generate,
                             description="Number of images to generate per engine")
-    image_size: int = Field(settings.query.generated_image_size, description="Image size in pixels")
+    image_size: str = Field(settings.query.generated_image_size, description="Image size in pixels")
     use_fallback: bool = Field(settings.query.use_fallback, description="Whether to use fallback engines on failure")
 
 

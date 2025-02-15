@@ -10,8 +10,8 @@ query_app = typer.Typer(help="Query the database.")
 
 
 @query_app.command("run")
-def search_run(ctx: typer.Context, prompt: str, n: Optional[int] = None, m: Optional[int] = None,
-               k: Optional[int] = None, image_size: Optional[int] = None, include_base_images: Optional[bool] = None,
+def search_run(ctx: typer.Context, prompt: str, n: Optional[int] = None, num_images_to_generate: Optional[int] = None,
+               num_engines: Optional[int] = None, image_size: Optional[str] = None, include_base_images: Optional[bool] = None,
                use_fallback: Optional[bool] = None):
     client = BackendClient(ctx.obj["api_url"])
     manager = GeneratorConfigManager("generator")
@@ -23,7 +23,7 @@ def search_run(ctx: typer.Context, prompt: str, n: Optional[int] = None, m: Opti
         raise typer.Exit(code=1)
 
     result = client.run_search(prompt=prompt, engine_configs=engine_configs, num_images_to_retrieve=n,
-                               num_images_per_engine=m, num_engines_to_use=k, image_size=image_size,
+                               num_images_per_engine=num_images_to_generate, num_engines_to_use=num_engines, image_size=image_size,
                                include_base_images=include_base_images, use_fallback=use_fallback)
     print_result(result, ctx.obj["output"])
 

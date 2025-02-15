@@ -93,7 +93,7 @@ class BackendClient:
             include_base_images: Optional[bool] = None,
             num_engines_to_use: Optional[int] = None,
             num_images_per_engine: Optional[int] = None,
-            image_size: Optional[int] = None,
+            image_size: Optional[str] = None,
             use_fallback: Optional[bool] = None
     ) -> Any:
         """

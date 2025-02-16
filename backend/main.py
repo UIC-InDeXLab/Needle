@@ -194,7 +194,7 @@ async def search(
         collection_name = f"{embedder_name}"
         collection = Collection(name=collection_name)
         collection.load()
-        verbose[embedder_name] = {}
+        verbose[embedder_name] = defaultdict(list)
 
         for i, (image, engine_name) in enumerate(generated_images):
             query_embedding = embedder.embed(image)
@@ -213,8 +213,7 @@ async def search(
 
             results[f"{embedder_name}_{i}"] = [hit.id for hit in search_results[0]]
 
-            current_rankings = verbose[embedder_name].get(engine_name, [])
-            verbose[embedder_name][engine_name] = current_rankings.append([hit.id for hit in search_results[0]])
+            verbose[embedder_name][engine_name].append([hit.id for hit in search_results[0]])
 
         rankings = [ranking for e, ranking in results.items() if e.startswith(embedder_name)]
         embedder_top_results = aggregate_rankings(rankings, weights=[1] * len(generated_images),

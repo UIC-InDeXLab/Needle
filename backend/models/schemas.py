@@ -84,6 +84,7 @@ class SearchRequest(BaseModel):
                                         description="Number of images to retrieve from the search")
     include_base_images_in_preview: bool = Field(settings.query.include_base_images_in_preview,
                                                  description="Whether to include base images in the preview")
+    verbose: bool = Field(True, description="Include Verbose results")
     generation_config: GenerationConfig = Field(..., description="Configuration for image generation")
 
 
@@ -92,6 +93,7 @@ class SearchResponse(BaseModel):
     qid: int
     preview_url: str
     base_images: Optional[List[str]] = None
+    verbose_results : Optional[Dict[str, Any]] = None
 
 
 class GeneratorRequirement(BaseModel):

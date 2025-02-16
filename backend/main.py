@@ -231,7 +231,8 @@ async def search(
         qid=request.qid,
         preview_url=str(request_obj.url_for("gallery", qid=request.qid)),
         base_images=[pil_image_to_base64(image) for image in
-                     generated_images] if request.include_base_images_in_preview else None
+                     generated_images] if request.include_base_images_in_preview else None,
+        verbose_results=query.embedder_results if request.verbose else None
     )
 
 

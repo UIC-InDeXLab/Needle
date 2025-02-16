@@ -189,10 +189,12 @@ async def search(
 
     results = {}
     ranking_weights = []
+    verbose = {}
     for embedder_name, embedder in embedders.items():
         collection_name = f"{embedder_name}"
         collection = Collection(name=collection_name)
         collection.load()
+        verbose[embedder_name] = {}
 
         for i, (image, engine_name) in enumerate(generated_images):
             query_embedding = embedder.embed(image)
@@ -211,6 +213,9 @@ async def search(
 
             results[f"{embedder_name}_{i}"] = [hit.id for hit in search_results[0]]
 
+            current_rankings = verbose[embedder_name].get(engine_name, [])
+            verbose[embedder_name][engine_name] = current_rankings.append([hit.id for hit in search_results[0]])
+
         rankings = [ranking for e, ranking in results.items() if e.startswith(embedder_name)]
         embedder_top_results = aggregate_rankings(rankings, weights=[1] * len(generated_images),
                                                   k=request.num_images_to_retrieve)
@@ -227,9 +232,6 @@ async def search(
 
     query_object.final_results = top_images
 
-    verbose_results = defaultdict(list)
-    for r, w, n in ranking_weights:
-        verbose_results[n].append(r)
 
     return SearchResponse(
         results=top_images,
@@ -237,7 +239,7 @@ async def search(
         preview_url=str(request_obj.url_for("gallery", qid=request.qid)),
         base_images=[pil_image_to_base64(image) for image in
                      generated_images] if request.include_base_images_in_preview else None,
-        verbose_results=verbose_results if request.verbose else None
+        verbose_results=verbose if request.verbose else None
     )
 
 

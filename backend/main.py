@@ -1,4 +1,5 @@
 import os
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from typing import List
 
@@ -216,15 +217,19 @@ async def search(
         query_object.add_embedder_results(embedder_name=embedder_name, results=embedder_top_results)
 
         for r in rankings:
-            ranking_weights.append((r, embedder.weight))
+            ranking_weights.append((r, embedder.weight, embedder_name))
 
     top_images = aggregate_rankings(
-        rankers_results=[r for r, w in ranking_weights],
-        weights=[w for r, w in ranking_weights],
+        rankers_results=[r for r, w, _ in ranking_weights],
+        weights=[w for r, w, _ in ranking_weights],
         k=request.num_images_to_retrieve
     )
 
     query_object.final_results = top_images
+
+    verbose_results = defaultdict(list)
+    for r, w, n in ranking_weights:
+        verbose_results[n].append(r)
 
     return SearchResponse(
         results=top_images,
@@ -232,7 +237,7 @@ async def search(
         preview_url=str(request_obj.url_for("gallery", qid=request.qid)),
         base_images=[pil_image_to_base64(image) for image in
                      generated_images] if request.include_base_images_in_preview else None,
-        verbose_results=query_object.embedder_results if request.verbose else None
+        verbose_results=verbose_results if request.verbose else None
     )
 
 

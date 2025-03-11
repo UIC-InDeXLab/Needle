@@ -85,21 +85,42 @@ document.addEventListener('DOMContentLoaded', function() {
     const precisionCtx = document.getElementById('precisionChart').getContext('2d');
     new Chart(precisionCtx, {
         type: 'bar',
-        data: {
-            labels: ['LVIS', 'Caltech256', 'BDD100K', 'NoCaps', 'SentiCap'],
+data: {
+            labels: ['LVIS', 'Caltech256', 'BDD100K', 'COCO'],
             datasets: [
                 {
                     label: 'Needle',
-                    data: [0.31, 0.95, 0.83, 0.37, 0.34],
-                    backgroundColor: '#bbddf5',
-                    borderColor: '#367ea4',
+                    data: [0.323, 0.966, 0.711, 0.977],
+                    backgroundColor: '#4caf50',
+                    borderColor: '#2e7d32',
                     borderWidth: 1
                 },
                 {
                     label: 'CLIP',
-                    data: [0.16, 0.94, 0.76, 0.11, 0.24],
-                    backgroundColor: '#f9f0d6',
-                    borderColor: '#ffac33',
+                    data: [0.168, 0.939, 0.670, 0.952],
+                    backgroundColor: '#2196f3',
+                    borderColor: '#1565c0',
+                    borderWidth: 1
+                },
+                {
+                    label: 'ALIGN',
+                    data: [0.207, 0.947, 0.573, 0.960],
+                    backgroundColor: '#ff9800',
+                    borderColor: '#ef6c00',
+                    borderWidth: 1
+                },
+                {
+                    label: 'FLAVA',
+                    data: [0.180, 0.903, 0.698, 0.941],
+                    backgroundColor: '#9c27b0',
+                    borderColor: '#6a1b9a',
+                    borderWidth: 1
+                },
+                {
+                    label: 'BLIP + MiniLM',
+                    data: [0.179, 0.838, 0.610, 0.951],
+                    backgroundColor: '#e91e63',
+                    borderColor: '#c2185b',
                     borderWidth: 1
                 }
             ]

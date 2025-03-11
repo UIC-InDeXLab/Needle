@@ -63,7 +63,7 @@ compare Needle with OPEN-AI CLIP image retrieval method for LVIS, Caltech256 and
             <div style="background: white; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
                 <h3 style="margin-block-start: 0" id="chartTitle">Mean Average Precision Across Datasets (All Queries)</h3>
                 <div style="height: 400px;">
-                    <canvas id="precisionChart"></canvas>
+                    <canvas id="allQueriesChart"></canvas>
                 </div>
             </div>
         </div>
@@ -71,7 +71,7 @@ compare Needle with OPEN-AI CLIP image retrieval method for LVIS, Caltech256 and
             <div style="background: white; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
                 <h3 style="margin-block-start: 0">Mean Average Precision Across Datasets (Hard Queries)</h3>
                 <div style="height: 400px;">
-                    <canvas id="precisionChart"></canvas>
+                    <canvas id="hardQueriesChart"></canvas>
                 </div>
             </div>
         </div>
@@ -167,22 +167,31 @@ compare Needle with OPEN-AI CLIP image retrieval method for LVIS, Caltech256 and
                 }
             ]
             };
-            const ctx = document.getElementById('precisionChart').getContext('2d');
-            new Chart(ctx, {
+            const allQueriesCtx = document.getElementById('allQueriesChart').getContext('2d');
+            const allQueriesChart = new Chart(allQueriesCtx, {
                 type: 'bar',
                 data: allQueriesData,
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                label: function (context) {
-                                    return context.dataset.label + ': ' + context.raw;
-                                }
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Mean Average Precision'
                             }
                         }
-                    },
+                    }
+                }
+            });
+            const hardQueriesCtx = document.getElementById('hardQueriesChart').getContext('2d');
+            const hardQueriesChart = new Chart(hardQueriesCtx, {
+                type: 'bar',
+                data: hardQueriesData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
                     scales: {
                         y: {
                             beginAtZero: true,

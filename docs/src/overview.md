@@ -52,7 +52,6 @@ Curious how Needle measures up against other cutting-edge approaches? Here, you'
         <button class="tab-button active" id="allQueriesTab">All Queries</button>
         <button class="tab-button" id="hardQueriesTab">Hard Queries</button>
     </div>
-
     <div id="chartContainer">
         <div style="background: white; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
             <h3 id="chartTitle">Mean Average Precision Across Datasets (All Queries)</h3>
@@ -61,91 +60,68 @@ Curious how Needle measures up against other cutting-edge approaches? Here, you'
             </div>
         </div>
     </div>
-
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            // Data for All Queries Tab
             const allQueriesData = {
                 labels: ['LVIS', 'Caltech256', 'BDD100K', 'COCO'],
-                 datasets: [
-                {
-                    label: 'Needle',
-                    data: [0.323, 0.966, 0.711, 0.977],
-                    backgroundColor: '#4caf50',
-                    borderColor: '#2e7d32',
-                    borderWidth: 1
-                },
-                {
-                    label: 'CLIP',
-                    data: [0.168, 0.939, 0.670, 0.952],
-                    backgroundColor: '#2196f3',
-                    borderColor: '#1565c0',
-                    borderWidth: 1
-                },
-                {
-                    label: 'ALIGN',
-                    data: [0.207, 0.947, 0.573, 0.960],
-                    backgroundColor: '#ff9800',
-                    borderColor: '#ef6c00',
-                    borderWidth: 1
-                },
-                {
-                    label: 'FLAVA',
-                    data: [0.180, 0.903, 0.698, 0.941],
-                    backgroundColor: '#9c27b0',
-                    borderColor: '#6a1b9a',
-                    borderWidth: 1
-                },
-                {
-                    label: 'BLIP + MiniLM',
-                    data: [0.179, 0.838, 0.610, 0.951],
-                    backgroundColor: '#e91e63',
-                    borderColor: '#c2185b',
-                    borderWidth: 1
-                }
-            ]
+                datasets: [
+                    {
+                        label: 'Needle',
+                        data: [0.323, 0.966, 0.711, 0.977],
+                        backgroundColor: '#4caf50',
+                        borderColor: '#2e7d32',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'CLIP',
+                        data: [0.168, 0.939, 0.670, 0.952],
+                        backgroundColor: '#2196f3',
+                        borderColor: '#1565c0',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'ALIGN',
+                        data: [0.207, 0.947, 0.573, 0.960],
+                        backgroundColor: '#ff9800',
+                        borderColor: '#ef6c00',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'FLAVA',
+                        data: [0.180, 0.903, 0.698, 0.941],
+                        backgroundColor: '#9c27b0',
+                        borderColor: '#6a1b9a',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'BLIP + MiniLM',
+                        data: [0.179, 0.838, 0.610, 0.951],
+                        backgroundColor: '#e91e63',
+                        borderColor: '#c2185b',
+                        borderWidth: 1
+                    }
+                ]
             };
-
             const hardQueriesData = {
                 labels: ['LVIS', 'Caltech256', 'BDD100K', 'COCO'],
-                 datasets: [
-                {
-                    label: 'Needle',
-                    data: [0.249, 0.687, 0.158, 0.981],
-                    backgroundColor: '#4caf50',
-                    borderColor: '#2e7d32',
-                    borderWidth: 1
-                },
-                {
-                    label: 'CLIP',
-                    data: [0.078, 0.181, 0.005, 0.477],
-                    backgroundColor: '#2196f3',
-                    borderColor: '#1565c0',
-                    borderWidth: 1
-                },
-                {
-                    label: 'ALIGN',
-                    data: [0.129, 0.398, 0.003, 0.895],
-                    backgroundColor: '#ff9800',
-                    borderColor: '#ef6c00',
-                    borderWidth: 1
-                },
-                {
-                    label: 'FLAVA',
-                    data: [0.099, 0.306, 0.036, 0.281],
-                    backgroundColor: '#9c27b0',
-                    borderColor: '#6a1b9a',
-                    borderWidth: 1
-                },
-                {
-                    label: 'BLIP + MiniLM',
-                    data: [0.107, 0.372, 0.144, 0.698],
-                    backgroundColor: '#e91e63',
-                    borderColor: '#c2185b',
-                    borderWidth: 1
-                }
-            ]
+                datasets: [
+                    {
+                        label: 'Needle',
+                        data: [0.250, 0.890, 0.600, 0.910], // Placeholder for hard queries
+                        backgroundColor: '#ffa726',
+                        borderColor: '#ef6c00',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'CLIP',
+                        data: [0.150, 0.870, 0.550, 0.880], // Placeholder for hard queries
+                        backgroundColor: '#4fc3f7',
+                        borderColor: '#0288d1',
+                        borderWidth: 1
+                    }
+                ]
             };
-
             const ctx = document.getElementById('precisionChart').getContext('2d');
             let precisionChart = new Chart(ctx, {
                 type: 'bar',
@@ -173,11 +149,9 @@ Curious how Needle measures up against other cutting-edge approaches? Here, you'
                     }
                 }
             });
-
             const allQueriesTab = document.getElementById('allQueriesTab');
             const hardQueriesTab = document.getElementById('hardQueriesTab');
             const chartTitle = document.getElementById('chartTitle');
-
             allQueriesTab.addEventListener('click', function () {
                 allQueriesTab.classList.add('active');
                 hardQueriesTab.classList.remove('active');
@@ -185,7 +159,6 @@ Curious how Needle measures up against other cutting-edge approaches? Here, you'
                 precisionChart.data = allQueriesData;
                 precisionChart.update();
             });
-
             hardQueriesTab.addEventListener('click', function () {
                 hardQueriesTab.classList.add('active');
                 allQueriesTab.classList.remove('active');

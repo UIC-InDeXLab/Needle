@@ -21,73 +21,52 @@ Needle is an open-source image retrieval database with high accuracy that can ea
 Curious how Needle measures up against other cutting-edge approaches? Here, you'll soon find performance plots that compare Needle with OPEN-AI CLIP image retrieval method for LVIS, Caltech256 and BDD100k.   
 
 <!DOCTYPE html>
-<div class="chart-container" style="font-family: system-ui, -apple-system, sans-serif;">
-    <div style="background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
-        <h3 style="margin-top: 0; color: #333;">User Preference Comparison</h3>
-        <h4 style="margin-top: 0; color: #333;">Which one do you prefer for your queries?</h4>
-        <div style="height: 400px;">
-            <canvas id="preferenceChart"></canvas>
-        </div>
-    </div>
-    <div style="background: white; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
-        <h3 style="margin-top: 0; color: #333;">Mean Average Precision Across Datasets</h3>
-        <div style="height: 400px;">
-            <canvas id="precisionChart"></canvas>
-        </div>
-    </div>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Preference Data
-    const preferenceCtx = document.getElementById('preferenceChart').getContext('2d');
-    new Chart(preferenceCtx, {
-        type: 'bar',
-        data: {
-            labels: ['Needle', 'CLIP', 'Both', 'Neither'],
-            datasets: [
-                {
-                    label: 'Needle',
-                    data: [52.52, 23.23, 14.15, 10.1],
-                    backgroundColor: '#bbddf5',
-                    borderColor: '#367ea4',
-                    borderWidth: 1
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ' + context.raw + '%';
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100,
-                    title: {
-                        display: true,
-                        text: 'Score (%)'
-                    }
-                }
-            }
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <style>
+        .tabs {
+            display: flex;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
         }
-    });
+        .tab-button {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            outline: none;
+            font-size: 16px;
+        }
+        .tab-button.active {
+            border-bottom: 2px solid #007acc;
+            font-weight: bold;
+        }
+    </style>
+    <title>Mean Average Precision Charts</title>
+</head>
+<body>
+    <div class="tabs">
+        <button class="tab-button active" id="allQueriesTab">All Queries</button>
+        <button class="tab-button" id="hardQueriesTab">Hard Queries</button>
+    </div>
 
-    // Precision Data
-    const precisionCtx = document.getElementById('precisionChart').getContext('2d');
-    new Chart(precisionCtx, {
-        type: 'bar',
-data: {
-            labels: ['LVIS', 'Caltech256', 'BDD100K', 'COCO'],
-            datasets: [
+    <div id="chartContainer">
+        <div style="background: white; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
+            <h3 id="chartTitle">Mean Average Precision Across Datasets (All Queries)</h3>
+            <div style="height: 400px;">
+                <canvas id="precisionChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const allQueriesData = {
+                labels: ['LVIS', 'Caltech256', 'BDD100K', 'COCO'],
+                 datasets: [
                 {
                     label: 'Needle',
                     data: [0.323, 0.966, 0.711, 0.977],
@@ -124,33 +103,100 @@ data: {
                     borderWidth: 1
                 }
             ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ' + context.raw.toFixed(2);
+            };
+
+            const hardQueriesData = {
+                labels: ['LVIS', 'Caltech256', 'BDD100K', 'COCO'],
+                 datasets: [
+                {
+                    label: 'Needle',
+                    data: [0.249, 0.687, 0.158, 0.981],
+                    backgroundColor: '#4caf50',
+                    borderColor: '#2e7d32',
+                    borderWidth: 1
+                },
+                {
+                    label: 'CLIP',
+                    data: [0.078, 0.181, 0.005, 0.477],
+                    backgroundColor: '#2196f3',
+                    borderColor: '#1565c0',
+                    borderWidth: 1
+                },
+                {
+                    label: 'ALIGN',
+                    data: [0.129, 0.398, 0.003, 0.895],
+                    backgroundColor: '#ff9800',
+                    borderColor: '#ef6c00',
+                    borderWidth: 1
+                },
+                {
+                    label: 'FLAVA',
+                    data: [0.099, 0.306, 0.036, 0.281],
+                    backgroundColor: '#9c27b0',
+                    borderColor: '#6a1b9a',
+                    borderWidth: 1
+                },
+                {
+                    label: 'BLIP + MiniLM',
+                    data: [0.107, 0.372, 0.144, 0.698],
+                    backgroundColor: '#e91e63',
+                    borderColor: '#c2185b',
+                    borderWidth: 1
+                }
+            ]
+            };
+
+            const ctx = document.getElementById('precisionChart').getContext('2d');
+            let precisionChart = new Chart(ctx, {
+                type: 'bar',
+                data: allQueriesData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return context.dataset.label + ': ' + context.raw;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Mean Average Precision'
+                            }
                         }
                     }
                 }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 1,
-                    title: {
-                        display: true,
-                        text: 'Mean Average Precision'
-                    }
-                }
-            }
-        }
-    });
-});
-</script>
+            });
+
+            const allQueriesTab = document.getElementById('allQueriesTab');
+            const hardQueriesTab = document.getElementById('hardQueriesTab');
+            const chartTitle = document.getElementById('chartTitle');
+
+            allQueriesTab.addEventListener('click', function () {
+                allQueriesTab.classList.add('active');
+                hardQueriesTab.classList.remove('active');
+                chartTitle.textContent = 'Mean Average Precision Across Datasets (All Queries)';
+                precisionChart.data = allQueriesData;
+                precisionChart.update();
+            });
+
+            hardQueriesTab.addEventListener('click', function () {
+                hardQueriesTab.classList.add('active');
+                allQueriesTab.classList.remove('active');
+                chartTitle.textContent = 'Mean Average Precision Across Datasets (Hard Queries)';
+                precisionChart.data = hardQueriesData;
+                precisionChart.update();
+            });
+        });
+    </script>
+</body>
+</html>
 
 <!-- Call to Action -->
 ## Get Started Today!

@@ -71,7 +71,7 @@ compare Needle with OPEN-AI CLIP image retrieval method for LVIS, Caltech256 and
             <div style="background: white; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
                 <h3 style="margin-block-start: 0">Mean Average Precision Across Datasets (Hard Queries)</h3>
                 <div style="height: 400px;">
-                    <canvas id="precisionChartHard"></canvas>
+                    <canvas id="precisionChart"></canvas>
                 </div>
             </div>
         </div>

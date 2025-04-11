@@ -1,8 +1,10 @@
+import platform
+
 import torch
-from timm import create_model, data
+import torch.nn as nn
 from core.singleton import Singleton
 from settings import settings
-import torch.nn as nn
+from timm import create_model, data
 
 
 class ImageEmbedder:
@@ -73,7 +75,9 @@ class ImageEmbedder:
 class EmbedderManager:
     def __init__(self):
         self._device = torch.device(
-            "cuda" if torch.cuda.is_available() and settings.service.use_cuda else "cpu")
+            "cuda" if torch.cuda.is_available() and settings.service.use_cuda else
+            "mps" if torch.backends.mps.is_available() and platform.system() == "Darwin" else
+            "cpu")
         self._image_embedders = {}
         for embedder_config in settings.image_embedders:
             self._image_embedders[embedder_config.name] = ImageEmbedder(

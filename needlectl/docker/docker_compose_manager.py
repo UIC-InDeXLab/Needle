@@ -3,22 +3,32 @@ import subprocess
 import json
 import typer
 import yaml
+from pathlib import Path
 from utils import get_compose_file
 
 
 class DockerComposeManager:
     def __init__(self):
-        self.docker_compose_path = get_compose_file()
-        if not os.path.isfile(self.docker_compose_path):
-            typer.echo("Error: docker-compose file not found.")
-            raise typer.Exit(code=1)
+        compose_env = os.getenv("NEEDLE_COMPOSE_FILES")
+        if compose_env:
+            paths = compose_env.split(os.pathsep)
+            self.compose_files = [Path(p) for p in paths]
+        else:
+            self.compose_files = [get_compose_file()]
 
-        # Load compose file to get service information
-        with open(self.docker_compose_path, "r") as file:
+        for path in self.compose_files:
+            if not path.is_file():
+                typer.echo(f"Error: docker-compose file not found: {path}")
+                raise typer.Exit(code=1)
+
+        with open(self.compose_files[0], "r") as file:
             self.compose_data = yaml.safe_load(file)
 
     def _docker_compose_run(self, *args):
-        cmd = ["docker", "compose", "-f", self.docker_compose_path] + list(args)
+        cmd = ["docker", "compose"]
+        for path in self.compose_files:
+            cmd += ["-f", str(path)]
+        cmd += list(args)
         subprocess.run(cmd, check=True)
 
     def get_backend_version(self) -> str:
@@ -39,7 +49,10 @@ class DockerComposeManager:
                 return "unknown (backend service not found)"
 
             # Get container ID of the running backend service
-            cmd = ["docker", "compose", "-f", self.docker_compose_path, "ps", "-q", backend_service]
+            cmd = ["docker", "compose"]
+            for path in self.compose_files:
+                cmd += ["-f", str(path)]
+            cmd += ["ps", "-q", backend_service]
             container_id = subprocess.check_output(cmd).decode().strip()
 
             if not container_id:
@@ -78,28 +91,3 @@ class DockerComposeManager:
     def log_services(self, service_name):
         self._docker_compose_run("logs", service_name)
 
-    def add_volume(self, service_name, volume_path):
-        """
-        Adds a volume to a specific service in the docker-compose file.
-        Args:
-            service_name (str): The name of the service to update.
-            volume_path (str): The path of the volume to add.
-        Raises:
-            typer.Exit: If the service is not found in the docker-compose file.
-        """
-        services = self.compose_data.get("services", {})
-        if service_name not in services:
-            typer.echo(f"Error: Service '{service_name}' not found in docker-compose.yml.")
-            raise typer.Exit(code=1)
-
-        service = services[service_name]
-        volumes = service.get("volumes", [])
-        # Check if the volume already exists
-        if volume_path not in [v.split(":")[0] for v in volumes if isinstance(v, str)]:
-            volumes.append(f"{volume_path}:{volume_path}")
-            service["volumes"] = volumes
-            with open(self.docker_compose_path, "w") as file:
-                yaml.safe_dump(self.compose_data, file, sort_keys=False)
-            typer.echo(f"Added volume '{volume_path}' to service '{service_name}'.")
-        else:
-            typer.echo(f"Volume '{volume_path}' already exists for service '{service_name}'.")

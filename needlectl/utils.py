@@ -13,11 +13,16 @@ def get_storage_dir():
 
 
 def get_config_file(filename) -> Path:
-    configs_path = Path(os.path.join(get_storage_dir(), "configs"))
-    if not os.path.exists(configs_path):
+    """Allow override of config directory via env var NEEDLE_CONFIG_DIR."""
+    config_base = os.getenv("NEEDLE_CONFIG_DIR")
+    if config_base:
+        configs_path = Path(config_base)
+    else:
+        configs_path = Path(os.path.join(get_storage_dir(), "configs"))
+    if not configs_path.exists():
         os.makedirs(configs_path, exist_ok=True)
 
-    return Path(os.path.join(configs_path, filename))
+    return configs_path / filename
 
 
 def get_compose_file():

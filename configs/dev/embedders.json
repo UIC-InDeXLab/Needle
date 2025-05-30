@@ -1,0 +1,9 @@
+{
+  "image_embedders": [
+    {
+      "name": "eva",
+      "model_name": "eva_large_patch14_196.in22k_ft_in1k",
+      "weight": 1
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      args:
+        BACKEND_VERSION: dev
+    environment:
+      SERVICE__CONFIG_DIR_PATH: /configs/
+    env_file:
+      - ../configs/dev/directory.env
+      - ../configs/dev/query.env
+      - ../configs/dev/service.env
+    volumes:
+      - ../backend:/app
+      - ../configs/dev:/configs
+      - ${NEEDLE_HOME:-..}/volumes/.cache/:/root/.cache
+      - ${HOME}:${HOME}:ro
+    command: ["uvicorn", "main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]

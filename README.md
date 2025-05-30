@@ -49,6 +49,31 @@ Then, you can start needle service using this command:
 needlectl service start
 ```
 
+## 🏭 Production
+
+To launch the CPU-based stack with your production configs (located in `$NEEDLE_HOME/configs/`),
+use the production override:
+```bash
+docker compose -f docker/docker-compose.cpu.yaml -f docker/docker-compose.prod.yaml up -d
+```
+
+## 🛠️ Development
+You can start the full CPU-based stack (etcd, MinIO, Milvus, Postgres, image-generator-hub)
+and launch the backend in hot‑reload dev mode with one command:
+
+```bash
+make dev
+```
+
+This runs core services in detached mode, then rebuilds and starts the backend
+with your local code mounted and Uvicorn reload enabled.
+
+For GPU development use:
+
+```bash
+make dev-gpu
+```
+
 ### 📄 Documentation 
 
 Checkout [Needle documentation](https://www.cs.uic.edu/~indexlab/Needle/) to learn more about Needle CLI and its capabilities.

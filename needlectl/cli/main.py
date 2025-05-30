@@ -89,6 +89,7 @@ def main(
     elif profile == Profile.dev:
         os.environ["NEEDLE_CONFIG_DIR"] = str(Path(needle_home) / "configs" / "dev")
 
+
     files = []
     if profile == Profile.dev:
         files = [Path(needle_home) / "docker" / "docker-compose.cpu.yaml",

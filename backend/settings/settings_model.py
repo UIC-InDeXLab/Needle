@@ -20,7 +20,7 @@ class PostgresSettings(BaseModel):
     user: str = Field("myuser")
     password: str = Field("mypassword")
     host: str = Field("0.0.0.0")
-    port: int = Field(5433)
+    port: int = Field(5432)
     db: str = Field("mydb")
 
     @property

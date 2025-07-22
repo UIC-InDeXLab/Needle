@@ -42,7 +42,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+base_dir = os.path.dirname(__file__)
+static_dir = os.path.join(base_dir, "static")
+
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 templates = Jinja2Templates(directory="templates")
 
 

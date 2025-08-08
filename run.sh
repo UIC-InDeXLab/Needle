@@ -1,5 +1,7 @@
-echo "=== Setting up Docker containers ==="
-docker compose -f Needle-main/docker/docker-compose.cpu.yaml up -d
+#!/bin/bash
+
+# Exit immediately if any command fails
+set -e
 
 echo "=== Starting ImageGeneratorsHub (port 8001) ==="
 uvicorn main:app --app-dir ./ImageGeneratorsHub-main --host 0.0.0.0 --port 8001 &
@@ -11,7 +13,7 @@ echo "Choose configuration mode for Needle backend:"
 select config_mode in "fast" "balanced" "accurate"; do
   case $config_mode in
     fast|balanced|accurate)
-      export SERVICE__CONFIG_DIR_PATH="Needle-main/configs/$config_mode"
+      export SERVICE__CONFIG_DIR_PATH="Needle-linh/configs/$config_mode"
       break
       ;;
     *)
@@ -20,7 +22,7 @@ select config_mode in "fast" "balanced" "accurate"; do
   esac
 done
 
-uvicorn main:app --app-dir ./Needle-main/backend/ --host 0.0.0.0 --port 8000 &
+uvicorn main:app --app-dir ./Needle-linh/backend/ --host 0.0.0.0 --port 8000 &
 NEEDLE_PID=$!
 
 # Trap CTRL+C to cleanly stop both apps

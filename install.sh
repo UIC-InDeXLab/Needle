@@ -41,7 +41,7 @@ brew install postgresql@14
 brew services start postgresql@14
 export PATH="/usr/local/opt/postgresql@14/bin:$PATH"
 
-Create user and database (idempotent)
+# Create user and database (idempotent)
 createuser myuser || echo "User 'myuser' already exists"
 psql -c "ALTER USER myuser WITH PASSWORD 'mypassword';" || true
 createdb -O myuser mydb || echo "Database 'mydb' already exists"

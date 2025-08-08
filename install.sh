@@ -12,7 +12,7 @@ echo "=== Creating virtual environment and installing dependencies ==="
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
-pip install -r ImageGeneratorsHub-main/requirements.txt
+pip install -r Needle-linh/ImageGeneratorsHub-main/requirements.txt
 pip install -r Needle-linh/backend/requirements.txt
 
 

@@ -6,6 +6,7 @@ wget https://github.com/UIC-InDeXLab/ImageGeneratorsHub/archive/refs/heads/main.
 unzip imagehub.zip && rm imagehub.zip
 wget https://github.com/UIC-InDeXLab/Needle/archive/refs/heads/linh.zip -O needle.zip
 unzip needle.zip && rm needle.zip
+mv ImageGeneratorsHub-main Needle-linh/
 
 echo "=== Creating virtual environment and installing dependencies ==="
 python3 -m venv venv

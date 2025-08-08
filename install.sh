@@ -14,7 +14,7 @@ source venv/bin/activate
 pip install --upgrade pip
 pip install -r Needle-linh/ImageGeneratorsHub-main/requirements.txt
 pip install -r Needle-linh/backend/requirements.txt
-
+chmod +x Needle-linh/run.sh
 
 echo "=== Setting up Docker containers ==="
 docker compose -f Needle-linh/docker/docker-compose.cpu.yaml up -d

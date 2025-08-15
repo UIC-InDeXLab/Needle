@@ -63,51 +63,51 @@ services:
       - etcd
       - minio
 
-  postgres:
-    image: postgres:14
-    container_name: postgres
-    environment:
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: mypassword
-      POSTGRES_DB: mydb
-    volumes:
-      - ${NEEDLE_HOME:-..}/volumes/postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U myuser -d mydb" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
+  # postgres:
+  #   image: postgres:14
+  #   container_name: postgres
+  #   environment:
+  #     POSTGRES_USER: myuser
+  #     POSTGRES_PASSWORD: mypassword
+  #     POSTGRES_DB: mydb
+  #   volumes:
+  #     - ${NEEDLE_HOME:-..}/volumes/postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: [ "CMD-SHELL", "pg_isready -U myuser -d mydb" ]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 5s
 
-  image-generator-hub:
-    image: merfanian/image-generator-hub:latest
-    container_name: image-generator-hub
+  # image-generator-hub:
+  #   image: merfanian/image-generator-hub:latest
+  #   container_name: image-generator-hub
 
-  backend:
-    image: merfanian/needle:latest
-    container_name: needle
-    depends_on:
-      - postgres
-      - standalone
-      - image-generator-hub
-    environment:
-      POSTGRES__USER: myuser
-      POSTGRES__PASSWORD: mypassword
-      POSTGRES__DB: mydb
-      POSTGRES__HOST: postgres
-      POSTGRES__PORT: 5432
-      MILVUS__HOST: standalone
-      MILVUS__PORT: 19530
-      SERVICE__USE_CUDA: false
-      SERVICE__CONFIG_DIR_PATH: ${NEEDLE_HOME:-..}/configs/
-      GENERATOR__HOST: image-generator-hub
-      GENERATOR__PORT: 8000
-    volumes:
-      - ${NEEDLE_HOME:-..}/volumes/.cache/:/root/.cache
-      - ${HOME}:${HOME}:ro
-    ports:
-      - "8000:8000"
-    command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000" ]
+  # backend:
+  #   image: merfanian/needle:latest
+  #   container_name: needle
+  #   depends_on:
+  #     - postgres
+  #     - standalone
+  #     - image-generator-hub
+  #   environment:
+  #     POSTGRES__USER: myuser
+  #     POSTGRES__PASSWORD: mypassword
+  #     POSTGRES__DB: mydb
+  #     POSTGRES__HOST: postgres
+  #     POSTGRES__PORT: 5432
+  #     MILVUS__HOST: standalone
+  #     MILVUS__PORT: 19530
+  #     SERVICE__USE_CUDA: false
+  #     SERVICE__CONFIG_DIR_PATH: ${NEEDLE_HOME:-..}/configs/
+  #     GENERATOR__HOST: image-generator-hub
+  #     GENERATOR__PORT: 8000
+  #   volumes:
+  #     - ${NEEDLE_HOME:-..}/volumes/.cache/:/root/.cache
+  #     - ${HOME}:${HOME}:ro
+  #   ports:
+  #     - "8000:8000"
+  #   command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000" ]
 
 networks:
   default:

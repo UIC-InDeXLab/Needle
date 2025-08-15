@@ -46,7 +46,7 @@ curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/in
 ```
 For MacOS
 ```bash
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/refs/heads/linh/install.sh -o install_macos.sh && bash install_macos.sh && rm install_macos.sh
+curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/refs/heads/linh/install_macos.sh -o install_macos.sh && bash install_macos.sh && rm install_macos.sh
 ```
 Then, you can start needle service using this command: 
 ```bash

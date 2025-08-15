@@ -8,6 +8,21 @@ wget https://github.com/UIC-InDeXLab/Needle/archive/refs/heads/linh.zip -O needl
 unzip needle.zip && rm needle.zip
 mv ImageGeneratorsHub-main Needle-linh/
 
+# Resolve absolute path to Needle-linh
+NEEDLE_DIR="$(pwd)"
+
+# Use it for the rest of the script
+export NEEDLE_HOME="$NEEDLE_DIR"
+
+# Persist for future shells (zsh on macOS by default)
+RC="${ZDOTDIR:-$HOME}/.zshrc"   # or use ~/.bashrc if you use bash
+if ! grep -q 'export NEEDLE_HOME=' "$RC" 2>/dev/null; then
+  echo "export NEEDLE_HOME=\"$NEEDLE_DIR\"" >> "$RC"
+fi
+
+echo "NEEDLE_HOME set to: $NEEDLE_HOME"
+echo "Run: source $RC   # to load it now"
+
 echo "=== Creating virtual environment and installing dependencies ==="
 python3 -m venv venv
 source venv/bin/activate
@@ -31,3 +46,7 @@ createuser myuser || echo "User 'myuser' already exists"
 psql -c "ALTER USER myuser WITH PASSWORD 'mypassword';" || true
 createdb -O myuser mydb || echo "Database 'mydb' already exists"
 pg_isready -U myuser -d mydb
+
+export NEEDLE_HOME="/Needle-linh"
+
+cd Needle-linh

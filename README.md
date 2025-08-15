@@ -44,6 +44,10 @@ Installing Needle is quick and straightforward. Make sure you have [Docker](http
 ```bash  
 curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install.sh -o install.sh && bash install.sh && rm install.sh 
 ```
+For MacOS
+```bash
+curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/refs/heads/linh/install.sh -o install_macos.sh && bash install_macos.sh && rm install_macos.sh
+```
 Then, you can start needle service using this command: 
 ```bash
 needlectl service start

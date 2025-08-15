@@ -35,7 +35,7 @@ select config_mode in "fast" "balanced" "accurate"; do
   esac
 done
 
-uvicorn main:app --app-dir .//backend/ --host 0.0.0.0 --port 8000 &
+uvicorn main:app --app-dir ./backend/ --host 0.0.0.0 --port 8000 &
 NEEDLE_PID=$!
 
 # Trap CTRL+C to cleanly stop both apps

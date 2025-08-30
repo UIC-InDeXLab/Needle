@@ -16,6 +16,9 @@ fi
 echo "NEEDLE_HOME set to: $NEEDLE_HOME"
 echo "Run: source $RC   # to load it now"
 
+echo "=== Starting Docker ==="
+docker compose -f ./docker/docker-compose.cpu.yaml up -d
+
 echo "=== Starting ImageGeneratorsHub (port 8001) ==="
 uvicorn main:app --app-dir ./ImageGeneratorsHub-main --host 0.0.0.0 --port 8001 &
 IMG_PID=$!

@@ -28,16 +28,6 @@ const GeneratorPage = () => {
   const [editingGenerator, setEditingGenerator] = useState(null);
   const [configParams, setConfigParams] = useState({});
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    if (generators.length > 0) {
-      loadGeneratorConfig();
-    }
-  }, [generators, loadGeneratorConfig]);
-
   const loadData = async () => {
     try {
       setLoading(true);
@@ -73,6 +63,16 @@ const GeneratorPage = () => {
       setGeneratorConfig(config);
     }
   }, [generators]);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    if (generators.length > 0) {
+      loadGeneratorConfig();
+    }
+  }, [generators, loadGeneratorConfig]);
 
   const handleToggleActivation = (generatorName) => {
     const updatedConfig = updateGeneratorConfig(generatorName, {

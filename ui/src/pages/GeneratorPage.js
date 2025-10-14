@@ -36,7 +36,7 @@ const GeneratorPage = () => {
     if (generators.length > 0) {
       loadGeneratorConfig();
     }
-  }, [generators]);
+  }, [generators, loadGeneratorConfig]);
 
   const loadData = async () => {
     try {

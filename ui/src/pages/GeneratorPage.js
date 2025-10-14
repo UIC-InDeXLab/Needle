@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Settings, 
   RefreshCw, 
@@ -57,7 +57,7 @@ const GeneratorPage = () => {
     }
   };
 
-  const loadGeneratorConfig = () => {
+  const loadGeneratorConfig = useCallback(() => {
     const config = getGeneratorConfig();
     if (config.length === 0) {
       // Initialize with default configuration from available generators
@@ -72,7 +72,7 @@ const GeneratorPage = () => {
     } else {
       setGeneratorConfig(config);
     }
-  };
+  }, [generators]);
 
   const handleToggleActivation = (generatorName) => {
     const updatedConfig = updateGeneratorConfig(generatorName, {

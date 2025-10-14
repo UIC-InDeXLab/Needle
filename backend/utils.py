@@ -3,6 +3,33 @@ from io import BytesIO
 
 from PIL import Image
 
+import time
+from collections import defaultdict
+
+
+class Timer:
+    """A context manager to time blocks of code."""
+
+    def __init__(self, name: str, timings_dict: dict, aggregate: bool = False):
+        self.name = name
+        self.timings = timings_dict
+        self.aggregate = aggregate
+        self._start = 0.0
+
+    def __enter__(self):
+        self._start = time.perf_counter()
+        return self
+
+    def __exit__(self, *args):
+        duration = time.perf_counter() - self._start
+        if self.aggregate:
+            # If called multiple times (in a loop), aggregate the times
+            if not isinstance(self.timings.get(self.name), list):
+                self.timings[self.name] = []
+            self.timings[self.name].append(duration)
+        else:
+            self.timings[self.name] = duration
+
 
 def aggregate_rankings(rankers_results, weights, k):
     scores = {}

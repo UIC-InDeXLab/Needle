@@ -94,6 +94,7 @@ class SearchResponse(BaseModel):
     preview_url: str
     base_images: Optional[List[str]] = None
     verbose_results : Optional[Dict[str, Any]] = None
+    timings: Optional[Dict[str, Any]] = None
 
 
 class GeneratorRequirement(BaseModel):

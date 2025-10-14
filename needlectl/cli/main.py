@@ -24,10 +24,17 @@ app.add_typer(generator_app, name="generator")
 
 
 def get_backend_version() -> str:
-    """Get the backend version from environment variable set by Docker."""
-    manager = DockerComposeManager()
-    backend_version = manager.get_backend_version()
-    return backend_version
+    """Get the backend version from the running service."""
+    try:
+        # Try to get version from running backend
+        import requests
+        response = requests.get("http://localhost:8000/health", timeout=5)
+        if response.status_code == 200:
+            return "running"
+        else:
+            return "unknown (not responding)"
+    except:
+        return "unknown (not running)"
 
 
 def version_callback(value: bool):
@@ -83,24 +90,24 @@ def main(
         os.environ["NEEDLE_HOME"] = home
 
     needle_home = get_storage_dir()
-
+    
     if config_dir:
         os.environ["NEEDLE_CONFIG_DIR"] = config_dir
     elif profile == Profile.dev:
         os.environ["NEEDLE_CONFIG_DIR"] = str(Path(needle_home) / "configs" / "dev")
 
-
-    files = []
-    if profile == Profile.dev:
-        files = [Path(needle_home) / "docker" / "docker-compose.cpu.yaml",
-                 Path(needle_home) / "docker" / "docker-compose.dev.yaml"]
+    # Set up Docker compose files for infrastructure services only
+    # Check if we're in the current directory (for development) or use the home directory
+    current_dir = Path.cwd()
+    if (current_dir / "docker" / "docker-compose.infrastructure.yaml").exists():
+        files = [current_dir / "docker" / "docker-compose.infrastructure.yaml"]
     else:
-        files = [Path(needle_home) / "docker" / "docker-compose.cpu.yaml",
-                 Path(needle_home) / "docker" / "docker-compose.prod.yaml"]
+        files = [Path(needle_home) / "docker" / "docker-compose.infrastructure.yaml"]
     os.environ["NEEDLE_COMPOSE_FILES"] = os.pathsep.join(str(p) for p in files)
 
     ctx.obj = {
         "api_url": api_url,
         "output": output.lower(),
         "profile": profile,
+        "needle_home": needle_home,
     }

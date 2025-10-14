@@ -1,0 +1,81 @@
+[
+  {
+    "name": "StableDiffusionXL",
+    "description": "Image generator using Stable Diffusion XL optimized for GPU and CPU",
+    "required_params": [],
+    "enabled": true,
+    "activated": true
+  },
+  {
+    "name": "DALL-E",
+    "description": "OpenAI's DALL-E image generation model",
+    "required_params": [
+      {
+        "name": "api_key",
+        "description": "OpenAI API key"
+      }
+    ],
+    "enabled": false,
+    "activated": false
+  },
+  {
+    "name": "Replicate",
+    "description": "Replicate.com hosted models",
+    "required_params": [
+      {
+        "name": "api_token",
+        "description": "Replicate API token"
+      },
+      {
+        "name": "model",
+        "description": "Model identifier on Replicate"
+      }
+    ],
+    "enabled": false,
+    "activated": false
+  },
+  {
+    "name": "RealVisXL",
+    "description": "adirik/realvisxl-v3.0-turbo on Replicate.com",
+    "required_params": [
+      {
+        "name": "api_token",
+        "description": "Replicate API token"
+      }
+    ],
+    "enabled": false,
+    "activated": false
+  },
+  {
+    "name": "Imagen3-fast",
+    "description": "https://replicate.com/google/imagen-3-fast/api",
+    "required_params": [
+      {
+        "name": "api_token",
+        "description": "Replicate API token"
+      }
+    ],
+    "enabled": false,
+    "activated": false
+  },
+  {
+    "name": "Local",
+    "description": "Custom local image generation service",
+    "required_params": [
+      {
+        "name": "host",
+        "description": "Host address of the local service (e.g., http://localhost)"
+      },
+      {
+        "name": "port",
+        "description": "Port number of the local service"
+      },
+      {
+        "name": "endpoint",
+        "description": "API endpoint for image generation"
+      }
+    ],
+    "enabled": false,
+    "activated": false
+  }
+]

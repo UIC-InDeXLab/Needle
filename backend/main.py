@@ -1,4 +1,6 @@
 import os
+import time
+
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from typing import List
@@ -20,7 +22,7 @@ from models.schemas import AddDirectoryRequest, AddDirectoryResponse, HealthChec
     ServiceStatusResponse, ServiceLogResponse, SearchResponse, SearchRequest, UpdateDirectoryResponse, \
     UpdateDirectoryRequest
 from indexing import image_indexing_service
-from utils import aggregate_rankings, pil_image_to_base64
+from utils import aggregate_rankings, pil_image_to_base64, Timer
 
 origins = ["http://localhost:3000", "http://127.0.0.1:3000", os.getenv("PUBLIC_IP", "http://127.0.0.1:3000")]
 
@@ -150,6 +152,8 @@ async def search(
         request: SearchRequest,
         request_obj: Request = None
 ):
+    timings = {}
+    total_timer_start = time.perf_counter()
     query_object = query_manager.get_query(request.qid)
     if not query_object:
         raise HTTPException(status_code=404, detail="Query not found")
@@ -163,7 +167,9 @@ async def search(
         for engine in generation_request["engines"]:
             engine["prompt"] = query
 
-        generated_images.extend(image_generator.generate(generation_request))
+        with Timer("image_generation", timings):
+            generated_images.extend(image_generator.generate(generation_request))
+
         query_object.generated_images.extend(generated_images)
     else:
         generated_images = query_object.generated_images
@@ -197,19 +203,21 @@ async def search(
         verbose[embedder_name] = defaultdict(list)
 
         for i, (image, engine_name) in enumerate(generated_images):
-            query_embedding = embedder.embed(image)
+            with Timer(f"embedding_{embedder_name}", timings, aggregate=True):
+                query_embedding = embedder.embed(image)
 
             search_params = {
                 "metric_type": "COSINE"
             }
 
-            search_results = collection.search(
-                data=[query_embedding],
-                anns_field="embedding",
-                param=search_params,
-                limit=request.num_images_to_retrieve,
-                expr=directory_expr
-            )
+            with Timer(f"retrieval_{embedder_name}", timings, aggregate=True):
+                search_results = collection.search(
+                    data=[query_embedding],
+                    anns_field="embedding",
+                    param=search_params,
+                    limit=request.num_images_to_retrieve,
+                    expr=directory_expr
+                )
 
             results[f"{embedder_name}_{i}"] = [hit.id for hit in search_results[0]]
 
@@ -223,14 +231,17 @@ async def search(
         for r in rankings:
             ranking_weights.append((r, embedder.weight, embedder_name))
 
-    top_images = aggregate_rankings(
-        rankers_results=[r for r, w, _ in ranking_weights],
-        weights=[w for r, w, _ in ranking_weights],
-        k=request.num_images_to_retrieve
-    )
+    with Timer("ranking_aggregation", timings):
+        top_images = aggregate_rankings(
+            rankers_results=[r for r, w, _ in ranking_weights],
+            weights=[w for r, w, _ in ranking_weights],
+            k=request.num_images_to_retrieve
+        )
 
     query_object.final_results = top_images
 
+    # Add total time and calculate the overhead
+    timings["total_request_time"] = time.perf_counter() - total_timer_start
 
     return SearchResponse(
         results=top_images,
@@ -238,7 +249,8 @@ async def search(
         preview_url=str(request_obj.url_for("gallery", qid=request.qid)),
         base_images=[pil_image_to_base64(image) for image in
                      generated_images] if request.include_base_images_in_preview else None,
-        verbose_results=verbose if request.verbose else None
+        verbose_results=verbose if request.verbose else None,
+        timings=timings
     )
 
 

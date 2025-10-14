@@ -72,6 +72,8 @@ services:
       POSTGRES_DB: mydb
     volumes:
       - ${NEEDLE_HOME:-..}/volumes/postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U myuser -d mydb" ]
       interval: 5s
@@ -86,27 +88,25 @@ services:
   backend:
     image: merfanian/needle:latest
     container_name: needle
+    network_mode: host
     depends_on:
       - postgres
       - standalone
-      - image-generator-hub
     environment:
       POSTGRES__USER: myuser
       POSTGRES__PASSWORD: mypassword
       POSTGRES__DB: mydb
-      POSTGRES__HOST: postgres
+      POSTGRES__HOST: localhost
       POSTGRES__PORT: 5432
-      MILVUS__HOST: standalone
+      MILVUS__HOST: localhost
       MILVUS__PORT: 19530
-      SERVICE__USE_CUDA: false
+      SERVICE__USE_CUDA: true
       SERVICE__CONFIG_DIR_PATH: ${NEEDLE_HOME:-..}/configs/
-      GENERATOR__HOST: image-generator-hub
-      GENERATOR__PORT: 8000
+      GENERATOR__HOST: localhost
+      GENERATOR__PORT: 8010
     volumes:
       - ${NEEDLE_HOME:-..}/volumes/.cache/:/root/.cache
       - ${HOME}:${HOME}:ro
-    ports:
-      - "8000:8000"
     command: [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000" ]
 
 networks:

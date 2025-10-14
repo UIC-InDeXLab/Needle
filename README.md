@@ -39,15 +39,109 @@ Watch as Needle transforms natural language queries into precise image retrieval
 
 ## ⚙️ Installation
 
-Installing Needle is quick and straightforward. Make sure you have [Docker](https://www.docker.com/get-started/) and [Docker Compose](https://docs.docker.com/compose/) installed, then, use the one-liner below to install Needle:
+Needle uses a unified installation system that sets up two virtual environments (backend and image generator hub) with Docker infrastructure services.
 
-```bash  
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install.sh -o install.sh && bash install.sh && rm install.sh 
-```
-Then, you can start needle service using this command: 
+### 🚀 One-Liner Installation (Recommended)
+
+Install Needle with a single command - no cloning required:
+
 ```bash
-needlectl service start
+# One-liner installation (interactive configuration selection)
+curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash
+
+# Or install with specific configuration
+curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s -- fast
 ```
+
+### 🛠️ Manual Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/UIC-InDeXLab/Needle.git
+cd Needle
+
+# Run the unified installer
+chmod +x install.sh
+./install.sh
+
+# Start all services
+./start-needle.sh
+```
+
+### ⚙️ Configuration Options
+
+Choose your performance configuration:
+
+- **Fast** (Default): Single CLIP model, fastest indexing and retrieval
+- **Balanced**: 4 models with balanced performance and accuracy  
+- **Accurate**: 6 models with highest accuracy but slower performance
+
+```bash
+# Install with specific configuration
+./install.sh fast          # Fast mode
+./install.sh balanced      # Balanced mode  
+./install.sh accurate      # Accurate mode
+
+# Or using Make
+make install-fast
+make install-balanced
+make install-accurate
+```
+
+### 🛠️ Using needlectl (Recommended)
+
+After installation, you can use the `needlectl` command to manage services:
+
+```bash
+# Start all services
+needlectl service start
+
+# Stop all services
+needlectl service stop
+
+# Check status
+needlectl service status
+
+# View logs
+needlectl service log backend
+needlectl service log image-generator-hub
+needlectl service log infrastructure
+
+# Restart services
+needlectl service restart
+```
+
+### 🛠️ Using Make Commands
+
+```bash
+# Install Needle (interactive)
+make install
+
+# Install with specific configuration
+make install-fast
+make install-balanced
+make install-accurate
+
+# Start all services
+make start
+
+# Stop all services
+make stop
+
+# Check status
+make status
+
+# Development mode
+make dev
+```
+
+**Architecture:**
+- **Backend**: Python virtual environment with direct GPU access
+- **Image Generator Hub**: Python virtual environment
+- **Infrastructure**: Docker containers (PostgreSQL, Milvus, MinIO, etcd)
+- **Cross-Platform**: Works on Linux and macOS with automatic GPU detection
+
+For detailed setup instructions, see [README_UNIFIED.md](README_UNIFIED.md).
 
 ## 🏭 Production
 
@@ -58,20 +152,19 @@ docker compose -f docker/docker-compose.cpu.yaml -f docker/docker-compose.prod.y
 ```
 
 ## 🛠️ Development
-You can start the full CPU-based stack (etcd, MinIO, Milvus, Postgres, image-generator-hub)
-and launch the backend in hot‑reload dev mode with one command:
+You can start the infrastructure services and launch the backend in hot-reload dev mode with one command:
 
 ```bash
 make dev
 ```
 
-This runs core services in detached mode, then rebuilds and starts the backend
-with your local code mounted and Uvicorn reload enabled.
+This runs infrastructure services in detached mode, then starts the backend with hot reload enabled.
 
-For GPU development use:
+For full production-like setup:
 
 ```bash
-make dev-gpu
+make install
+make start
 ```
 
 ### 📄 Documentation 

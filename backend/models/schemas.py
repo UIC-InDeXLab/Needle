@@ -27,6 +27,7 @@ class DirectoryModel(BaseModel):
     path: str
     is_indexed: bool
     is_enabled: bool
+    indexing_ratio: Optional[float] = None
 
 
 class DirectoryListResponse(BaseModel):

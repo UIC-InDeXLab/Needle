@@ -66,10 +66,25 @@ async def add_directory(request: AddDirectoryRequest):
 async def get_directories():
     with SessionLocal() as session:
         directories = session.query(Directory).all()
-        directory_models = [
-            DirectoryModel(id=d.id, path=d.path, is_indexed=d.is_indexed, is_enabled=d.is_enabled)
-            for d in directories
-        ]
+        directory_models = []
+        for d in directories:
+            # Calculate indexing progress
+            images = session.query(Image).filter_by(directory_id=d.id).all()
+            if not d.is_indexed and len(images) > 0:
+                indexed_images_count = session.query(Image).filter_by(
+                    directory_id=d.id, is_indexed=True
+                ).count()
+                indexing_ratio = indexed_images_count / len(images)
+            else:
+                indexing_ratio = 1.0 if d.is_indexed else 0.0
+            
+            directory_models.append(DirectoryModel(
+                id=d.id, 
+                path=d.path, 
+                is_indexed=d.is_indexed, 
+                is_enabled=d.is_enabled,
+                indexing_ratio=indexing_ratio
+            ))
     return DirectoryListResponse(directories=directory_models)
 
 

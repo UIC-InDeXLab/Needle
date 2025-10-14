@@ -27,21 +27,35 @@ const DirectoryPage = () => {
   const [selectedDirectory, setSelectedDirectory] = useState(null);
   const [directoryDetails, setDirectoryDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   useEffect(() => {
     loadDirectories();
   }, []);
 
-  const loadDirectories = async () => {
+  // Auto-refresh every second when autoRefresh is enabled
+  useEffect(() => {
+    let interval;
+    if (autoRefresh) {
+      interval = setInterval(() => {
+        loadDirectories(false); // Don't show loading spinner during auto-refresh
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [autoRefresh]);
+
+  const loadDirectories = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       setError(null);
       const response = await getDirectories();
       setDirectories(response.data.directories || []);
     } catch (err) {
       setError(err.response?.data?.detail || err.message || 'Failed to load directories');
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
@@ -192,14 +206,25 @@ const DirectoryPage = () => {
         <div className="card">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Directories</h2>
-            <button
-              onClick={loadDirectories}
-              disabled={loading}
-              className="btn btn-secondary flex items-center"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+            <div className="flex items-center space-x-3">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={autoRefresh}
+                  onChange={(e) => setAutoRefresh(e.target.checked)}
+                  className="rounded border-gray-300 text-needle-600 focus:ring-needle-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">Auto-refresh</span>
+              </label>
+              <button
+                onClick={() => loadDirectories()}
+                disabled={loading}
+                className="btn btn-secondary flex items-center"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
           </div>
 
           {loading ? (
@@ -247,6 +272,21 @@ const DirectoryPage = () => {
                           {directory.is_enabled ? 'Enabled' : 'Disabled'}
                         </span>
                       </div>
+                      {/* Progress Bar */}
+                      {directory.indexing_ratio !== undefined && !directory.is_indexed && (
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                            <span>Indexing Progress</span>
+                            <span>{Math.round(directory.indexing_ratio * 100)}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-1.5">
+                            <div
+                              className="bg-needle-600 h-1.5 rounded-full transition-all duration-300"
+                              style={{ width: `${directory.indexing_ratio * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center space-x-2 ml-4">
                       <button

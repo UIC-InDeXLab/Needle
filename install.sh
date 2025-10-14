@@ -295,23 +295,31 @@ RELEASE_URL="https://github.com/UIC-InDeXLab/Needle/releases/latest/download/nee
 
 # Try to download the binary
 if curl -L -o /tmp/needlectl "$RELEASE_URL" 2>/dev/null; then
-    # Make it executable and install
-    chmod +x /tmp/needlectl
-    sudo mv /tmp/needlectl /usr/local/bin/needlectl
-    
-    print_success "needlectl binary installed to /usr/local/bin/needlectl"
-    
-    # Verify installation
-    if needlectl --version > /dev/null 2>&1; then
-        print_success "needlectl installation verified"
+    # Check if the downloaded file is valid (not a 404 page)
+    if [ -s /tmp/needlectl ] && ! grep -q "Not Found" /tmp/needlectl; then
+        # Make it executable and install
+        chmod +x /tmp/needlectl
+        sudo mv /tmp/needlectl /usr/local/bin/needlectl
+        
+        print_success "needlectl binary installed to /usr/local/bin/needlectl"
+        
+        # Verify installation
+        if needlectl --version > /dev/null 2>&1; then
+            print_success "needlectl installation verified"
+        else
+            print_warning "needlectl installed but version check failed"
+        fi
     else
-        print_warning "needlectl installed but version check failed"
+        print_warning "Downloaded file appears to be invalid (404 or empty)"
+        rm -f /tmp/needlectl
+        print_warning "Falling back to building from source..."
     fi
-else
-    print_error "Failed to download needlectl binary from GitHub releases"
-    print_warning "Falling back to building from source..."
+fi
+
+# Fallback to building from source if download failed or was invalid
+if [ ! -f "/usr/local/bin/needlectl" ] || ! needlectl --version > /dev/null 2>&1; then
+    print_status "Building needlectl from source..."
     
-    # Fallback to building from source
     if [ -f "needlectl/needlectl.py" ]; then
         cd needlectl
         

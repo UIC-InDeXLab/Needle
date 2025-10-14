@@ -130,9 +130,9 @@ class ServiceManager:
         # Start backend
         typer.echo("Starting Needle backend...")
         backend_dir = self.needle_home / "backend"
-        uvicorn_path = backend_dir / "venv" / "bin" / "uvicorn"
+        python_path = backend_dir / "venv" / "bin" / "python"
         command = [
-            str(uvicorn_path), "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"
+            str(python_path), "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"
         ]
         log_file = self.needle_home / "logs" / "backend.log"
         self._start_virtual_env_service("Backend", command, self.backend_pid_file, log_file)

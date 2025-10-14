@@ -49,7 +49,7 @@ class ServiceManager:
         except (OSError, ValueError, FileNotFoundError):
             return None
     
-    def _start_virtual_env_service(self, service_name: str, command: list, pid_file: Path, log_file: Path):
+    def _start_virtual_env_service(self, service_name: str, command: list, pid_file: Path, log_file: Path, working_dir: Path = None):
         """Start a virtual environment service."""
         if self._is_service_running(pid_file):
             typer.echo(f"{service_name} is already running (PID: {self._get_service_pid(pid_file)})")
@@ -58,13 +58,16 @@ class ServiceManager:
         # Ensure logs directory exists
         log_file.parent.mkdir(parents=True, exist_ok=True)
         
+        # Use provided working directory or default to needle_home
+        cwd = working_dir if working_dir else self.needle_home
+        
         # Start service in background
         with open(log_file, 'w') as log_f:
             process = subprocess.Popen(
                 command,
                 stdout=log_f,
                 stderr=subprocess.STDOUT,
-                cwd=self.needle_home
+                cwd=cwd
             )
         
         # Save PID
@@ -135,7 +138,7 @@ class ServiceManager:
             str(python_path), "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"
         ]
         log_file = self.needle_home / "logs" / "backend.log"
-        self._start_virtual_env_service("Backend", command, self.backend_pid_file, log_file)
+        self._start_virtual_env_service("Backend", command, self.backend_pid_file, log_file, backend_dir)
         
         typer.echo("All services started!")
         typer.echo("🌐 Access Points:")

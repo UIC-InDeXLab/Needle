@@ -279,45 +279,67 @@ fi
 
 print_success "Environment configuration created for ${CONFIG_MODE} mode"
 
-### Step 7: Install needlectl
-print_status "Installing needlectl..."
+### Step 7: Download and Install needlectl Binary
+print_status "Downloading and installing needlectl binary from GitHub releases..."
 
-# Install needlectl to /usr/local/bin
-if [ -f "needlectl/needlectl.py" ]; then
-    # Install Python dependencies for needlectl
-    cd needlectl
-    pip install -r requirements.txt
-    cd ..
-    
-    # Create needlectl binary
-    cat > /tmp/needlectl << 'EOF'
-#!/usr/bin/env python3
-
-import os
-import sys
-from pathlib import Path
-
-# Add the needlectl directory to Python path
-needlectl_dir = Path("/usr/local/lib/needlectl")
-sys.path.insert(0, str(needlectl_dir))
-
-from cli.main import app
-
-if __name__ == "__main__":
-    app()
-EOF
-
-    # Copy needlectl to system location
-    sudo cp /tmp/needlectl /usr/local/bin/needlectl
-    sudo chmod +x /usr/local/bin/needlectl
-    rm /tmp/needlectl
-    
-    # Copy needlectl directory to system location
-    sudo cp -r needlectl /usr/local/lib/needlectl
-    
-    print_success "needlectl installed to /usr/local/bin/needlectl"
+# Detect OS
+if [[ "$OS_TYPE" == "darwin"* ]]; then
+    OS="macos"
 else
-    print_warning "needlectl directory not found, skipping needlectl installation"
+    OS="linux"
+fi
+
+# Download the latest needlectl binary
+print_status "Downloading latest needlectl binary for $OS..."
+RELEASE_URL="https://github.com/UIC-InDeXLab/Needle/releases/latest/download/needlectl-$OS"
+
+# Try to download the binary
+if curl -L -o /tmp/needlectl "$RELEASE_URL" 2>/dev/null; then
+    # Make it executable and install
+    chmod +x /tmp/needlectl
+    sudo mv /tmp/needlectl /usr/local/bin/needlectl
+    
+    print_success "needlectl binary installed to /usr/local/bin/needlectl"
+    
+    # Verify installation
+    if needlectl --version > /dev/null 2>&1; then
+        print_success "needlectl installation verified"
+    else
+        print_warning "needlectl installed but version check failed"
+    fi
+else
+    print_error "Failed to download needlectl binary from GitHub releases"
+    print_warning "Falling back to building from source..."
+    
+    # Fallback to building from source
+    if [ -f "needlectl/needlectl.py" ]; then
+        cd needlectl
+        
+        # Install Python dependencies for needlectl
+        print_status "Installing needlectl dependencies..."
+        pip install -r requirements.txt
+        
+        # Build needlectl binary using PyInstaller
+        print_status "Building needlectl binary with PyInstaller..."
+        ./build.sh
+        
+        if [ -f "dist/needlectl" ]; then
+            # Copy the built binary to system location
+            print_status "Installing needlectl binary to /usr/local/bin/..."
+            sudo cp dist/needlectl /usr/local/bin/needlectl
+            sudo chmod +x /usr/local/bin/needlectl
+            
+            print_success "needlectl binary installed to /usr/local/bin/needlectl"
+        else
+            print_error "Failed to build needlectl binary from source"
+            exit 1
+        fi
+        
+        cd ..
+    else
+        print_error "needlectl source not found and download failed"
+        exit 1
+    fi
 fi
 
 ### Step 8: Create Service Management Scripts

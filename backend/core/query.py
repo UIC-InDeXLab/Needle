@@ -60,3 +60,7 @@ class QueryManager:
 
     def get_query(self, id: int) -> Optional[Query]:
         return self._queries.get(id, None)
+    
+    def list_queries(self):
+        """Return a list of (query_id, query_string) tuples."""
+        return [(qid, query.query) for qid, query in self._queries.items()]

@@ -185,7 +185,7 @@ async def search(
         return SearchResponse(
             results=[],
             qid=request.qid,
-            base_images=[pil_image_to_base64(image) for image in
+            base_images=[pil_image_to_base64(image) for image, _ in
                          generated_images] if request.include_base_images_in_preview else None,
             preview_url=str(request_obj.url_for("gallery", qid=request.qid))
         )
@@ -247,7 +247,7 @@ async def search(
         results=top_images,
         qid=request.qid,
         preview_url=str(request_obj.url_for("gallery", qid=request.qid)),
-        base_images=[pil_image_to_base64(image) for image in
+        base_images=[pil_image_to_base64(image) for image, _ in
                      generated_images] if request.include_base_images_in_preview else None,
         verbose_results=verbose if request.verbose else None,
         timings=timings

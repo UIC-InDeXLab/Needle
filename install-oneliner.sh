@@ -124,7 +124,7 @@ chmod +x install.sh
 ./install.sh "$CONFIG_MODE"
 
 # Move to user's home directory
-INSTALL_DIR="$HOME/needle"
+INSTALL_DIR="$HOME/.needle"
 if [ -d "$INSTALL_DIR" ]; then
     print_warning "Directory $INSTALL_DIR already exists. Removing old installation..."
     rm -rf "$INSTALL_DIR"

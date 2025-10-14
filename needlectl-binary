@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+from pathlib import Path
+
+# Add the needlectl directory to Python path
+needlectl_dir = Path(__file__).parent / "needlectl"
+sys.path.insert(0, str(needlectl_dir))
+
+from cli.main import app
+
+if __name__ == "__main__":
+    app()

@@ -26,5 +26,5 @@ def get_config_file(filename) -> Path:
 
 
 def get_compose_file():
-    compose_path = Path(os.path.join(get_storage_dir(), "docker-compose.yaml"))
+    compose_path = Path(os.path.join(get_storage_dir(), "docker", "docker-compose.infrastructure.yaml"))
     return Path(compose_path)

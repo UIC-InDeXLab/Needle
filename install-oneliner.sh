@@ -85,26 +85,25 @@ echo "2) Balanced - 4 models with balanced performance and accuracy"
 echo "3) Accurate - 6 models with highest accuracy but slower performance"
 echo ""
 
-while true; do
-    read -p "Enter your choice (1-3) [default: 1]: " config_choice
-    case $config_choice in
-        1|"")
-            CONFIG_MODE="fast"
-            break
-            ;;
-        2)
-            CONFIG_MODE="balanced"
-            break
-            ;;
-        3)
-            CONFIG_MODE="accurate"
-            break
-            ;;
-        *)
-            print_error "Invalid choice. Please enter 1, 2, or 3."
-            ;;
-    esac
-done
+# Use a more robust input method
+echo -n "Enter your choice (1-3) [default: 1]: "
+read config_choice
+
+case $config_choice in
+    1|"")
+        CONFIG_MODE="fast"
+        ;;
+    2)
+        CONFIG_MODE="balanced"
+        ;;
+    3)
+        CONFIG_MODE="accurate"
+        ;;
+    *)
+        print_error "Invalid choice. Using default: fast"
+        CONFIG_MODE="fast"
+        ;;
+esac
 
 print_success "Selected ${CONFIG_MODE} configuration"
 

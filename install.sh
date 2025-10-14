@@ -596,31 +596,51 @@ chmod +x start-needle.sh stop-needle.sh status-needle.sh
 
 print_success "Service management scripts created"
 
-### Step 9: Build UI for production
-print_status "Building UI for production..."
+### Step 9: Download and Install UI Artifacts
+print_status "Downloading pre-built UI artifacts from GitHub releases..."
 
-if [ -d "ui" ]; then
+# Download the latest UI build artifacts
+print_status "Downloading latest UI build for $OS..."
+UI_RELEASE_URL="https://github.com/UIC-InDeXLab/Needle/releases/latest/download/ui-build-$OS.tar.gz"
+
+# Try to download the UI artifacts
+if curl -L -o /tmp/ui-build.tar.gz "$UI_RELEASE_URL" 2>/dev/null; then
+    # Extract UI build artifacts
+    print_status "Extracting UI build artifacts..."
     cd ui
-    
-    # Check if node_modules exists
-    if [ ! -d "node_modules" ]; then
-        print_status "Installing UI dependencies..."
-        npm install
-    fi
-    
-    # Build the UI
-    print_status "Building React app..."
-    npm run build
-    
-    if [ $? -eq 0 ]; then
-        print_success "UI built successfully"
-    else
-        print_warning "UI build failed, but continuing with installation"
-    fi
-    
+    tar -xzf /tmp/ui-build.tar.gz
     cd ..
+    rm /tmp/ui-build.tar.gz
+    
+    print_success "UI build artifacts installed successfully"
 else
-    print_warning "UI directory not found, skipping UI build"
+    print_warning "Failed to download UI artifacts from GitHub releases"
+    print_status "Falling back to building UI from source..."
+    
+    # Fallback to building from source
+    if [ -d "ui" ]; then
+        cd ui
+        
+        # Check if node_modules exists
+        if [ ! -d "node_modules" ]; then
+            print_status "Installing UI dependencies..."
+            npm install
+        fi
+        
+        # Build the UI
+        print_status "Building React app..."
+        npm run build
+        
+        if [ $? -eq 0 ]; then
+            print_success "UI built successfully from source"
+        else
+            print_warning "UI build failed, but continuing with installation"
+        fi
+        
+        cd ..
+    else
+        print_warning "UI directory not found, skipping UI build"
+    fi
 fi
 
 ### Step 10: Create logs directory

@@ -1,0 +1,121 @@
+name: Update UI Artifacts in Latest Release
+
+on:
+  push:
+    paths:
+      - 'ui/**'
+      - '.github/workflows/update-ui-artifacts.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-update:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: ui/package-lock.json
+        
+    - name: Install UI dependencies
+      working-directory: ./ui
+      run: npm ci
+      
+    - name: Build UI
+      working-directory: ./ui
+      run: npm run build
+      
+    - name: Create UI build artifacts
+      run: |
+        cd ui
+        tar -czf ../ui-build-linux.tar.gz build/
+        
+    - name: Get latest release
+      id: get_latest_release
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { data: releases } = await github.rest.repos.listReleases({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            per_page: 1
+          });
+          
+          if (releases.length === 0) {
+            throw new Error('No releases found');
+          }
+          
+          return releases[0];
+          
+    - name: Update latest release with UI artifacts
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.get_latest_release.outputs.result.tag_name }}
+        files: |
+          ./ui-build-linux.tar.gz
+        overwrite: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-and-update-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: ui/package-lock.json
+        
+    - name: Install UI dependencies
+      working-directory: ./ui
+      run: npm ci
+      
+    - name: Build UI
+      working-directory: ./ui
+      run: npm run build
+      
+    - name: Create UI build artifacts
+      run: |
+        cd ui
+        tar -czf ../ui-build-macos.tar.gz build/
+        
+    - name: Get latest release
+      id: get_latest_release
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { data: releases } = await github.rest.repos.listReleases({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            per_page: 1
+          });
+          
+          if (releases.length === 0) {
+            throw new Error('No releases found');
+          }
+          
+          return releases[0];
+          
+    - name: Update latest release with UI artifacts
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.get_latest_release.outputs.result.tag_name }}
+        files: |
+          ./ui-build-macos.tar.gz
+        overwrite: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

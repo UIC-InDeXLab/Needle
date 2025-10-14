@@ -574,10 +574,37 @@ chmod +x start-needle.sh stop-needle.sh status-needle.sh
 
 print_success "Service management scripts created"
 
-### Step 9: Create logs directory
+### Step 9: Build UI for production
+print_status "Building UI for production..."
+
+if [ -d "ui" ]; then
+    cd ui
+    
+    # Check if node_modules exists
+    if [ ! -d "node_modules" ]; then
+        print_status "Installing UI dependencies..."
+        npm install
+    fi
+    
+    # Build the UI
+    print_status "Building React app..."
+    npm run build
+    
+    if [ $? -eq 0 ]; then
+        print_success "UI built successfully"
+    else
+        print_warning "UI build failed, but continuing with installation"
+    fi
+    
+    cd ..
+else
+    print_warning "UI directory not found, skipping UI build"
+fi
+
+### Step 10: Create logs directory
 mkdir -p logs
 
-### Step 10: Final message
+### Step 11: Final message
 print_success "🎉 Installation complete!"
 echo ""
 echo "📋 Next steps:"
@@ -590,10 +617,14 @@ echo "  - Start services: needlectl service start"
 echo "  - Stop services: needlectl service stop"
 echo "  - Check status: needlectl service status"
 echo "  - View logs: needlectl service log [backend|image-generator-hub|infrastructure]"
+echo "  - Start UI: needlectl ui start"
+echo "  - Stop UI: needlectl ui stop"
+echo "  - UI status: needlectl ui status"
 echo ""
 echo "🌐 Access Points:"
 echo "  - Backend API: http://localhost:8000"
 echo "  - Image Generator: http://localhost:8010"
+echo "  - Web UI: http://localhost:3000 (when started with 'needlectl ui start')"
 echo "  - API Documentation: http://localhost:8000/docs"
 echo ""
 echo "📊 Configuration:"

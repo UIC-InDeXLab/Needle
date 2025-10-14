@@ -11,6 +11,7 @@ from cli.directory import directory_app
 from cli.generator import generator_app
 from cli.query import query_app
 from cli.service import service_app
+from cli.ui import ui_app
 from cli.version import VERSION as NEEDLECTL_VERSION
 from docker.docker_compose_manager import DockerComposeManager
 
@@ -21,6 +22,7 @@ app.add_typer(service_app, name="service")
 app.add_typer(directory_app, name="directory")
 app.add_typer(query_app, name="query")
 app.add_typer(generator_app, name="generator")
+app.add_typer(ui_app, name="ui")
 
 
 def get_backend_version() -> str:

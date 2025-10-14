@@ -1,0 +1,3 @@
+[submodule "ImageGeneratorsHub"]
+	path = ImageGeneratorsHub
+	url = git@github.com:UIC-InDeXLab/ImageGeneratorsHub.git

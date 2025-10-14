@@ -49,7 +49,7 @@ class ServiceManager:
         except (OSError, ValueError, FileNotFoundError):
             return None
     
-    def _start_virtual_env_service(self, service_name: str, command: list, pid_file: Path, log_file: Path, working_dir: Path = None):
+    def _start_virtual_env_service(self, service_name: str, command: list, pid_file: Path, log_file: Path, working_dir: Path = None, env_vars: dict = None):
         """Start a virtual environment service."""
         if self._is_service_running(pid_file):
             typer.echo(f"{service_name} is already running (PID: {self._get_service_pid(pid_file)})")
@@ -61,13 +61,19 @@ class ServiceManager:
         # Use provided working directory or default to needle_home
         cwd = working_dir if working_dir else self.needle_home
         
+        # Prepare environment variables
+        env = os.environ.copy()
+        if env_vars:
+            env.update(env_vars)
+        
         # Start service in background
         with open(log_file, 'w') as log_f:
             process = subprocess.Popen(
                 command,
                 stdout=log_f,
                 stderr=subprocess.STDOUT,
-                cwd=cwd
+                cwd=cwd,
+                env=env
             )
         
         # Save PID
@@ -118,17 +124,17 @@ class ServiceManager:
         time.sleep(15)
         
         # Start image generator hub
-        if (self.needle_home.parent / "ImageGeneratorsHub").exists():
+        image_gen_dir = self.needle_home / "ImageGeneratorsHub"
+        if image_gen_dir.exists() and (image_gen_dir / ".venv").exists():
             typer.echo("Starting image-generator-hub...")
-            image_gen_dir = self.needle_home.parent / "ImageGeneratorsHub"
+            python_path = image_gen_dir / ".venv" / "bin" / "python"
             command = [
-                "bash", "-c",
-                f"cd {image_gen_dir} && source .venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 8010"
+                str(python_path), "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8010"
             ]
             log_file = self.needle_home / "logs" / "image-generator-hub.log"
-            self._start_virtual_env_service("Image-generator-hub", command, self.image_gen_pid_file, log_file)
+            self._start_virtual_env_service("Image-generator-hub", command, self.image_gen_pid_file, log_file, image_gen_dir)
         else:
-            typer.echo("Warning: ImageGeneratorsHub not found. Image generation will not be available.")
+            typer.echo("Warning: ImageGeneratorsHub not found or virtual environment not set up. Image generation will not be available.")
         
         # Start backend
         typer.echo("Starting Needle backend...")
@@ -138,7 +144,11 @@ class ServiceManager:
             str(python_path), "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"
         ]
         log_file = self.needle_home / "logs" / "backend.log"
-        self._start_virtual_env_service("Backend", command, self.backend_pid_file, log_file, backend_dir)
+        # Set the config directory path to the correct location
+        env_vars = {
+            "SERVICE__CONFIG_DIR_PATH": str(self.needle_home / "configs" / "fast")
+        }
+        self._start_virtual_env_service("Backend", command, self.backend_pid_file, log_file, backend_dir, env_vars)
         
         typer.echo("All services started!")
         typer.echo("🌐 Access Points:")

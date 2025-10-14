@@ -165,19 +165,22 @@ else
     fi
 fi
 
-### Step 3: Clone ImageGeneratorsHub if needed
-print_status "Setting up ImageGeneratorsHub..."
+### Step 3: Initialize and update submodules
+print_status "Setting up ImageGeneratorsHub submodule..."
 
-if [ -d "${IMAGE_GEN_HUB_DIR}" ]; then
-    print_warning "ImageGeneratorsHub directory already exists. Updating..."
-    cd "${IMAGE_GEN_HUB_DIR}"
-    git pull origin main
-    cd "${NEEDLE_DIR}"
+# Initialize and update submodules
+print_status "Initializing git submodules..."
+git submodule init
+git submodule update --recursive
+
+# Check if ImageGeneratorsHub submodule is properly initialized
+if [ -d "ImageGeneratorsHub" ] && [ -f "ImageGeneratorsHub/.git" ]; then
+    print_success "ImageGeneratorsHub submodule initialized"
+    IMAGE_GEN_HUB_DIR="${NEEDLE_DIR}/ImageGeneratorsHub"
+    print_status "ImageGeneratorsHub directory: $IMAGE_GEN_HUB_DIR"
 else
-    print_status "Cloning ImageGeneratorsHub repository..."
-    cd "${NEEDLE_DIR}/.."
-    git clone git@github.com:UIC-InDeXLab/ImageGeneratorsHub.git
-    cd "${NEEDLE_DIR}"
+    print_error "Failed to initialize ImageGeneratorsHub submodule"
+    exit 1
 fi
 
 ### Step 4: Setup Backend Virtual Environment

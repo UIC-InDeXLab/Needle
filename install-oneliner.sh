@@ -111,10 +111,10 @@ print_success "Selected ${CONFIG_MODE} configuration"
 TEMP_DIR=$(mktemp -d)
 print_status "Using temporary directory: $TEMP_DIR"
 
-# Clone repository
-print_status "Cloning Needle repository..."
+# Clone repository with submodules
+print_status "Cloning Needle repository with submodules..."
 cd "$TEMP_DIR"
-git clone https://github.com/UIC-InDeXLab/Needle.git
+git clone --recursive https://github.com/UIC-InDeXLab/Needle.git
 cd Needle
 
 # Make install script executable and run it

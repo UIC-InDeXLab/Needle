@@ -94,7 +94,6 @@ const SearchPage = () => {
     setIsSearching(true);
     setError(null);
     setResults([]);
-    setSearchStartTime(Date.now());
     
     // Clear previous image URLs
     Object.values(imageUrls).forEach(url => {
@@ -105,6 +104,10 @@ const SearchPage = () => {
     setImageUrls({});
 
     try {
+      // Record start time right before the actual query request
+      const searchStartTime = Date.now();
+      setSearchStartTime(searchStartTime);
+      
       // Create query
       const queryResponse = await createQuery(query);
       const queryId = queryResponse.data.qid;
@@ -114,7 +117,7 @@ const SearchPage = () => {
       const searchData = searchResponse.data;
 
       const searchEndTime = Date.now();
-      const frontendTiming = searchStartTime ? searchEndTime - searchStartTime : null;
+      const frontendTiming = searchEndTime - searchStartTime;
       
       setResults({
         queryId,
@@ -123,7 +126,7 @@ const SearchPage = () => {
         previewUrl: searchData.preview_url,
         timings: {
           ...searchData.timings,
-          frontend_total_time: frontendTiming ? frontendTiming / 1000 : null
+          frontend_total_time: frontendTiming / 1000
         },
         verboseResults: searchData.verbose_results || {}
       });

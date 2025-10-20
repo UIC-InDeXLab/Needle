@@ -601,44 +601,58 @@ print_status "Downloading pre-built UI artifacts from GitHub releases..."
 print_status "Downloading latest UI build for $OS..."
 UI_RELEASE_URL="https://github.com/UIC-InDeXLab/Needle/releases/latest/download/ui-build-$OS.tar.gz"
 
-# Try to download the UI artifacts
+print_status "Download URL: $UI_RELEASE_URL"
+
+# Try to download the UI artifacts with better error handling
 if curl -L -o /tmp/ui-build.tar.gz "$UI_RELEASE_URL" 2>/dev/null; then
-    # Extract UI build artifacts
-    print_status "Extracting UI build artifacts..."
-    cd ui
-    tar -xzf /tmp/ui-build.tar.gz
-    cd ..
-    rm /tmp/ui-build.tar.gz
-    
-    print_success "UI build artifacts installed successfully"
-else
-    print_warning "Failed to download UI artifacts from GitHub releases"
-    print_status "Falling back to building UI from source..."
-    
-    # Fallback to building from source
-    if [ -d "ui" ]; then
+    # Check if the downloaded file is valid (not a 404 page)
+    if [ -s /tmp/ui-build.tar.gz ] && ! grep -q "Not Found" /tmp/ui-build.tar.gz 2>/dev/null; then
+        # Extract UI build artifacts
+        print_status "Extracting UI build artifacts..."
         cd ui
-        
-        # Check if node_modules exists
-        if [ ! -d "node_modules" ]; then
-            print_status "Installing UI dependencies..."
-            npm install
-        fi
-        
-        # Build the UI
-        print_status "Building React app..."
-        npm run build
-        
-        if [ $? -eq 0 ]; then
-            print_success "UI built successfully from source"
+        if tar -xzf /tmp/ui-build.tar.gz; then
+            cd ..
+            rm /tmp/ui-build.tar.gz
+            print_success "UI build artifacts installed successfully"
         else
-            print_warning "UI build failed, but continuing with installation"
+            print_error "Failed to extract UI build artifacts"
+            print_status "Downloaded file may be corrupted or not a valid tar.gz file"
+            print_status "File size: $(wc -c < /tmp/ui-build.tar.gz) bytes"
+            print_status "File type: $(file /tmp/ui-build.tar.gz)"
+            cd ..
+            rm /tmp/ui-build.tar.gz
+            exit 1
         fi
-        
-        cd ..
     else
-        print_warning "UI directory not found, skipping UI build"
+        print_error "Downloaded file appears to be invalid (404 or empty)"
+        print_status "File size: $(wc -c < /tmp/ui-build.tar.gz) bytes"
+        print_status "File content preview:"
+        head -5 /tmp/ui-build.tar.gz
+        rm /tmp/ui-build.tar.gz
+        
+        # Check what's actually available in the release
+        print_status "Checking available release assets..."
+        LATEST_TAG=$(curl -s "https://api.github.com/repos/UIC-InDeXLab/Needle/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)
+        print_status "Latest release tag: $LATEST_TAG"
+        
+        print_status "Available assets in latest release:"
+        curl -s "https://api.github.com/repos/UIC-InDeXLab/Needle/releases/latest" | grep '"name"' | sed 's/.*"name": "\(.*\)".*/  - \1/'
+        
+        print_error "UI build artifacts not found in GitHub releases"
+        print_status "This indicates that the GitHub Actions workflow for building UI artifacts is not working correctly"
+        print_status "Please check:"
+        print_status "1. GitHub Actions: https://github.com/UIC-InDeXLab/Needle/actions"
+        print_status "2. UI build workflow should create and upload ui-build-$OS.tar.gz files"
+        print_status "3. The workflow should run on every release"
+        exit 1
     fi
+else
+    print_error "Failed to download UI artifacts from GitHub releases"
+    print_status "Please check:"
+    print_status "1. GitHub releases page: https://github.com/UIC-InDeXLab/Needle/releases"
+    print_status "2. If ui-build-$OS.tar.gz exists in the latest release"
+    print_status "3. If GitHub Actions are running successfully"
+    exit 1
 fi
 
 ### Step 10: Create logs directory

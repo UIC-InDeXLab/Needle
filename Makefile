@@ -12,26 +12,26 @@ dev:
 
 # Install Needle (unified setup)
 install:
-	@chmod +x install.sh
-	@./install.sh
+	@chmod +x scripts/install.sh
+	@./scripts/install.sh
 
 # Install with specific configuration
 install-fast:
-	@chmod +x install.sh
-	@./install.sh fast
+	@chmod +x scripts/install.sh
+	@./scripts/install.sh fast
 
 install-balanced:
-	@chmod +x install.sh
-	@./install.sh balanced
+	@chmod +x scripts/install.sh
+	@./scripts/install.sh balanced
 
 install-accurate:
-	@chmod +x install.sh
-	@./install.sh accurate
+	@chmod +x scripts/install.sh
+	@./scripts/install.sh accurate
 
 # Uninstall Needle
 uninstall:
-	@chmod +x uninstall.sh
-	@./uninstall.sh
+	@chmod +x scripts/uninstall.sh
+	@./scripts/uninstall.sh
 
 # Start all services
 start:

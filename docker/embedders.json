@@ -1,9 +1,0 @@
-{
-  "image_embedders": [
-    {
-      "name": "clip",
-      "model_name": "vit_large_patch14_clip_336.openai_ft_in12k_in1k",
-      "weight": 1
-    }
-  ]
-}

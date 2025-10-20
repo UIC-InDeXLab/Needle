@@ -25,7 +25,9 @@ needlectl --home $(pwd) --profile dev service start
 
 This uses:
 - `NEEDLE_CONFIG_DIR=$NEEDLE_HOME/configs/fast`
-- Compose files: `docker/docker-compose.cpu.yaml` + `docker/docker-compose.dev.yaml`
+- Infrastructure: `docker/docker-compose.infrastructure.yaml`
+- Backend: Virtual environment
+- Image Generator: Virtual environment
 
 #### Production
 

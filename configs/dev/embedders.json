@@ -1,8 +1,8 @@
 {
   "image_embedders": [
     {
-      "name": "eva",
-      "model_name": "eva_large_patch14_196.in22k_ft_in1k",
+      "name": "clip",
+      "model_name": "vit_large_patch14_clip_336.openai_ft_in12k_in1k",
       "weight": 1
     }
   ]

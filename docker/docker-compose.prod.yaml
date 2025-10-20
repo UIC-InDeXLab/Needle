@@ -1,8 +1,0 @@
-services:
-  backend:
-    environment:
-      SERVICE__CONFIG_DIR_PATH: ${NEEDLE_HOME:-../}/configs/
-    env_file:
-      - ${NEEDLE_HOME:-../}/configs/directory.env
-      - ${NEEDLE_HOME:-../}/configs/query.env
-      - ${NEEDLE_HOME:-../}/configs/service.env

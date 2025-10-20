@@ -47,16 +47,16 @@ Install Needle with a single command - no cloning required:
 
 ```bash
 # Interactive installation (download first, then run)
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh -o install-needle.sh
+curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh -o install-needle.sh
 bash install-needle.sh
 
 # Or one-liner with specific configuration (non-interactive)
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s fast
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s balanced
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s accurate
+curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash -s fast
+curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash -s balanced
+curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash -s accurate
 
 # Or one-liner with default configuration (fast)
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash
+curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash
 ```
 
 ### 🛠️ Manual Installation
@@ -67,8 +67,8 @@ git clone https://github.com/UIC-InDeXLab/Needle.git
 cd Needle
 
 # Run the unified installer
-chmod +x install.sh
-./install.sh
+chmod +x scripts/install.sh
+./scripts/install.sh
 
 # Start all services
 ./start-needle.sh
@@ -84,9 +84,9 @@ Choose your performance configuration:
 
 ```bash
 # Install with specific configuration
-./install.sh fast          # Fast mode
-./install.sh balanced      # Balanced mode  
-./install.sh accurate      # Accurate mode
+./scripts/install.sh fast          # Fast mode
+./scripts/install.sh balanced      # Balanced mode  
+./scripts/install.sh accurate      # Accurate mode
 
 # Or using Make
 make install-fast
@@ -151,10 +151,15 @@ For detailed setup instructions, see [README_UNIFIED.md](README_UNIFIED.md).
 
 ## 🏭 Production
 
-To launch the CPU-based stack with your production configs (located in `$NEEDLE_HOME/configs/`),
-use the production override:
+To launch the production stack, use the unified installation and start services:
 ```bash
-docker compose -f docker/docker-compose.cpu.yaml -f docker/docker-compose.prod.yaml up -d
+# Install with your preferred configuration
+./scripts/install.sh balanced  # or fast, accurate
+
+# Start all services
+./start-needle.sh
+# or
+needlectl service start
 ```
 
 ## 🛠️ Development

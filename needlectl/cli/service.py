@@ -22,6 +22,61 @@ class ServiceManager:
         self.backend_pid_file = self.needle_home / "logs" / "backend.pid"
         self.image_gen_pid_file = self.needle_home / "logs" / "image-generator-hub.pid"
         self.docker_manager = DockerComposeManager()
+    
+    def _load_environment_vars(self) -> dict:
+        """Load environment variables from template or use defaults."""
+        env_vars = {
+            # Database Configuration
+            "POSTGRES__USER": "myuser",
+            "POSTGRES__PASSWORD": "mypassword", 
+            "POSTGRES__DB": "mydb",
+            "POSTGRES__HOST": "localhost",
+            "POSTGRES__PORT": "5432",
+            
+            # Vector Database Configuration
+            "MILVUS__HOST": "localhost",
+            "MILVUS__PORT": "19530",
+            
+            # Service Configuration
+            "SERVICE__USE_CUDA": "true",  # Will be detected at runtime
+            "SERVICE__CONFIG_DIR_PATH": str(self.needle_home / "configs"),
+            
+            # Image Generator Configuration
+            "GENERATOR__HOST": "localhost",
+            "GENERATOR__PORT": "8010",
+            
+            # Directory Indexing Configuration
+            "DIRECTORY__NUM_WATCHER_WORKERS": "4",
+            "DIRECTORY__BATCH_SIZE": "50",
+            "DIRECTORY__RECURSIVE_INDEXING": "true",
+            "DIRECTORY__CONSISTENCY_CHECK_INTERVAL": "1800",
+            
+            # Query Configuration
+            "QUERY__NUM_IMAGES_TO_RETRIEVE": "10",
+            "QUERY__NUM_IMAGES_TO_GENERATE": "1",
+            "QUERY__GENERATED_IMAGE_SIZE": "SMALL",
+            "QUERY__NUM_ENGINES_TO_USE": "1",
+            "QUERY__USE_FALLBACK": "true",
+            "QUERY__INCLUDE_BASE_IMAGES_IN_PREVIEW": "false",
+        }
+        
+        # Try to load from template if it exists
+        env_template = self.needle_home / "scripts" / "env.template"
+        if env_template.exists():
+            try:
+                with open(env_template, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#') and '=' in line:
+                            key, value = line.split('=', 1)
+                            # Replace template variables
+                            value = value.replace('{{HAS_GPU}}', 'true')
+                            value = value.replace('{{NEEDLE_DIR}}', str(self.needle_home))
+                            env_vars[key] = value
+            except Exception as e:
+                typer.echo(f"Warning: Could not load environment template: {e}")
+        
+        return env_vars
         
     def _is_service_running(self, pid_file: Path) -> bool:
         """Check if a service is running based on PID file."""
@@ -132,7 +187,9 @@ class ServiceManager:
                 str(python_path), "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8010"
             ]
             log_file = self.needle_home / "logs" / "image-generator-hub.log"
-            self._start_virtual_env_service("Image-generator-hub", command, self.image_gen_pid_file, log_file, image_gen_dir)
+            # Load environment variables for image generator
+            env_vars = self._load_environment_vars()
+            self._start_virtual_env_service("Image-generator-hub", command, self.image_gen_pid_file, log_file, image_gen_dir, env_vars)
         else:
             typer.echo("Warning: ImageGeneratorsHub not found or virtual environment not set up. Image generation will not be available.")
         
@@ -144,10 +201,8 @@ class ServiceManager:
             str(python_path), "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"
         ]
         log_file = self.needle_home / "logs" / "backend.log"
-        # Set the config directory path to the correct location
-        env_vars = {
-            "SERVICE__CONFIG_DIR_PATH": str(self.needle_home / "configs" / "fast")
-        }
+        # Load environment variables
+        env_vars = self._load_environment_vars()
         self._start_virtual_env_service("Backend", command, self.backend_pid_file, log_file, backend_dir, env_vars)
         
         typer.echo("All services started!")

@@ -121,14 +121,12 @@ fi
 
 ### Step 4: Remove configuration files
 print_status "Removing configuration files..."
-if [ -f ".env" ]; then
-    rm -f .env
-    print_success "Environment configuration removed"
-fi
+# Note: No .env file to remove - configuration is now handled via configs/ directory
 
+# Legacy cleanup - remove old .env.venv if it exists
 if [ -f ".env.venv" ]; then
     rm -f .env.venv
-    print_success "Old environment configuration removed"
+    print_success "Legacy .env.venv removed"
 fi
 
 ### Step 5: Remove service management scripts

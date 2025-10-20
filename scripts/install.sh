@@ -234,40 +234,6 @@ cd "${NEEDLE_DIR}"
 ### Step 6: Create Configuration Files
 print_status "Creating configuration files for ${CONFIG_MODE} mode..."
 
-# Create .env file for the unified setup
-cat > .env << EOF
-# Needle Unified Configuration - ${CONFIG_MODE} mode
-# Backend Configuration
-POSTGRES__USER=myuser
-POSTGRES__PASSWORD=mypassword
-POSTGRES__DB=mydb
-POSTGRES__HOST=localhost
-POSTGRES__PORT=5432
-
-MILVUS__HOST=localhost
-MILVUS__PORT=19530
-
-SERVICE__USE_CUDA=${HAS_GPU}
-SERVICE__CONFIG_DIR_PATH=${NEEDLE_DIR}/configs/${CONFIG_MODE}/
-
-GENERATOR__HOST=localhost
-GENERATOR__PORT=8010
-
-# Directory Configuration
-DIRECTORY__NUM_WATCHER_WORKERS=4
-DIRECTORY__BATCH_SIZE=50
-DIRECTORY__RECURSIVE_INDEXING=true
-DIRECTORY__CONSISTENCY_CHECK_INTERVAL=1800
-
-# Query Configuration
-QUERY__NUM_IMAGES_TO_RETRIEVE=10
-QUERY__NUM_IMAGES_TO_GENERATE=1
-QUERY__GENERATED_IMAGE_SIZE=SMALL
-QUERY__NUM_ENGINES_TO_USE=1
-QUERY__USE_FALLBACK=true
-QUERY__INCLUDE_BASE_IMAGES_IN_PREVIEW=false
-EOF
-
 # Copy configuration files from the selected mode
 print_status "Copying ${CONFIG_MODE} configuration files..."
 if [ -d "configs/${CONFIG_MODE}" ]; then
@@ -392,10 +358,32 @@ if [ ! -f "scripts/install.sh" ]; then
     exit 1
 fi
 
+# Load environment variables from template
+load_environment() {
+    local env_template="scripts/env.template"
+    local temp_env=$(mktemp)
+    
+    if [ -f "$env_template" ]; then
+        # Replace template variables with actual values
+        sed -e "s|{{HAS_GPU}}|${HAS_GPU:-false}|g" \
+            -e "s|{{NEEDLE_DIR}}|${NEEDLE_DIR}|g" \
+            "$env_template" > "$temp_env"
+        
+        # Load environment variables
+        set -a  # automatically export all variables
+        source "$temp_env"
+        set +a  # disable automatic export
+        
+        rm -f "$temp_env"
+        print_success "Environment variables loaded from template"
+    else
+        print_error "Environment template not found: $env_template"
+        exit 1
+    fi
+}
+
 # Load environment variables
-if [ -f ".env" ]; then
-    export $(grep -v '^#' .env | xargs)
-fi
+load_environment
 
 # Start infrastructure services (Docker)
 print_status "Starting infrastructure services (PostgreSQL, Milvus, etc.)..."
@@ -436,6 +424,8 @@ print_success "Image-generator-hub started on port 8010"
 print_status "Starting Needle backend..."
 cd backend
 source venv/bin/activate
+# Set the config directory path for the backend
+export SERVICE__CONFIG_DIR_PATH="${NEEDLE_DIR}/configs/"
 nohup uvicorn main:app --host 0.0.0.0 --port 8000 --reload > ../logs/backend.log 2>&1 &
 echo $! > ../logs/backend.pid
 cd ..

@@ -77,23 +77,246 @@ class ServiceManager:
                 typer.echo(f"Warning: Could not load environment template: {e}")
         
         return env_vars
+
+
+class UpdateManager:
+    """Manages updates for Needle components."""
+    
+    def __init__(self, needle_home: str):
+        self.needle_home = Path(needle_home)
+        self.github_repo = "UIC-InDeXLab/Needle"
         
-    def _is_service_running(self, pid_file: Path) -> bool:
-        """Check if a service is running based on PID file."""
-        if not pid_file.exists():
-            return False
+    def get_latest_release_info(self):
+        """Get latest release information from GitHub API."""
+        import requests
+        try:
+            response = requests.get(f"https://api.github.com/repos/{self.github_repo}/releases/latest")
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            typer.echo(f"Error fetching release info: {e}")
+            return None
+    
+    def get_current_needlectl_version(self):
+        """Get current needlectl version."""
+        try:
+            from cli.version import VERSION
+            return VERSION
+        except:
+            return "unknown"
+    
+    def get_current_backend_version(self):
+        """Get current backend version from git."""
+        try:
+            import subprocess
+            import os
+            
+            # Change to project root directory
+            original_cwd = os.getcwd()
+            os.chdir(self.needle_home)
+            
+            try:
+                # Get the latest needlectl tag
+                result = subprocess.run(
+                    ["git", "tag", "-l", "needlectl/v*", "--sort=-v:refname"],
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                tags = result.stdout.strip().split('\n')
+                
+                if not tags or tags == ['']:
+                    return "0.1.0"
+                else:
+                    latest_tag = tags[0]
+                    return latest_tag.replace("needlectl/v", "")
+            finally:
+                os.chdir(original_cwd)
+        except:
+            return "unknown"
+    
+    def get_current_ui_version(self):
+        """Get current UI version from package.json."""
+        try:
+            import json
+            ui_package_json = self.needle_home / "ui" / "package.json"
+            if ui_package_json.exists():
+                with open(ui_package_json, 'r') as f:
+                    package_data = json.load(f)
+                    return package_data.get("version", "unknown")
+            return "not found"
+        except:
+            return "unknown"
+    
+    def update_needlectl(self, latest_version: str, force: bool = False):
+        """Update needlectl binary."""
+        typer.echo("🔄 Updating needlectl binary...")
+        
+        current_version = self.get_current_needlectl_version()
+        if not force and current_version == latest_version:
+            typer.echo("✅ needlectl is already up to date")
+            return True
         
         try:
-            with open(pid_file, 'r') as f:
-                pid = int(f.read().strip())
+            import requests
+            import platform
             
-            # Check if process is still running
-            os.kill(pid, 0)
+            # Determine OS and architecture
+            os_name = platform.system().lower()
+            if os_name == "darwin":
+                os_name = "macos"
+            
+            # Download the appropriate binary
+            binary_name = f"needlectl-{os_name}"
+            download_url = f"https://github.com/{self.github_repo}/releases/latest/download/{binary_name}"
+            
+            typer.echo(f"📥 Downloading {binary_name}...")
+            response = requests.get(download_url)
+            response.raise_for_status()
+            
+            # Backup current binary
+            current_binary = Path("/usr/local/bin/needlectl")
+            if current_binary.exists():
+                backup_path = current_binary.with_suffix('.backup')
+                current_binary.rename(backup_path)
+                typer.echo(f"💾 Backed up current binary to {backup_path}")
+            
+            # Install new binary
+            with open(current_binary, 'wb') as f:
+                f.write(response.content)
+            
+            # Make executable
+            current_binary.chmod(0o755)
+            
+            typer.echo(f"✅ needlectl updated to version {latest_version}")
             return True
-        except (OSError, ValueError, FileNotFoundError):
+            
+        except Exception as e:
+            typer.echo(f"❌ Failed to update needlectl: {e}")
             return False
     
-    def _get_service_pid(self, pid_file: Path) -> Optional[int]:
+    def update_backend(self, force: bool = False):
+        """Update backend by pulling latest changes from git."""
+        typer.echo("🔄 Updating backend...")
+        
+        try:
+            import subprocess
+            import os
+            
+            # Change to project root directory
+            original_cwd = os.getcwd()
+            os.chdir(self.needle_home)
+            
+            try:
+                # Check if we're in a git repository
+                subprocess.run(["git", "status"], check=True, capture_output=True)
+                
+                # Pull latest changes
+                typer.echo("📥 Pulling latest changes from git...")
+                result = subprocess.run(
+                    ["git", "pull", "origin", "main"],
+                    capture_output=True,
+                    text=True
+                )
+                
+                if result.returncode == 0:
+                    typer.echo("✅ Backend updated successfully")
+                    return True
+                else:
+                    typer.echo(f"❌ Failed to update backend: {result.stderr}")
+                    return False
+                    
+            finally:
+                os.chdir(original_cwd)
+                
+        except Exception as e:
+            typer.echo(f"❌ Failed to update backend: {e}")
+            return False
+    
+    def update_ui(self, latest_version: str, force: bool = False):
+        """Update UI by downloading latest artifacts."""
+        typer.echo("🔄 Updating UI artifacts...")
+        
+        try:
+            import requests
+            import platform
+            import tarfile
+            
+            # Determine OS
+            os_name = platform.system().lower()
+            if os_name == "darwin":
+                os_name = "macos"
+            
+            # Download UI artifacts
+            artifact_name = f"ui-build-{os_name}.tar.gz"
+            download_url = f"https://github.com/{self.github_repo}/releases/latest/download/{artifact_name}"
+            
+            typer.echo(f"📥 Downloading {artifact_name}...")
+            response = requests.get(download_url)
+            response.raise_for_status()
+            
+            # Extract to UI directory
+            ui_dir = self.needle_home / "ui"
+            ui_dir.mkdir(exist_ok=True)
+            
+            # Save and extract
+            temp_file = ui_dir / "temp_ui_build.tar.gz"
+            with open(temp_file, 'wb') as f:
+                f.write(response.content)
+            
+            # Extract build directory
+            with tarfile.open(temp_file, 'r:gz') as tar:
+                tar.extractall(ui_dir)
+            
+            # Clean up temp file
+            temp_file.unlink()
+            
+            typer.echo("✅ UI artifacts updated successfully")
+            return True
+            
+        except Exception as e:
+            typer.echo(f"❌ Failed to update UI: {e}")
+            return False
+    
+    def update(self, force: bool = False, component: Optional[str] = None):
+        """Update Needle components."""
+        typer.echo("🔍 Checking for updates...")
+        
+        # Get latest release info
+        release_info = self.get_latest_release_info()
+        if not release_info:
+            typer.echo("❌ Failed to fetch release information")
+            return
+        
+        latest_version = release_info["tag_name"].replace("needlectl/v", "")
+        typer.echo(f"📋 Latest version available: {latest_version}")
+        
+        # Show current versions
+        typer.echo(f"📊 Current versions:")
+        typer.echo(f"  - needlectl: {self.get_current_needlectl_version()}")
+        typer.echo(f"  - backend: {self.get_current_backend_version()}")
+        typer.echo(f"  - UI: {self.get_current_ui_version()}")
+        
+        success = True
+        
+        if component is None or component == "all" or component == "needlectl":
+            success &= self.update_needlectl(latest_version, force)
+        
+        if component is None or component == "all" or component == "backend":
+            success &= self.update_backend(force)
+        
+        if component is None or component == "all" or component == "ui":
+            success &= self.update_ui(latest_version, force)
+        
+        if success:
+            typer.echo("🎉 Update completed successfully!")
+            typer.echo("💡 You may need to restart services: needlectl service restart")
+        else:
+            typer.echo("⚠️  Some updates failed. Check the output above for details.")
+
+
+@service_app.command("start")
+def service_start(ctx: typer.Context):
         """Get the PID of a service if it's running."""
         if not self._is_service_running(pid_file):
             return None
@@ -337,6 +560,20 @@ def service_log_cmd(ctx: typer.Context, service: str = typer.Argument("backend",
                 typer.echo(f.read())
         else:
             typer.echo(f"Log file not found: {log_file}")
+
+
+@service_app.command("update")
+def service_update(
+    ctx: typer.Context,
+    force: bool = typer.Option(False, "--force", "-f", help="Force update even if already up to date"),
+    component: Optional[str] = typer.Option(None, "--component", "-c", help="Update specific component: needlectl, backend, ui, or all")
+):
+    """Update Needle components to latest versions."""
+    needle_home = ctx.obj.get("needle_home", ".")
+    manager = ServiceManager(needle_home)
+    
+    updater = UpdateManager(needle_home)
+    updater.update(force=force, component=component)
 
 
 @service_app.command("config")

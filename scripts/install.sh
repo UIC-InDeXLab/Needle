@@ -37,8 +37,8 @@ echo ""
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NEEDLE_DIR="$SCRIPT_DIR"
-IMAGE_GEN_HUB_DIR="$SCRIPT_DIR/../ImageGeneratorsHub"
+NEEDLE_DIR="$(dirname "$SCRIPT_DIR")"
+IMAGE_GEN_HUB_DIR="$NEEDLE_DIR/ImageGeneratorsHub"
 
 print_status "Needle directory: $NEEDLE_DIR"
 print_status "ImageGeneratorsHub directory: $IMAGE_GEN_HUB_DIR"
@@ -413,11 +413,11 @@ mkdir -p logs
 
 # Start image-generator-hub
 print_status "Starting image-generator-hub..."
-cd ../ImageGeneratorsHub
+cd "${IMAGE_GEN_HUB_DIR}"
 source .venv/bin/activate
-nohup uvicorn main:app --host 0.0.0.0 --port 8010 > ../Needle/logs/image-generator-hub.log 2>&1 &
-echo $! > ../Needle/logs/image-generator-hub.pid
-cd ../Needle
+nohup uvicorn main:app --host 0.0.0.0 --port 8010 > "${NEEDLE_DIR}/logs/image-generator-hub.log" 2>&1 &
+echo $! > "${NEEDLE_DIR}/logs/image-generator-hub.pid"
+cd "${NEEDLE_DIR}"
 print_success "Image-generator-hub started on port 8010"
 
 # Start backend
@@ -426,8 +426,8 @@ cd backend
 source venv/bin/activate
 # Set the config directory path for the backend
 export SERVICE__CONFIG_DIR_PATH="${NEEDLE_DIR}/configs/"
-nohup uvicorn main:app --host 0.0.0.0 --port 8000 --reload > ../logs/backend.log 2>&1 &
-echo $! > ../logs/backend.pid
+nohup uvicorn main:app --host 0.0.0.0 --port 8000 --reload > "${NEEDLE_DIR}/logs/backend.log" 2>&1 &
+echo $! > "${NEEDLE_DIR}/logs/backend.pid"
 cd ..
 
 print_success "Needle backend started on port 8000"

@@ -35,8 +35,8 @@ echo ""
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NEEDLE_DIR="$SCRIPT_DIR"
-IMAGE_GEN_HUB_DIR="$SCRIPT_DIR/../ImageGeneratorsHub"
+NEEDLE_DIR="$(dirname "$SCRIPT_DIR")"
+IMAGE_GEN_HUB_DIR="$NEEDLE_DIR/ImageGeneratorsHub"
 
 print_status "Needle directory: $NEEDLE_DIR"
 print_status "ImageGeneratorsHub directory: $IMAGE_GEN_HUB_DIR"

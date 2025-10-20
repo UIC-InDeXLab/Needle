@@ -46,13 +46,17 @@ Needle uses a unified installation system that sets up two virtual environments 
 Install Needle with a single command - no cloning required:
 
 ```bash
-# One-liner installation (interactive configuration selection)
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash
+# Interactive installation (download first, then run)
+curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh -o install-needle.sh
+bash install-needle.sh
 
-# Or install with specific configuration
+# Or one-liner with specific configuration (non-interactive)
 curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s fast
 curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s balanced
 curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s accurate
+
+# Or one-liner with default configuration (fast)
+curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash
 ```
 
 ### 🛠️ Manual Installation

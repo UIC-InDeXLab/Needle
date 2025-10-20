@@ -108,9 +108,9 @@ else
     echo "3) Accurate - 6 models with highest accuracy but slower performance"
     echo ""
 
-    # Check if we're in an interactive environment
-    if [ -t 0 ]; then
-        # Interactive mode - prompt user
+    # Check if we're being run from a file (interactive) vs piped (non-interactive)
+    if [ -f "${BASH_SOURCE[0]}" ] && [ "${BASH_SOURCE[0]}" != "/dev/stdin" ]; then
+        # Interactive mode - script is being run from a file
         echo -n "Enter your choice (1-3) [default: 1]: "
         read config_choice
     else
@@ -120,6 +120,10 @@ else
         print_status "  curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s fast"
         print_status "  curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s balanced"
         print_status "  curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s accurate"
+        print_status ""
+        print_status "Or download and run interactively:"
+        print_status "  curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh -o install-needle.sh"
+        print_status "  bash install-needle.sh"
         config_choice="1"
     fi
 

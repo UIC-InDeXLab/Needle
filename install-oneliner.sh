@@ -2,7 +2,11 @@
 
 # Needle One-Liner Installation Script
 # This script can be run directly with curl without cloning the repository
-# Usage: curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash
+# Usage: 
+#   curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s fast
+#   curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s balanced
+#   curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s accurate
 
 set -euo pipefail
 
@@ -78,32 +82,63 @@ fi
 print_success "All dependencies found"
 
 # Configuration selection
-echo ""
-print_status "Choose your performance configuration:"
-echo "1) Fast (Default) - Single CLIP model, fastest indexing and retrieval"
-echo "2) Balanced - 4 models with balanced performance and accuracy"
-echo "3) Accurate - 6 models with highest accuracy but slower performance"
-echo ""
+CONFIG_MODE="${1:-}"
 
-# Use a more robust input method
-echo -n "Enter your choice (1-3) [default: 1]: "
-read config_choice
+if [ -n "$CONFIG_MODE" ]; then
+    # Configuration provided as argument
+    case $CONFIG_MODE in
+        fast|balanced|accurate)
+            print_status "Using provided configuration: $CONFIG_MODE"
+            ;;
+        *)
+            print_error "Invalid configuration: $CONFIG_MODE. Must be one of: fast, balanced, accurate"
+            print_status "Available options:"
+            print_status "  curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s fast"
+            print_status "  curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s balanced"
+            print_status "  curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s accurate"
+            exit 1
+            ;;
+    esac
+else
+    # No configuration provided - interactive selection
+    echo ""
+    print_status "Choose your performance configuration:"
+    echo "1) Fast (Default) - Single CLIP model, fastest indexing and retrieval"
+    echo "2) Balanced - 4 models with balanced performance and accuracy"
+    echo "3) Accurate - 6 models with highest accuracy but slower performance"
+    echo ""
 
-case $config_choice in
-    1|"")
-        CONFIG_MODE="fast"
-        ;;
-    2)
-        CONFIG_MODE="balanced"
-        ;;
-    3)
-        CONFIG_MODE="accurate"
-        ;;
-    *)
-        print_error "Invalid choice. Using default: fast"
-        CONFIG_MODE="fast"
-        ;;
-esac
+    # Check if we're in an interactive environment
+    if [ -t 0 ]; then
+        # Interactive mode - prompt user
+        echo -n "Enter your choice (1-3) [default: 1]: "
+        read config_choice
+    else
+        # Non-interactive mode (piped from curl) - use default
+        print_warning "Non-interactive mode detected. Using default configuration: fast"
+        print_status "To choose a different configuration, run:"
+        print_status "  curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s fast"
+        print_status "  curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s balanced"
+        print_status "  curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/install-oneliner.sh | bash -s accurate"
+        config_choice="1"
+    fi
+
+    case $config_choice in
+        1|"")
+            CONFIG_MODE="fast"
+            ;;
+        2)
+            CONFIG_MODE="balanced"
+            ;;
+        3)
+            CONFIG_MODE="accurate"
+            ;;
+        *)
+            print_error "Invalid choice. Using default: fast"
+            CONFIG_MODE="fast"
+            ;;
+    esac
+fi
 
 print_success "Selected ${CONFIG_MODE} configuration"
 

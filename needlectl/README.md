@@ -45,3 +45,4 @@ Only override the configuration directory (compose files follow the selected pro
 needlectl --home /opt/needle --config-dir /etc/needle/configs service start
 ```
 
+# Trigger

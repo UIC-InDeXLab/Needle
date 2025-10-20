@@ -59,7 +59,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
           cache-dependency-path: ui/package-lock.json
           
@@ -95,7 +95,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
           cache-dependency-path: ui/package-lock.json
           
@@ -118,44 +118,6 @@ jobs:
           name: ui-build-macos
           path: ui-build-macos.tar.gz
           retention-days: 30
-
-  build-linux:
-    runs-on: ubuntu-22.04
-    needs: prepare
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0  # Ensure full git history for tag discovery
-
-      - name: Get version information
-        id: version
-        run: |
-          # Get the latest needlectl tag
-          LATEST_TAG=$(git tag -l "needlectl/v*" --sort=-v:refname | head -n 1)
-
-          if [ -z "$LATEST_TAG" ]; then
-            echo "No existing tags found, using needlectl/v0.1.0"
-            echo "base_version=0.1.0" >> $GITHUB_OUTPUT
-            COMMIT_COUNT=$(git rev-list --count HEAD)
-          else
-            echo "Found latest tag: $LATEST_TAG"
-            # Extract version number without prefix
-            BASE_VERSION=${LATEST_TAG#needlectl/v}
-            echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
-            # Count commits since last tag
-            COMMIT_COUNT=$(git rev-list --count $LATEST_TAG..HEAD)
-          fi
-
-          # Split the base version
-          IFS='.' read -r major minor patch <<< "$BASE_VERSION"
-
-          # Calculate new version
-          NEW_PATCH=$((patch + COMMIT_COUNT))
-          NEW_VERSION="${major}.${minor}.${NEW_PATCH}"
-
-          echo "New version will be: $NEW_VERSION"
-          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
   build-linux:
     runs-on: ubuntu-22.04

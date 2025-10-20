@@ -315,8 +315,22 @@ class UpdateManager:
             typer.echo("⚠️  Some updates failed. Check the output above for details.")
 
 
-@service_app.command("start")
-def service_start(ctx: typer.Context):
+    def _is_service_running(self, pid_file: Path) -> bool:
+        """Check if a service is running based on PID file."""
+        if not pid_file.exists():
+            return False
+        
+        try:
+            with open(pid_file, 'r') as f:
+                pid = int(f.read().strip())
+            
+            # Check if process is still running
+            os.kill(pid, 0)
+            return True
+        except (OSError, ValueError, FileNotFoundError):
+            return False
+    
+    def _get_service_pid(self, pid_file: Path) -> Optional[int]:
         """Get the PID of a service if it's running."""
         if not self._is_service_running(pid_file):
             return None

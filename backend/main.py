@@ -23,6 +23,7 @@ from models.schemas import AddDirectoryRequest, AddDirectoryResponse, HealthChec
     UpdateDirectoryRequest
 from indexing import image_indexing_service
 from utils import aggregate_rankings, pil_image_to_base64, Timer
+from version import VERSION as BACKEND_VERSION
 
 origins = ["http://localhost:3000", "http://127.0.0.1:3000", os.getenv("PUBLIC_IP", "http://127.0.0.1:3000")]
 
@@ -51,6 +52,11 @@ templates = Jinja2Templates(directory="templates")
 @app.get("/health", response_model=HealthCheckResponse)
 async def health_check():
     return HealthCheckResponse(status="running")
+
+
+@app.get("/version")
+async def get_version():
+    return {"version": BACKEND_VERSION}
 
 
 @app.post("/directory", response_model=AddDirectoryResponse)

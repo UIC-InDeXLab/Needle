@@ -28,20 +28,53 @@ def get_backend_version() -> str:
     try:
         # Try to get version from running backend
         import requests
-        response = requests.get("http://localhost:8000/health", timeout=5)
+        response = requests.get("http://localhost:8000/version", timeout=5)
         if response.status_code == 200:
-            return "running"
+            data = response.json()
+            return data.get("version", "unknown")
         else:
             return "unknown (not responding)"
     except:
         return "unknown (not running)"
 
 
+def get_ui_version() -> str:
+    """Get the UI version from package.json."""
+    try:
+        import json
+        from pathlib import Path
+        
+        # Try to find UI directory
+        current_dir = Path.cwd()
+        ui_dir = None
+        
+        # Check current directory first
+        if (current_dir / "ui" / "package.json").exists():
+            ui_dir = current_dir / "ui"
+        # Check needle home directory
+        else:
+            needle_home = get_storage_dir()
+            ui_path = Path(needle_home) / "ui" / "package.json"
+            if ui_path.exists():
+                ui_dir = ui_path.parent
+        
+        if ui_dir and (ui_dir / "package.json").exists():
+            with open(ui_dir / "package.json", "r") as f:
+                package_data = json.load(f)
+                return package_data.get("version", "unknown")
+        else:
+            return "not found"
+    except:
+        return "unknown"
+
+
 def version_callback(value: bool):
     """Callback for --version flag"""
     if value:
         backend_version = get_backend_version()
+        ui_version = get_ui_version()
         typer.echo(f"Backend version: {backend_version}")
+        typer.echo(f"UI version: {ui_version}")
         typer.echo(f"Needlectl version: {NEEDLECTL_VERSION}")
         raise typer.Exit()
 

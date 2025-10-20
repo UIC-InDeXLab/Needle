@@ -6,6 +6,7 @@ on:
     paths:
       - needlectl/**
       - ui/**
+      - backend/**
 
 jobs:
   prepare:
@@ -136,6 +137,7 @@ jobs:
       - name: Create version file
         run: |
           echo "VERSION = '${{ needs.prepare.outputs.version }}'" > needlectl/cli/version.py
+          echo "VERSION = '${{ needs.prepare.outputs.version }}'" > backend/version.py
 
       - name: Build needlectl for Linux
         run: |
@@ -171,6 +173,7 @@ jobs:
       - name: Create version file
         run: |
           echo "VERSION = '${{ needs.prepare.outputs.version }}'" > needlectl/cli/version.py
+          echo "VERSION = '${{ needs.prepare.outputs.version }}'" > backend/version.py
 
       - name: Build needlectl for macOS
         run: |

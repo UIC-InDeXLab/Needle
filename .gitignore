@@ -9,6 +9,7 @@ volumes/**
 # dependencies
 /node_modules
 ui/node_modules
+demo/node_modules
 /.pnp
 .pnp.js
 
@@ -18,6 +19,8 @@ ui/node_modules
 # production build
 /build
 /dist
+demo/build
+docs/book
 
 # misc
 .DS_Store

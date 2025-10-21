@@ -14,6 +14,9 @@
   <a href="https://www.youtube.com/watch?v=n-SXX_ry9-0&t=122s">
     <img src="https://img.shields.io/badge/demo-Youtube-purple" alt="Youtube">
   </a>
+  <a href="https://uic-indexlab.github.io/Needle/demo/">
+    <img src="https://img.shields.io/badge/🎨-Try%20Demo-green" alt="Interactive Demo">
+  </a>
 </p>
 
 
@@ -34,6 +37,22 @@ Watch as Needle transforms natural language queries into precise image retrieval
 <p align="center">
     <img src="media/needle_demo.gif"/>
 </p>
+
+## 🎨 Interactive Demo
+
+Try Needle's capabilities with our interactive demo! Experience the complete workflow from text queries to image retrieval.
+
+<div align="center">
+  <a href="https://uic-indexlab.github.io/Needle/demo/" target="_blank">
+    <img src="https://img.shields.io/badge/🎨-Try%20Interactive%20Demo-667eea?style=for-the-badge&logo=react&logoColor=white" alt="Interactive Demo" />
+  </a>
+</div>
+
+**What you'll experience:**
+- 🖼️ **Image Generation**: AI-generated images from text prompts
+- 🔍 **Similarity Search**: Find similar images from curated datasets  
+- ⚡ **Real-time Results**: See performance metrics and timing
+- 🎛️ **Full Interface**: Explore all Needle features in a demo environment
 
 ---
 

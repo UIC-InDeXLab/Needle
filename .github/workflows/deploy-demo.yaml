@@ -1,0 +1,55 @@
+name: Deploy Demo
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'demo/**'
+      - '.github/workflows/deploy-demo.yaml'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'demo/package-lock.json'
+      
+      - name: Install dependencies
+        run: |
+          cd demo
+          npm ci
+      
+      - name: Build demo
+        run: |
+          cd demo
+          npm run build
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      
+      - name: Upload demo artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'demo/build'
+      
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          folder: 'demo/build'

@@ -35,7 +35,7 @@ function App() {
   console.log('Needle Demo App loading...');
   
   return (
-    <Router>
+    <Router basename="/Needle/demo">
       <div className="App">
         <RedirectHandler />
         <Layout>

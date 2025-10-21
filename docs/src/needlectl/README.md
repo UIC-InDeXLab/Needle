@@ -7,21 +7,50 @@ needlectl is the primary command-line interface that connects to the Needle back
 The following options are available with needlectl:
 
 - **`--api-url`**: Specifies the backend URL to connect to.  
-  _Default:_ `127.0.0.1:8000`
+  _Default:_ `http://127.0.0.1:8000`
 
 - **`--output`**: Determines the format of the output.  
-  _Supported formats:_ human-readable, JSON, YAML.  
-  _Default:_ human-readable.
+  _Supported formats:_ human, json, yaml.  
+  _Default:_ human.
 
-- **`--version`**: Prints the version information for both the Needle backend and the needlectl tool.
+- **`--version`** or **`-v`**: Prints the version information for both the Needle backend and the needlectl tool.
 
-- **`--install-completion`**: Installs auto-completion for your current shell.
+- **`--home`** or **`-H`**: Specifies the Needle installation directory.  
+  _Default:_ Auto-detected from installation
 
+- **`--profile`**: Selects the runtime profile (prod or dev).  
+  _Default:_ prod
+
+- **`--config-dir`**: Overrides the configuration directory path.
 
 > **Note:** `--api-url` and `--output` are accessible globally and in all commands, for example, in order to get the outputs of a query in JSON format you can use following command: 
 > ```bash
 > needlectl --output json query run "a wolf howling"
 > ```
+
+## Profiles & Configuration
+
+You can use the `--home`/`-H` flag to point needlectl at a custom Needle installation or local checkout, and select a runtime profile (`prod` or `dev`) that auto-configures the compose files and config directory.
+
+### Development Profile
+```bash
+needlectl --home $(pwd) --profile dev service start
+```
+This uses:
+- `NEEDLE_CONFIG_DIR=$NEEDLE_HOME/configs/fast`
+- Infrastructure: `docker/docker-compose.infrastructure.yaml`
+- Backend: Virtual environment
+- Image Generator: Virtual environment
+
+### Production Profile
+```bash
+needlectl --home /opt/needle --profile prod service start
+```
+This uses:
+- `NEEDLE_CONFIG_DIR=$NEEDLE_HOME/configs/balanced` (or your chosen mode)
+- Infrastructure: `docker/docker-compose.infrastructure.yaml`
+- Backend: Virtual environment
+- Image Generator: Virtual environment
 
 
 
@@ -35,17 +64,32 @@ Manages Needle's core service operations, including:
 - Restarting the service
 - Stopping the service
 - Viewing logs
-- Upgrading the service
+- Updating components
+- Managing configuration
 
 ### [Directory](directory.md)
 Handles image directory management tasks, such as:
 - Adding directories
 - Removing directories
-- Indexing images
+- Listing directories
+- Modifying directory settings
+- Viewing directory details
 
 ### [Query](query.md)
-Executes natural language queries against the image database, providing flexible and powerful search capabilities.
+Executes natural language queries against the image database, providing flexible and powerful search capabilities:
+- Running search queries
+- Viewing query logs
+- Managing query configuration
 
 ### [Generator](generator.md)
-Manages image generation operations, allowing you to adjust parameters and generate images as needed.
+Manages image generation operations, allowing you to:
+- List available generators
+- Configure generator settings
+- Manage image generation parameters
+
+### [UI](ui.md)
+Controls the web-based user interface:
+- Starting the web UI
+- Stopping the web UI
+- Managing UI configuration
 

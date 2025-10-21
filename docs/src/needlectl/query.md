@@ -10,10 +10,10 @@ This command executes a search query against the Needle image retrieval database
 
 - **Options:**
     - **`prompt`** (string): The search prompt in natural language.
-    - **`-n` or `--n`** (integer, optional): Specifies the number of images to retrieve.
-    - **`-m` or `--m`** (integer, optional): Specifies the number of images per engine.
-    - **`-k` or `--k`** (integer, optional): Specifies the number of engines to use.
-    - **`--image-size`** (integer, optional): Sets the desired image size for image generation.
+    - **`-n`** (integer, optional): Specifies the number of images to retrieve.
+    - **`--num-images-to-generate`** (integer, optional): Specifies the number of images to generate.
+    - **`--num-engines`** (integer, optional): Specifies the number of engines to use.
+    - **`--image-size`** (string, optional): Sets the desired image size for image generation (e.g., "512", "1024").
     - **`--include-base-images`** (boolean, optional): Indicates whether to include base images in the results preview.
     - **`--use-fallback`** (boolean, optional): Indicates whether to use fallback mode if the primary engines set fails.
 
@@ -29,7 +29,10 @@ This command executes a search query against the Needle image retrieval database
    needlectl query run "red cars"
    
    # Run a query with additional options
-   needlectl query run "red cars" --n 5 --m 2 --k 3 --image-size 512 --include-base-images true --use-fallback false
+   needlectl query run "red cars" -n 5 --num-images-to-generate 2 --num-engines 3 --image-size 512 --include-base-images true --use-fallback false
+   
+   # Run a query with JSON output
+   needlectl --output json query run "mountain landscape" -n 10
    ```
 
 ### `log`

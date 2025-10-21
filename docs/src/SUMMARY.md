@@ -8,4 +8,5 @@
     * [Directory](needlectl/directory.md)
     * [Query](needlectl/query.md)
     * [Generator](needlectl/generator.md)
+    * [UI](needlectl/ui.md)
 * [Uninstallation](uninstallation.md)

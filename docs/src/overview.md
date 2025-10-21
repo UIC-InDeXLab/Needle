@@ -14,6 +14,29 @@ Needle is an open-source image retrieval database with high accuracy that can ea
   <source src="media/needle-demo.mp4" type="video/mp4">
 </video>*Watch as Needle transforms natural language queries into precise image retrieval results in real time.*
 
+## 🎨 Try the Interactive Demo
+
+Experience Needle's full capabilities with our interactive demo! Test different queries, explore the interface, and see how Needle works with real data.
+
+<div style="text-align: center; margin: 2rem 0;">
+  <a href="https://uic-indexlab.github.io/Needle/demo/" 
+     target="_blank" 
+     style="display: inline-block; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            padding: 1rem 2rem; 
+            border-radius: 8px; 
+            text-decoration: none; 
+            font-weight: bold; 
+            font-size: 1.1rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: transform 0.2s ease;">
+    🎨 Try Needle Demo
+  </a>
+</div>
+
+*The demo showcases sample queries, image generation, and similarity search with pre-processed datasets.*
+
 ## Comparison to State-of-the-Art Methods
 
 Curious how Needle measures up against other cutting-edge approaches? Here, you'll soon find performance plots that

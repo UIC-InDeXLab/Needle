@@ -47,10 +47,22 @@ This command removes an image directory from Needle.
 
 This command lists all the directories currently registered in Needle.
 
+- **What it does:**
+  - Connects to the backend API
+  - Retrieves the list of all registered directories
+  - Displays directory information including status, file counts, and indexing progress
+
 - **Usage Examples:**
    ```bash
+   # List all directories
    needlectl directory list
+   
+   # List directories with JSON output
+   needlectl --output json directory list
    ```
+
+- **Output:**
+  Shows directory ID, path, name, status, file count, indexing progress, and other relevant information.
 
 ### `modify`
 This command allows you to modify the configuration for your added directories, you can enable/disable them for

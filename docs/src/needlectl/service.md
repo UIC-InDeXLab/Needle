@@ -1,8 +1,8 @@
 # Service Component
 
-The service component of `needlectl` manages the core operations of Needle. It connects to the Needle backend service and uses Docker Compose to start, stop, restart, check status, view logs, and configure the service environment.
+The service component of `needlectl` manages the core operations of Needle. It connects to the Needle backend service and uses Docker Compose to start, stop, restart, check status, view logs, update components, and configure the service environment.
 
-> **Note:** Most commands rely on the `--api-url` option (default: `127.0.0.1:8000`) to connect to the backend API. You can set this globally if needed.
+> **Note:** Most commands rely on the `--api-url` option (default: `http://127.0.0.1:8000`) to connect to the backend API. You can set this globally if needed.
 
 ## Commands Overview
 
@@ -77,6 +77,34 @@ Displays the logs from the Needle backend service.
   needlectl service log
   ```
   
+### `update`
+Updates Needle components to the latest versions.
+
+- **Options:**
+  - **`--force`** or **`-f`**: Force update even if already up to date
+  - **`--component`** or **`-c`**: Update specific component (needlectl, backend, ui, or all)
+
+- **What it does:**
+  - Checks for the latest release information
+  - Shows current versions of all components
+  - Updates the specified components
+  - Provides status updates during the process
+
+- **Usage Examples:**
+  ```bash
+  # Update all components
+  needlectl service update
+  
+  # Update only the backend
+  needlectl service update --component backend
+  
+  # Force update even if up to date
+  needlectl service update --force
+  ```
+
+- **Output:**
+  Displays current and latest versions, then updates the specified components with progress indicators.
+
 ### `config`
 Manages the configuration for the Needle service environment.
 

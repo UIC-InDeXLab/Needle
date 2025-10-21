@@ -4,79 +4,79 @@
       "id": "query_1",
       "text": "a cute cat with a red hat",
       "generatedImage": {
-        "url": "/demo/demo-images/query_1_generated.jpg",
+        "url": "/Needle/demo/demo-images/query_1_generated.jpg",
         "prompt": "a cute cat with a red hat"
       },
       "results": [
         {
           "id": "img_1_1",
-          "url": "/demo/demo-images/query_1_001.jpg",
+          "url": "/Needle/demo/demo-images/query_1_001.jpg",
           "filename": "query_1_001.jpg",
           "similarity": 0.92
         },
         {
           "id": "img_1_2",
-          "url": "/demo/demo-images/query_1_002.jpg",
+          "url": "/Needle/demo/demo-images/query_1_002.jpg",
           "filename": "query_1_002.jpg",
           "similarity": 0.9
         },
         {
           "id": "img_1_3",
-          "url": "/demo/demo-images/query_1_003.jpg",
+          "url": "/Needle/demo/demo-images/query_1_003.jpg",
           "filename": "query_1_003.jpg",
           "similarity": 0.88
         },
         {
           "id": "img_1_4",
-          "url": "/demo/demo-images/query_1_004.jpg",
+          "url": "/Needle/demo/demo-images/query_1_004.jpg",
           "filename": "query_1_004.jpg",
           "similarity": 0.85
         },
         {
           "id": "img_1_5",
-          "url": "/demo/demo-images/query_1_005.jpg",
+          "url": "/Needle/demo/demo-images/query_1_005.jpg",
           "filename": "query_1_005.jpg",
           "similarity": 0.82
         },
         {
           "id": "img_1_6",
-          "url": "/demo/demo-images/query_1_006.jpg",
+          "url": "/Needle/demo/demo-images/query_1_006.jpg",
           "filename": "query_1_006.jpg",
           "similarity": 0.8
         },
         {
           "id": "img_1_7",
-          "url": "/demo/demo-images/query_1_007.jpg",
+          "url": "/Needle/demo/demo-images/query_1_007.jpg",
           "filename": "query_1_007.jpg",
           "similarity": 0.77
         },
         {
           "id": "img_1_8",
-          "url": "/demo/demo-images/query_1_008.jpg",
+          "url": "/Needle/demo/demo-images/query_1_008.jpg",
           "filename": "query_1_008.jpg",
           "similarity": 0.75
         },
         {
           "id": "img_1_9",
-          "url": "/demo/demo-images/query_1_009.jpg",
+          "url": "/Needle/demo/demo-images/query_1_009.jpg",
           "filename": "query_1_009.jpg",
           "similarity": 0.72
         },
         {
           "id": "img_1_10",
-          "url": "/demo/demo-images/query_1_010.jpg",
+          "url": "/Needle/demo/demo-images/query_1_010.jpg",
           "filename": "query_1_010.jpg",
           "similarity": 0.7
         },
         {
           "id": "img_1_11",
-          "url": "/demo/demo-images/query_1_011.jpg",
+          "url": "/Needle/demo/demo-images/query_1_011.jpg",
           "filename": "query_1_011.jpg",
           "similarity": 0.67
         },
         {
           "id": "img_1_12",
-          "url": "/demo/demo-images/query_1_012.jpg",
+          "url": "/Needle/demo/demo-images/query_1_012.jpg",
           "filename": "query_1_012.jpg",
           "similarity": 0.65
         }
@@ -86,79 +86,79 @@
       "id": "query_2",
       "text": "mountain landscape",
       "generatedImage": {
-        "url": "/demo/demo-images/query_2_generated.jpg",
+        "url": "/Needle/demo/demo-images/query_2_generated.jpg",
         "prompt": "mountain landscape"
       },
       "results": [
         {
           "id": "img_2_1",
-          "url": "/demo/demo-images/query_2_001.jpg",
+          "url": "/Needle/demo/demo-images/query_2_001.jpg",
           "filename": "query_2_001.jpg",
           "similarity": 0.92
         },
         {
           "id": "img_2_2",
-          "url": "/demo/demo-images/query_2_002.jpg",
+          "url": "/Needle/demo/demo-images/query_2_002.jpg",
           "filename": "query_2_002.jpg",
           "similarity": 0.9
         },
         {
           "id": "img_2_3",
-          "url": "/demo/demo-images/query_2_003.jpg",
+          "url": "/Needle/demo/demo-images/query_2_003.jpg",
           "filename": "query_2_003.jpg",
           "similarity": 0.88
         },
         {
           "id": "img_2_4",
-          "url": "/demo/demo-images/query_2_004.jpg",
+          "url": "/Needle/demo/demo-images/query_2_004.jpg",
           "filename": "query_2_004.jpg",
           "similarity": 0.85
         },
         {
           "id": "img_2_5",
-          "url": "/demo/demo-images/query_2_005.jpg",
+          "url": "/Needle/demo/demo-images/query_2_005.jpg",
           "filename": "query_2_005.jpg",
           "similarity": 0.82
         },
         {
           "id": "img_2_6",
-          "url": "/demo/demo-images/query_2_006.jpg",
+          "url": "/Needle/demo/demo-images/query_2_006.jpg",
           "filename": "query_2_006.jpg",
           "similarity": 0.8
         },
         {
           "id": "img_2_7",
-          "url": "/demo/demo-images/query_2_007.jpg",
+          "url": "/Needle/demo/demo-images/query_2_007.jpg",
           "filename": "query_2_007.jpg",
           "similarity": 0.77
         },
         {
           "id": "img_2_8",
-          "url": "/demo/demo-images/query_2_008.jpg",
+          "url": "/Needle/demo/demo-images/query_2_008.jpg",
           "filename": "query_2_008.jpg",
           "similarity": 0.75
         },
         {
           "id": "img_2_9",
-          "url": "/demo/demo-images/query_2_009.jpg",
+          "url": "/Needle/demo/demo-images/query_2_009.jpg",
           "filename": "query_2_009.jpg",
           "similarity": 0.72
         },
         {
           "id": "img_2_10",
-          "url": "/demo/demo-images/query_2_010.jpg",
+          "url": "/Needle/demo/demo-images/query_2_010.jpg",
           "filename": "query_2_010.jpg",
           "similarity": 0.7
         },
         {
           "id": "img_2_11",
-          "url": "/demo/demo-images/query_2_011.jpg",
+          "url": "/Needle/demo/demo-images/query_2_011.jpg",
           "filename": "query_2_011.jpg",
           "similarity": 0.67
         },
         {
           "id": "img_2_12",
-          "url": "/demo/demo-images/query_2_012.jpg",
+          "url": "/Needle/demo/demo-images/query_2_012.jpg",
           "filename": "query_2_012.jpg",
           "similarity": 0.65
         }
@@ -168,79 +168,79 @@
       "id": "query_3",
       "text": "coca cola advertising car",
       "generatedImage": {
-        "url": "/demo/demo-images/query_3_generated.jpg",
+        "url": "/Needle/demo/demo-images/query_3_generated.jpg",
         "prompt": "coca cola advertising car"
       },
       "results": [
         {
           "id": "img_3_1",
-          "url": "/demo/demo-images/query_3_001.jpg",
+          "url": "/Needle/demo/demo-images/query_3_001.jpg",
           "filename": "query_3_001.jpg",
           "similarity": 0.92
         },
         {
           "id": "img_3_2",
-          "url": "/demo/demo-images/query_3_002.jpg",
+          "url": "/Needle/demo/demo-images/query_3_002.jpg",
           "filename": "query_3_002.jpg",
           "similarity": 0.9
         },
         {
           "id": "img_3_3",
-          "url": "/demo/demo-images/query_3_003.jpg",
+          "url": "/Needle/demo/demo-images/query_3_003.jpg",
           "filename": "query_3_003.jpg",
           "similarity": 0.88
         },
         {
           "id": "img_3_4",
-          "url": "/demo/demo-images/query_3_004.jpg",
+          "url": "/Needle/demo/demo-images/query_3_004.jpg",
           "filename": "query_3_004.jpg",
           "similarity": 0.85
         },
         {
           "id": "img_3_5",
-          "url": "/demo/demo-images/query_3_005.jpg",
+          "url": "/Needle/demo/demo-images/query_3_005.jpg",
           "filename": "query_3_005.jpg",
           "similarity": 0.82
         },
         {
           "id": "img_3_6",
-          "url": "/demo/demo-images/query_3_006.jpg",
+          "url": "/Needle/demo/demo-images/query_3_006.jpg",
           "filename": "query_3_006.jpg",
           "similarity": 0.8
         },
         {
           "id": "img_3_7",
-          "url": "/demo/demo-images/query_3_007.jpg",
+          "url": "/Needle/demo/demo-images/query_3_007.jpg",
           "filename": "query_3_007.jpg",
           "similarity": 0.77
         },
         {
           "id": "img_3_8",
-          "url": "/demo/demo-images/query_3_008.jpg",
+          "url": "/Needle/demo/demo-images/query_3_008.jpg",
           "filename": "query_3_008.jpg",
           "similarity": 0.75
         },
         {
           "id": "img_3_9",
-          "url": "/demo/demo-images/query_3_009.jpg",
+          "url": "/Needle/demo/demo-images/query_3_009.jpg",
           "filename": "query_3_009.jpg",
           "similarity": 0.72
         },
         {
           "id": "img_3_10",
-          "url": "/demo/demo-images/query_3_010.jpg",
+          "url": "/Needle/demo/demo-images/query_3_010.jpg",
           "filename": "query_3_010.jpg",
           "similarity": 0.7
         },
         {
           "id": "img_3_11",
-          "url": "/demo/demo-images/query_3_011.jpg",
+          "url": "/Needle/demo/demo-images/query_3_011.jpg",
           "filename": "query_3_011.jpg",
           "similarity": 0.67
         },
         {
           "id": "img_3_12",
-          "url": "/demo/demo-images/query_3_012.jpg",
+          "url": "/Needle/demo/demo-images/query_3_012.jpg",
           "filename": "query_3_012.jpg",
           "similarity": 0.65
         }
@@ -250,79 +250,79 @@
       "id": "query_4",
       "text": "happy birthday to youuu!",
       "generatedImage": {
-        "url": "/demo/demo-images/query_4_generated.jpg",
+        "url": "/Needle/demo/demo-images/query_4_generated.jpg",
         "prompt": "happy birthday to youuu!"
       },
       "results": [
         {
           "id": "img_4_1",
-          "url": "/demo/demo-images/query_4_001.jpg",
+          "url": "/Needle/demo/demo-images/query_4_001.jpg",
           "filename": "query_4_001.jpg",
           "similarity": 0.92
         },
         {
           "id": "img_4_2",
-          "url": "/demo/demo-images/query_4_002.jpg",
+          "url": "/Needle/demo/demo-images/query_4_002.jpg",
           "filename": "query_4_002.jpg",
           "similarity": 0.9
         },
         {
           "id": "img_4_3",
-          "url": "/demo/demo-images/query_4_003.jpg",
+          "url": "/Needle/demo/demo-images/query_4_003.jpg",
           "filename": "query_4_003.jpg",
           "similarity": 0.88
         },
         {
           "id": "img_4_4",
-          "url": "/demo/demo-images/query_4_004.jpg",
+          "url": "/Needle/demo/demo-images/query_4_004.jpg",
           "filename": "query_4_004.jpg",
           "similarity": 0.85
         },
         {
           "id": "img_4_5",
-          "url": "/demo/demo-images/query_4_005.jpg",
+          "url": "/Needle/demo/demo-images/query_4_005.jpg",
           "filename": "query_4_005.jpg",
           "similarity": 0.82
         },
         {
           "id": "img_4_6",
-          "url": "/demo/demo-images/query_4_006.jpg",
+          "url": "/Needle/demo/demo-images/query_4_006.jpg",
           "filename": "query_4_006.jpg",
           "similarity": 0.8
         },
         {
           "id": "img_4_7",
-          "url": "/demo/demo-images/query_4_007.jpg",
+          "url": "/Needle/demo/demo-images/query_4_007.jpg",
           "filename": "query_4_007.jpg",
           "similarity": 0.77
         },
         {
           "id": "img_4_8",
-          "url": "/demo/demo-images/query_4_008.jpg",
+          "url": "/Needle/demo/demo-images/query_4_008.jpg",
           "filename": "query_4_008.jpg",
           "similarity": 0.75
         },
         {
           "id": "img_4_9",
-          "url": "/demo/demo-images/query_4_009.jpg",
+          "url": "/Needle/demo/demo-images/query_4_009.jpg",
           "filename": "query_4_009.jpg",
           "similarity": 0.72
         },
         {
           "id": "img_4_10",
-          "url": "/demo/demo-images/query_4_010.jpg",
+          "url": "/Needle/demo/demo-images/query_4_010.jpg",
           "filename": "query_4_010.jpg",
           "similarity": 0.7
         },
         {
           "id": "img_4_11",
-          "url": "/demo/demo-images/query_4_011.jpg",
+          "url": "/Needle/demo/demo-images/query_4_011.jpg",
           "filename": "query_4_011.jpg",
           "similarity": 0.67
         },
         {
           "id": "img_4_12",
-          "url": "/demo/demo-images/query_4_012.jpg",
+          "url": "/Needle/demo/demo-images/query_4_012.jpg",
           "filename": "query_4_012.jpg",
           "similarity": 0.65
         }
@@ -332,79 +332,79 @@
       "id": "query_5",
       "text": "broccoli pasta",
       "generatedImage": {
-        "url": "/demo/demo-images/query_5_generated.jpg",
+        "url": "/Needle/demo/demo-images/query_5_generated.jpg",
         "prompt": "broccoli pasta"
       },
       "results": [
         {
           "id": "img_5_1",
-          "url": "/demo/demo-images/query_5_001.jpg",
+          "url": "/Needle/demo/demo-images/query_5_001.jpg",
           "filename": "query_5_001.jpg",
           "similarity": 0.92
         },
         {
           "id": "img_5_2",
-          "url": "/demo/demo-images/query_5_002.jpg",
+          "url": "/Needle/demo/demo-images/query_5_002.jpg",
           "filename": "query_5_002.jpg",
           "similarity": 0.9
         },
         {
           "id": "img_5_3",
-          "url": "/demo/demo-images/query_5_003.jpg",
+          "url": "/Needle/demo/demo-images/query_5_003.jpg",
           "filename": "query_5_003.jpg",
           "similarity": 0.88
         },
         {
           "id": "img_5_4",
-          "url": "/demo/demo-images/query_5_004.jpg",
+          "url": "/Needle/demo/demo-images/query_5_004.jpg",
           "filename": "query_5_004.jpg",
           "similarity": 0.85
         },
         {
           "id": "img_5_5",
-          "url": "/demo/demo-images/query_5_005.jpg",
+          "url": "/Needle/demo/demo-images/query_5_005.jpg",
           "filename": "query_5_005.jpg",
           "similarity": 0.82
         },
         {
           "id": "img_5_6",
-          "url": "/demo/demo-images/query_5_006.jpg",
+          "url": "/Needle/demo/demo-images/query_5_006.jpg",
           "filename": "query_5_006.jpg",
           "similarity": 0.8
         },
         {
           "id": "img_5_7",
-          "url": "/demo/demo-images/query_5_007.jpg",
+          "url": "/Needle/demo/demo-images/query_5_007.jpg",
           "filename": "query_5_007.jpg",
           "similarity": 0.77
         },
         {
           "id": "img_5_8",
-          "url": "/demo/demo-images/query_5_008.jpg",
+          "url": "/Needle/demo/demo-images/query_5_008.jpg",
           "filename": "query_5_008.jpg",
           "similarity": 0.75
         },
         {
           "id": "img_5_9",
-          "url": "/demo/demo-images/query_5_009.jpg",
+          "url": "/Needle/demo/demo-images/query_5_009.jpg",
           "filename": "query_5_009.jpg",
           "similarity": 0.72
         },
         {
           "id": "img_5_10",
-          "url": "/demo/demo-images/query_5_010.jpg",
+          "url": "/Needle/demo/demo-images/query_5_010.jpg",
           "filename": "query_5_010.jpg",
           "similarity": 0.7
         },
         {
           "id": "img_5_11",
-          "url": "/demo/demo-images/query_5_011.jpg",
+          "url": "/Needle/demo/demo-images/query_5_011.jpg",
           "filename": "query_5_011.jpg",
           "similarity": 0.67
         },
         {
           "id": "img_5_12",
-          "url": "/demo/demo-images/query_5_012.jpg",
+          "url": "/Needle/demo/demo-images/query_5_012.jpg",
           "filename": "query_5_012.jpg",
           "similarity": 0.65
         }
@@ -414,79 +414,79 @@
       "id": "query_6",
       "text": "two cats watching a dog on tv",
       "generatedImage": {
-        "url": "/demo/demo-images/query_6_generated.jpg",
+        "url": "/Needle/demo/demo-images/query_6_generated.jpg",
         "prompt": "two cats watching a dog on tv"
       },
       "results": [
         {
           "id": "img_6_1",
-          "url": "/demo/demo-images/query_6_001.jpg",
+          "url": "/Needle/demo/demo-images/query_6_001.jpg",
           "filename": "query_6_001.jpg",
           "similarity": 0.92
         },
         {
           "id": "img_6_2",
-          "url": "/demo/demo-images/query_6_002.jpg",
+          "url": "/Needle/demo/demo-images/query_6_002.jpg",
           "filename": "query_6_002.jpg",
           "similarity": 0.9
         },
         {
           "id": "img_6_3",
-          "url": "/demo/demo-images/query_6_003.jpg",
+          "url": "/Needle/demo/demo-images/query_6_003.jpg",
           "filename": "query_6_003.jpg",
           "similarity": 0.88
         },
         {
           "id": "img_6_4",
-          "url": "/demo/demo-images/query_6_004.jpg",
+          "url": "/Needle/demo/demo-images/query_6_004.jpg",
           "filename": "query_6_004.jpg",
           "similarity": 0.85
         },
         {
           "id": "img_6_5",
-          "url": "/demo/demo-images/query_6_005.jpg",
+          "url": "/Needle/demo/demo-images/query_6_005.jpg",
           "filename": "query_6_005.jpg",
           "similarity": 0.82
         },
         {
           "id": "img_6_6",
-          "url": "/demo/demo-images/query_6_006.jpg",
+          "url": "/Needle/demo/demo-images/query_6_006.jpg",
           "filename": "query_6_006.jpg",
           "similarity": 0.8
         },
         {
           "id": "img_6_7",
-          "url": "/demo/demo-images/query_6_007.jpg",
+          "url": "/Needle/demo/demo-images/query_6_007.jpg",
           "filename": "query_6_007.jpg",
           "similarity": 0.77
         },
         {
           "id": "img_6_8",
-          "url": "/demo/demo-images/query_6_008.jpg",
+          "url": "/Needle/demo/demo-images/query_6_008.jpg",
           "filename": "query_6_008.jpg",
           "similarity": 0.75
         },
         {
           "id": "img_6_9",
-          "url": "/demo/demo-images/query_6_009.jpg",
+          "url": "/Needle/demo/demo-images/query_6_009.jpg",
           "filename": "query_6_009.jpg",
           "similarity": 0.72
         },
         {
           "id": "img_6_10",
-          "url": "/demo/demo-images/query_6_010.jpg",
+          "url": "/Needle/demo/demo-images/query_6_010.jpg",
           "filename": "query_6_010.jpg",
           "similarity": 0.7
         },
         {
           "id": "img_6_11",
-          "url": "/demo/demo-images/query_6_011.jpg",
+          "url": "/Needle/demo/demo-images/query_6_011.jpg",
           "filename": "query_6_011.jpg",
           "similarity": 0.67
         },
         {
           "id": "img_6_12",
-          "url": "/demo/demo-images/query_6_012.jpg",
+          "url": "/Needle/demo/demo-images/query_6_012.jpg",
           "filename": "query_6_012.jpg",
           "similarity": 0.65
         }

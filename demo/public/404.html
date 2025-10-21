@@ -9,15 +9,12 @@
     <title>Needle Demo</title>
     <script>
         // GitHub Pages SPA redirect
-        // Redirect to the main demo page and let React Router handle the routing
-        var segmentCount = 2; // Number of path segments to keep (/Needle/demo/)
+        // Always redirect to the root demo page
         var l = window.location;
+        var basePath = '/Needle/demo/';
         l.replace(
             l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
-            l.pathname.split('/').slice(0, 1 + segmentCount).join('/') + '/?p=' +
-            encodeURIComponent(l.pathname.slice(1).split('/').slice(segmentCount).join('/')) +
-            (l.search ? '&' + l.search.slice(1) : '') +
-            l.hash
+            basePath
         );
     </script>
 </head>

@@ -1,19 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Image as ImageIcon, Loader2, AlertCircle, Play } from 'lucide-react';
-import { createQuery, search, getSearchLogs, getFile } from '../services/api';
+import { Image as ImageIcon, AlertCircle, Play } from 'lucide-react';
+// Removed unused imports: Loader2, getFile
 import { sampleQueries, mockApi } from '../services/mockApi';
 
 const SearchPage = () => {
-  const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState([]);
   const [error, setError] = useState(null);
   const [searchLogs, setSearchLogs] = useState([]);
   const [imageUrls, setImageUrls] = useState({});
-  const [loadingImages, setLoadingImages] = useState(false);
-  const [searchStartTime, setSearchStartTime] = useState(null);
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [searchConfig, setSearchConfig] = useState({
+  // Removed loadingImages - not needed for demo
+  // Removed searchStartTime - not needed for demo
+  const [searchConfig] = useState({
     num_images_to_retrieve: 10,
     include_base_images_in_preview: false,
     verbose: false,
@@ -38,18 +36,7 @@ const SearchPage = () => {
     };
   }, [imageUrls]);
 
-  // Timer for elapsed time during search
-  useEffect(() => {
-    let interval;
-    if (isSearching && searchStartTime) {
-      interval = setInterval(() => {
-        setElapsedTime(Date.now() - searchStartTime);
-      }, 100);
-    } else {
-      setElapsedTime(0);
-    }
-    return () => clearInterval(interval);
-  }, [isSearching, searchStartTime]);
+  // Removed elapsed time timer - not needed for demo
 
   const loadSearchLogs = async () => {
     try {
@@ -62,31 +49,9 @@ const SearchPage = () => {
     }
   };
 
-  const fetchImage = async (filePath) => {
-    try {
-      const response = await getFile(filePath);
-      const blob = new Blob([response.data], { type: 'image/jpeg' });
-      return URL.createObjectURL(blob);
-    } catch (err) {
-      console.error('Failed to fetch image:', err);
-      return null;
-    }
-  };
+  // Removed fetchImage function - not needed for demo
 
-  const loadImages = async (imagePaths) => {
-    setLoadingImages(true);
-    const newImageUrls = {};
-    
-    for (const path of imagePaths) {
-      const url = await fetchImage(path);
-      if (url) {
-        newImageUrls[path] = url;
-      }
-    }
-    
-    setImageUrls(prev => ({ ...prev, ...newImageUrls }));
-    setLoadingImages(false);
-  };
+  // Removed loadImages function - not needed for demo
 
   const handleSampleQuery = async (sampleQuery) => {
     setIsSearching(true);
@@ -104,7 +69,6 @@ const SearchPage = () => {
     try {
       // Record start time right before the actual query request
       const searchStartTime = Date.now();
-      setSearchStartTime(searchStartTime);
       
       // Use mock API for demo
       const searchResponse = await mockApi.search(sampleQuery.id, searchConfig);
@@ -136,88 +100,7 @@ const SearchPage = () => {
     }
   };
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-
-    setIsSearching(true);
-    setError(null);
-    setResults([]);
-    
-    // Clear previous image URLs
-    Object.values(imageUrls).forEach(url => {
-      if (url.startsWith('blob:')) {
-        URL.revokeObjectURL(url);
-      }
-    });
-    setImageUrls({});
-
-    try {
-      // Record start time right before the actual query request
-      const searchStartTime = Date.now();
-      setSearchStartTime(searchStartTime);
-      
-      // Create query
-      const queryResponse = await createQuery(query);
-      const queryId = queryResponse.data.qid;
-
-      // Perform search
-      const searchResponse = await search(queryId, searchConfig);
-      const searchData = searchResponse.data;
-
-      const searchEndTime = Date.now();
-      const frontendTiming = searchEndTime - searchStartTime;
-      
-      setResults({
-        queryId,
-        results: searchData.results || [],
-        baseImages: searchData.base_images || [],
-        previewUrl: searchData.preview_url,
-        timings: {
-          ...searchData.timings,
-          frontend_total_time: frontendTiming / 1000
-        },
-        verboseResults: searchData.verbose_results || {}
-      });
-
-      // Load images for display
-      if (searchData.results && searchData.results.length > 0) {
-        loadImages(searchData.results);
-      }
-
-      // Reload search logs
-      await loadSearchLogs();
-    } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Search failed');
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const renderImage = (imageData, index) => {
-    if (typeof imageData === 'string') {
-      // Base64 image
-      return (
-        <img
-          key={index}
-          src={`data:image/jpeg;base64,${imageData}`}
-          alt={`Search result ${index + 1}`}
-          className="w-full h-48 object-cover rounded-lg"
-        />
-      );
-    } else if (imageData.id) {
-      // Image ID - would need to fetch actual image
-      return (
-        <div
-          key={index}
-          className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center"
-        >
-          <span className="text-gray-500">Image ID: {imageData.id}</span>
-        </div>
-      );
-    }
-    return null;
-  };
+  // Removed unused functions: handleSearch and renderImage
 
   return (
     <div className="space-y-6">
@@ -399,12 +282,6 @@ const SearchPage = () => {
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-3">
               Retrieved Images ({results.results.length})
-              {loadingImages && (
-                <span className="ml-2 text-sm text-gray-500">
-                  <Loader2 className="inline h-4 w-4 animate-spin mr-1" />
-                  Loading images...
-                </span>
-              )}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {results.results.map((result, index) => {

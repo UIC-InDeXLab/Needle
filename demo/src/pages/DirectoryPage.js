@@ -9,13 +9,7 @@ import {
   AlertCircle,
   RefreshCw
 } from 'lucide-react';
-import { 
-  getDirectories, 
-  getDirectory, 
-  addDirectory, 
-  updateDirectory, 
-  removeDirectory 
-} from '../services/api';
+// Removed unused API imports - using mockApi instead
 import { mockApi } from '../services/mockApi';
 
 const DirectoryPage = () => {

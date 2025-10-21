@@ -10,13 +10,7 @@ import {
   Image as ImageIcon,
   Clock
 } from 'lucide-react';
-import { 
-  getHealth, 
-  getServiceStatus, 
-  getDirectories, 
-  getGenerators,
-  getSearchLogs 
-} from '../services/api';
+// Removed unused API imports - using mockApi instead
 import { mockApi } from '../services/mockApi';
 
 const StatusPage = () => {

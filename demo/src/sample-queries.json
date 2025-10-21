@@ -2,10 +2,10 @@
   "queries": [
     {
       "id": "query_1",
-      "text": "a cute cat with a red hat",
+      "text": "a cat with a cute hat",
       "generatedImage": {
-        "url": "/Needle/demo/demo-images/query_1_generated.jpg",
-        "prompt": "a cute cat with a red hat"
+        "url": "/demo-images/query_1_generated.jpg",
+        "prompt": "a cat with a cute hat"
       },
       "results": [
         {
@@ -86,7 +86,7 @@
       "id": "query_2",
       "text": "mountain landscape",
       "generatedImage": {
-        "url": "/Needle/demo/demo-images/query_2_generated.jpg",
+        "url": "/demo-images/query_2_generated.jpg",
         "prompt": "mountain landscape"
       },
       "results": [
@@ -168,7 +168,7 @@
       "id": "query_3",
       "text": "coca cola advertising car",
       "generatedImage": {
-        "url": "/Needle/demo/demo-images/query_3_generated.jpg",
+        "url": "/demo-images/query_3_generated.jpg",
         "prompt": "coca cola advertising car"
       },
       "results": [
@@ -248,10 +248,10 @@
     },
     {
       "id": "query_4",
-      "text": "happy birthday to youuu!",
+      "text": "birthday cake with candles",
       "generatedImage": {
-        "url": "/Needle/demo/demo-images/query_4_generated.jpg",
-        "prompt": "happy birthday to youuu!"
+        "url": "/demo-images/query_4_generated.jpg",
+        "prompt": "birthday cake with candles"
       },
       "results": [
         {
@@ -332,7 +332,7 @@
       "id": "query_5",
       "text": "broccoli pasta",
       "generatedImage": {
-        "url": "/Needle/demo/demo-images/query_5_generated.jpg",
+        "url": "/demo-images/query_5_generated.jpg",
         "prompt": "broccoli pasta"
       },
       "results": [
@@ -412,10 +412,10 @@
     },
     {
       "id": "query_6",
-      "text": "two cats watching a dog on tv",
+      "text": "Chicago skyline in the autumn",
       "generatedImage": {
-        "url": "/Needle/demo/demo-images/query_6_generated.jpg",
-        "prompt": "two cats watching a dog on tv"
+        "url": "/demo-images/query_6_generated.jpg",
+        "prompt": "Chicago skyline in the autumn"
       },
       "results": [
         {
@@ -488,6 +488,88 @@
           "id": "img_6_12",
           "url": "/Needle/demo/demo-images/query_6_012.jpg",
           "filename": "query_6_012.jpg",
+          "similarity": 0.65
+        }
+      ]
+    },
+    {
+      "id": "query_7",
+      "text": "two cats watching a dog on tv",
+      "generatedImage": {
+        "url": "/demo-images/query_7_generated.jpg",
+        "prompt": "two cats watching a dog on tv"
+      },
+      "results": [
+        {
+          "id": "img_7_1",
+          "url": "/Needle/demo/demo-images/query_7_001.jpg",
+          "filename": "query_7_001.jpg",
+          "similarity": 0.92
+        },
+        {
+          "id": "img_7_2",
+          "url": "/Needle/demo/demo-images/query_7_002.jpg",
+          "filename": "query_7_002.jpg",
+          "similarity": 0.9
+        },
+        {
+          "id": "img_7_3",
+          "url": "/Needle/demo/demo-images/query_7_003.jpg",
+          "filename": "query_7_003.jpg",
+          "similarity": 0.88
+        },
+        {
+          "id": "img_7_4",
+          "url": "/Needle/demo/demo-images/query_7_004.jpg",
+          "filename": "query_7_004.jpg",
+          "similarity": 0.85
+        },
+        {
+          "id": "img_7_5",
+          "url": "/Needle/demo/demo-images/query_7_005.jpg",
+          "filename": "query_7_005.jpg",
+          "similarity": 0.82
+        },
+        {
+          "id": "img_7_6",
+          "url": "/Needle/demo/demo-images/query_7_006.jpg",
+          "filename": "query_7_006.jpg",
+          "similarity": 0.8
+        },
+        {
+          "id": "img_7_7",
+          "url": "/Needle/demo/demo-images/query_7_007.jpg",
+          "filename": "query_7_007.jpg",
+          "similarity": 0.77
+        },
+        {
+          "id": "img_7_8",
+          "url": "/Needle/demo/demo-images/query_7_008.jpg",
+          "filename": "query_7_008.jpg",
+          "similarity": 0.75
+        },
+        {
+          "id": "img_7_9",
+          "url": "/Needle/demo/demo-images/query_7_009.jpg",
+          "filename": "query_7_009.jpg",
+          "similarity": 0.72
+        },
+        {
+          "id": "img_7_10",
+          "url": "/Needle/demo/demo-images/query_7_010.jpg",
+          "filename": "query_7_010.jpg",
+          "similarity": 0.7
+        },
+        {
+          "id": "img_7_11",
+          "url": "/Needle/demo/demo-images/query_7_011.jpg",
+          "filename": "query_7_011.jpg",
+          "similarity": 0.67
+        },
+        {
+          "id": "img_7_12",
+          "url": "/Needle/demo/demo-images/query_7_012.jpg",
+          "filename": "query_7_012.jpg",
           "similarity": 0.65
         }
       ]

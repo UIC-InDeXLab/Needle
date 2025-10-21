@@ -20,11 +20,12 @@ SAMPLE_QUERIES_FILE = DEMO_DIR / "src" / "sample-queries.json"
 
 # Sample queries to test
 SAMPLE_QUERIES = [
-    "a cute cat with a red hat",
+    "a cat with a cute hat",
     "mountain landscape", 
     "coca cola advertising car",
-    "happy birthday to youuu!",
+    "birthday cake with candles",
     "broccoli pasta",
+    "Chicago skyline in the autumn",
     "two cats watching a dog on tv"
 ]
 
@@ -169,7 +170,7 @@ def build_sample_queries():
                 
                 result_entry = {
                     "id": f"img_{i}_{j}",
-                    "url": f"/demo-images/{result_filename}",
+                    "url": f"/Needle/demo/demo-images/{result_filename}",
                     "filename": result_filename,
                     "similarity": round(similarity, 2)
                 }

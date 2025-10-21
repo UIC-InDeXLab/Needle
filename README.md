@@ -14,7 +14,7 @@
   <a href="https://www.youtube.com/watch?v=n-SXX_ry9-0&t=122s">
     <img src="https://img.shields.io/badge/demo-Youtube-purple" alt="Youtube">
   </a>
-  <a href="https://uic-indexlab.github.io/Needle/demo/">
+  <a href="https://uic-indexlab.github.io/Needle/">
     <img src="https://img.shields.io/badge/🎨-Try%20Demo-green" alt="Interactive Demo">
   </a>
 </p>
@@ -43,7 +43,7 @@ Watch as Needle transforms natural language queries into precise image retrieval
 Try Needle's capabilities with our interactive demo! Experience the complete workflow from text queries to image retrieval.
 
 <div align="center">
-  <a href="https://uic-indexlab.github.io/Needle/demo/" target="_blank">
+  <a href="https://uic-indexlab.github.io/Needle/" target="_blank">
     <img src="https://img.shields.io/badge/🎨-Try%20Interactive%20Demo-667eea?style=for-the-badge&logo=react&logoColor=white" alt="Interactive Demo" />
   </a>
 </div>

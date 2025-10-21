@@ -14,7 +14,7 @@ The demo demonstrates Needle's core functionality:
 ## 🚀 Try the Demo
 
 <div style="text-align: center; margin: 2rem 0;">
-  <a href="https://uic-indexlab.github.io/Needle/demo/" 
+  <a href="https://uic-indexlab.github.io/Needle/" 
      target="_blank" 
      style="display: inline-block; 
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 

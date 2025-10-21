@@ -8,6 +8,8 @@ import StatusPage from './pages/StatusPage';
 import './styles/index.css';
 
 function App() {
+  console.log('Needle Demo App loading...');
+  
   return (
     <Router basename="/demo">
       <div className="App">

@@ -4,6 +4,7 @@ import { Image as ImageIcon, AlertCircle, Play } from 'lucide-react';
 import { sampleQueries, mockApi } from '../services/mockApi';
 
 const SearchPage = () => {
+  console.log('SearchPage component loading...');
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState([]);
   const [error, setError] = useState(null);

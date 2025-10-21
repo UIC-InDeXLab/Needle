@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Image as ImageIcon, AlertCircle, Play } from 'lucide-react';
+import { Image as ImageIcon, AlertCircle, Play, ExternalLink, Github } from 'lucide-react';
 // Removed unused imports: Loader2, getFile
 import { sampleQueries, mockApi } from '../services/mockApi';
 
@@ -105,6 +105,45 @@ const SearchPage = () => {
 
   return (
     <div className="space-y-6">
+      {/* Demo Information Banner */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-start">
+          <div className="flex-shrink-0">
+            <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+          </div>
+          <div className="ml-3 flex-1">
+            <h3 className="text-sm font-medium text-blue-800">
+              This is a demo of the Needle image search system
+            </h3>
+            <div className="mt-2 text-sm text-blue-700">
+              <p className="mb-3">
+                This demo shows sample queries with pre-generated results. To install and run the actual system with your own images:
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <a
+                  href="https://github.com/UIC-IndexLab/Needle"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                >
+                  <Github className="h-4 w-4 mr-2" />
+                  Star us on GitHub
+                </a>
+                <a
+                  href="https://github.com/UIC-IndexLab/Needle#installation"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Installation Guide
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Image Search</h1>
@@ -157,97 +196,10 @@ const SearchPage = () => {
       {/* Search Results */}
       {results.results && results.results.length > 0 && (
         <div className="card">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <h2 className="text-xl font-semibold text-gray-900">Search Results</h2>
-            {results.timings && (
-              <div className="text-right">
-                <div className="text-sm font-medium text-gray-900">
-                  {results.timings.frontend_total_time ? 
-                    `${(results.timings.frontend_total_time * 1000).toFixed(0)}ms` : 
-                    results.timings.total_request_time ? 
-                    `${(results.timings.total_request_time * 1000).toFixed(0)}ms` : 
-                    'Timing unavailable'
-                  }
-                </div>
-                <div className="text-xs text-gray-500">
-                  {results.timings.frontend_total_time ? 'Total time (frontend)' : 'Backend time'}
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Detailed Timing Information */}
-          {results.timings && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <h3 className="text-sm font-medium text-gray-900 mb-3">Performance Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                {results.timings.total_request_time && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Total Request:</span>
-                    <span className="font-medium text-gray-900">
-                      {(results.timings.total_request_time * 1000).toFixed(0)}ms
-                    </span>
-                  </div>
-                )}
-                {results.timings.image_generation && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Image Generation:</span>
-                    <span className="font-medium text-gray-900">
-                      {(results.timings.image_generation * 1000).toFixed(0)}ms
-                    </span>
-                  </div>
-                )}
-                {results.timings.embedding_regnet && results.timings.embedding_regnet.length > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Embedding (RegNet):</span>
-                    <span className="font-medium text-gray-900">
-                      {(results.timings.embedding_regnet[0] * 1000).toFixed(0)}ms
-                    </span>
-                  </div>
-                )}
-                {results.timings.embedding_eva && results.timings.embedding_eva.length > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Embedding (EVA):</span>
-                    <span className="font-medium text-gray-900">
-                      {(results.timings.embedding_eva[0] * 1000).toFixed(0)}ms
-                    </span>
-                  </div>
-                )}
-                {results.timings.retrieval_regnet && results.timings.retrieval_regnet.length > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Retrieval (RegNet):</span>
-                    <span className="font-medium text-gray-900">
-                      {(results.timings.retrieval_regnet[0] * 1000).toFixed(0)}ms
-                    </span>
-                  </div>
-                )}
-                {results.timings.retrieval_eva && results.timings.retrieval_eva.length > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Retrieval (EVA):</span>
-                    <span className="font-medium text-gray-900">
-                      {(results.timings.retrieval_eva[0] * 1000).toFixed(0)}ms
-                    </span>
-                  </div>
-                )}
-                {results.timings.ranking_aggregation && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Ranking & Aggregation:</span>
-                    <span className="font-medium text-gray-900">
-                      {(results.timings.ranking_aggregation * 1000).toFixed(2)}ms
-                    </span>
-                  </div>
-                )}
-                {results.timings.frontend_total_time && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Frontend Total:</span>
-                    <span className="font-medium text-gray-900">
-                      {(results.timings.frontend_total_time * 1000).toFixed(0)}ms
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Generated Images */}
           {results.baseImages && results.baseImages.length > 0 && (

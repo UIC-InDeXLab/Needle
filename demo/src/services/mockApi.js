@@ -278,7 +278,7 @@ export const mockApi = {
 
   // Search - returns mock data based on query
   search: async (queryId, config) => {
-    await simulateDelay(1000, 2000); // Simulate search delay
+    // Removed delay for instant demo experience
     
     // Find matching sample query
     const sampleQuery = sampleQueries.find(q => q.id === queryId) || sampleQueries[0];

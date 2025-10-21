@@ -58,8 +58,9 @@ jobs:
       
       - name: Copy demo to docs
         run: |
-          # Copy demo build to docs/book root for serving
-          cp -r demo/build/* docs/book/
+          # Copy demo build to docs/book/demo for serving
+          mkdir -p docs/book/demo
+          cp -r demo/build/* docs/book/demo/
       
       - name: Setup Pages
         uses: actions/configure-pages@v4

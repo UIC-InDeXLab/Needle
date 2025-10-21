@@ -9,7 +9,7 @@ import './styles/index.css';
 
 function App() {
   return (
-    <Router>
+    <Router basename="/demo">
       <div className="App">
         <Layout>
           <Routes>

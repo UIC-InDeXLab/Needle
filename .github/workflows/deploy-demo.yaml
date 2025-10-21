@@ -1,13 +1,14 @@
 name: Deploy Demo
 
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'demo/**'
-      - '.github/workflows/deploy-demo.yaml'
-  workflow_dispatch:
+# DISABLED - Using deploy-books.yaml for combined documentation + demo deployment
+# on:
+#   push:
+#     branches:
+#       - main
+#     paths:
+#       - 'demo/**'
+#       - '.github/workflows/deploy-demo.yaml'
+#   workflow_dispatch:
 
 jobs:
   build-and-deploy:

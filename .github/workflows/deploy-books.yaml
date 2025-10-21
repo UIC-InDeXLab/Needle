@@ -66,6 +66,11 @@ jobs:
           ls -la docs/book/
           echo "Demo files:"
           ls -la docs/book/demo/
+          # Check if index.html exists and is the documentation
+          echo "Main index.html content (first 10 lines):"
+          head -10 docs/book/index.html
+          echo "Demo index.html content (first 10 lines):"
+          head -10 docs/book/demo/index.html
           # Ensure demo doesn't overwrite the main index.html
           echo "Demo copied to /demo/ subdirectory"
       

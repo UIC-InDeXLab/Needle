@@ -61,6 +61,8 @@ jobs:
           # Copy demo build to docs/book/demo for serving
           mkdir -p docs/book/demo
           cp -r demo/build/* docs/book/demo/
+          # Copy 404.html for SPA routing support
+          cp demo/public/404.html docs/book/demo/404.html
           # Verify the structure
           echo "Documentation files:"
           ls -la docs/book/

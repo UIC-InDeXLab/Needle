@@ -11,7 +11,7 @@ function App() {
   console.log('Needle Demo App loading...');
   
   return (
-    <Router basename="/demo">
+    <Router basename="/Needle/demo">
       <div className="App">
         <Layout>
           <Routes>

@@ -43,9 +43,8 @@ const Layout = ({ children }) => {
               <img 
                 src={logoImage} 
                 alt="Needle" 
-                className="h-16 w-16 object-contain"
+                className="h-24 w-24 object-contain"
               />
-              <span className="ml-3 text-3xl font-bold text-amber-800">Needle UI</span>
             </div>
             <nav className="mt-5 px-2 space-y-1">
               {navigation.map((item) => {
@@ -79,9 +78,8 @@ const Layout = ({ children }) => {
               <img 
                 src={logoImage} 
                 alt="Needle" 
-                className="h-16 w-16 object-contain"
+                className="h-24 w-24 object-contain"
               />
-              <span className="ml-3 text-3xl font-bold text-amber-800">Needle UI</span>
             </div>
             <nav className="mt-5 flex-1 px-2 space-y-1">
               {navigation.map((item) => {

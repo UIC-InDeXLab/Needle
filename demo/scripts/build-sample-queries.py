@@ -25,8 +25,9 @@ SAMPLE_QUERIES = [
     "coca cola advertising car",
     "birthday cake with candles",
     "broccoli pasta",
-    "Chicago skyline in the autumn",
-    "two cats watching a dog on tv"
+    "city skyline in the autumn",
+    "two cats watching a dog on tv",
+    "people watching a movie in a theater",
 ]
 
 def ensure_demo_images_dir():
@@ -148,7 +149,7 @@ def build_sample_queries():
             "id": query_id,
             "text": query_text,
         "generatedImage": {
-            "url": f"/demo-images/{query_id}_generated.jpg",
+            "url": f"/Needle/demo/demo-images/{query_id}_generated.jpg",
             "prompt": query_text
         },
             "results": []

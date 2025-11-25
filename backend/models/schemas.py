@@ -149,3 +149,18 @@ class GeneratePoolResponse(BaseModel):
     pool_size: int
     guide_images: List[GuideImageData]
     embedder_names: List[str]
+
+
+# Embedding computation schemas
+class ComputeEmbeddingsRequest(BaseModel):
+    image_paths: List[str] = Field(..., description="List of file paths to images")
+
+
+class ImageEmbeddingsResponse(BaseModel):
+    image_path: str
+    embeddings: List[EmbeddingData]
+
+
+class ComputeEmbeddingsResponse(BaseModel):
+    results: List[ImageEmbeddingsResponse]
+    embedder_names: List[str]

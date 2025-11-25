@@ -20,7 +20,8 @@ from models.schemas import AddDirectoryRequest, AddDirectoryResponse, HealthChec
     DirectoryModel, DirectoryDetailResponse, RemoveDirectoryResponse, RemoveDirectoryRequest, CreateQueryRequest, \
     CreateQueryResponse, GeneratorInfo, SearchLogsResponse, QueryLogEntry, \
     ServiceStatusResponse, ServiceLogResponse, SearchResponse, SearchRequest, UpdateDirectoryResponse, \
-    UpdateDirectoryRequest, GeneratePoolRequest, GeneratePoolResponse, GuideImageData, EmbeddingData
+    UpdateDirectoryRequest, GeneratePoolRequest, GeneratePoolResponse, GuideImageData, EmbeddingData, \
+    ComputeEmbeddingsRequest, ComputeEmbeddingsResponse, ImageEmbeddingsResponse
 from indexing import image_indexing_service
 from utils import aggregate_rankings, pil_image_to_base64, Timer
 from version import VERSION as BACKEND_VERSION
@@ -361,6 +362,58 @@ async def generate_pool(request: GeneratePoolRequest):
         query=request.query,
         pool_size=len(guide_images_data),
         guide_images=guide_images_data,
+        embedder_names=embedder_names
+    )
+
+
+@app.post("/variance-analysis/compute-embeddings", response_model=ComputeEmbeddingsResponse)
+async def compute_embeddings(request: ComputeEmbeddingsRequest):
+    """
+    Compute embeddings for a list of images from file paths.
+    Returns embeddings for all available embedders.
+    """
+    from PIL import Image as PImage
+    
+    embedders = embedder_manager.get_image_embedders()
+    embedder_names = list(embedders.keys())
+    
+    results = []
+    
+    for image_path in request.image_paths:
+        if not os.path.exists(image_path):
+            from monitoring import logger
+            logger.warning(f"Image path does not exist: {image_path}")
+            continue
+        
+        try:
+            # Load image
+            img = PImage.open(image_path).convert("RGB")
+            
+            # Compute embeddings for all embedders
+            embeddings_data = []
+            for embedder_name, embedder in embedders.items():
+                try:
+                    embedding = embedder.embed(img)
+                    embeddings_data.append(EmbeddingData(
+                        embedder_name=embedder_name,
+                        embedding=embedding.tolist() if hasattr(embedding, 'tolist') else embedding
+                    ))
+                except Exception as e:
+                    from monitoring import logger
+                    logger.error(f"Error computing embedding with {embedder_name} for {image_path}: {e}", exc_info=True)
+            
+            if embeddings_data:
+                results.append(ImageEmbeddingsResponse(
+                    image_path=image_path,
+                    embeddings=embeddings_data
+                ))
+        except Exception as e:
+            from monitoring import logger
+            logger.error(f"Error processing image {image_path}: {e}", exc_info=True)
+            continue
+    
+    return ComputeEmbeddingsResponse(
+        results=results,
         embedder_names=embedder_names
     )
 

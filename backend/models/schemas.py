@@ -124,3 +124,28 @@ class ServiceStatusResponse(BaseModel):
 
 class ServiceLogResponse(BaseModel):
     log: str
+
+
+# Variance Analysis Schemas
+class GeneratePoolRequest(BaseModel):
+    query: str = Field(..., description="Query string")
+    pool_size: int = Field(20, description="Number of guide images to generate (M_pool)")
+    generation_config: GenerationConfig = Field(..., description="Configuration for image generation")
+
+
+class EmbeddingData(BaseModel):
+    embedder_name: str
+    embedding: List[float]
+
+
+class GuideImageData(BaseModel):
+    image_index: int
+    base64_image: str
+    embeddings: List[EmbeddingData]
+
+
+class GeneratePoolResponse(BaseModel):
+    query: str
+    pool_size: int
+    guide_images: List[GuideImageData]
+    embedder_names: List[str]

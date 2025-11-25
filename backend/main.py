@@ -20,7 +20,7 @@ from models.schemas import AddDirectoryRequest, AddDirectoryResponse, HealthChec
     DirectoryModel, DirectoryDetailResponse, RemoveDirectoryResponse, RemoveDirectoryRequest, CreateQueryRequest, \
     CreateQueryResponse, GeneratorInfo, SearchLogsResponse, QueryLogEntry, \
     ServiceStatusResponse, ServiceLogResponse, SearchResponse, SearchRequest, UpdateDirectoryResponse, \
-    UpdateDirectoryRequest
+    UpdateDirectoryRequest, GeneratePoolRequest, GeneratePoolResponse, GuideImageData, EmbeddingData
 from indexing import image_indexing_service
 from utils import aggregate_rankings, pil_image_to_base64, Timer
 from version import VERSION as BACKEND_VERSION
@@ -308,6 +308,61 @@ async def service_status():
 @app.get("/service/log", response_model=ServiceLogResponse)
 async def service_log():
     return ServiceLogResponse(log="Service log not implemented yet.")
+
+
+@app.post("/variance-analysis/generate-pool", response_model=GeneratePoolResponse)
+async def generate_pool(request: GeneratePoolRequest):
+    """
+    Generate a pool of guide images for variance analysis.
+    This endpoint generates M_pool guide images and computes embeddings for all embedders.
+    """
+    # Prepare generation config - we need to generate pool_size images
+    generation_request = request.generation_config.model_dump()
+    for engine in generation_request["engines"]:
+        engine["prompt"] = request.query
+    
+    # Adjust to generate the requested pool size
+    # We'll use multiple engines if needed to reach pool_size
+    original_num_images = generation_request.get("num_images", 1)
+    original_num_engines = generation_request.get("num_engines_to_use", 1)
+    
+    # Calculate how many images per engine we need
+    images_per_engine = max(1, request.pool_size // original_num_engines)
+    generation_request["num_images"] = images_per_engine
+    
+    # Generate images
+    generated_images = image_generator.generate(generation_request)
+    
+    # Limit to pool_size if we generated more
+    generated_images = generated_images[:request.pool_size]
+    
+    # Get all embedders
+    embedders = embedder_manager.get_image_embedders()
+    embedder_names = list(embedders.keys())
+    
+    # Compute embeddings for all guide images using all embedders
+    guide_images_data = []
+    for idx, (image, engine_name) in enumerate(generated_images):
+        embeddings_data = []
+        for embedder_name, embedder in embedders.items():
+            embedding = embedder.embed(image)
+            embeddings_data.append(EmbeddingData(
+                embedder_name=embedder_name,
+                embedding=embedding.tolist() if hasattr(embedding, 'tolist') else embedding
+            ))
+        
+        guide_images_data.append(GuideImageData(
+            image_index=idx,
+            base64_image=pil_image_to_base64(image),
+            embeddings=embeddings_data
+        ))
+    
+    return GeneratePoolResponse(
+        query=request.query,
+        pool_size=len(guide_images_data),
+        guide_images=guide_images_data,
+        embedder_names=embedder_names
+    )
 
 
 from routes.gallery import router as gallery_router

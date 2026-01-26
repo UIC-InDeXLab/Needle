@@ -131,8 +131,23 @@ fi
 
 ### Step 4: Remove entire Needle directory
 print_status "Removing Needle installation directory..."
-rm -rf "$NEEDLE_DIR"
-print_success "Needle directory removed"
+
+# Clean up Docker volume files (may have root ownership)
+if [ -d "$NEEDLE_DIR/volumes" ]; then
+    print_status "Cleaning up Docker volume files..."
+    docker run --rm -v "$NEEDLE_DIR/volumes:/volumes" alpine sh -c "rm -rf /volumes/*" 2>/dev/null || true
+fi
+
+rm -rf "$NEEDLE_DIR" 2>/dev/null || {
+    print_error "Failed to remove some files in $NEEDLE_DIR"
+    print_status "You may need to run: sudo rm -rf $NEEDLE_DIR"
+}
+
+if [ ! -d "$NEEDLE_DIR" ]; then
+    print_success "Needle directory removed"
+else
+    print_warning "Some files could not be removed. Run: sudo rm -rf $NEEDLE_DIR"
+fi
 
 ### Step 5: Final message
 print_success "🎉 Uninstallation complete!"

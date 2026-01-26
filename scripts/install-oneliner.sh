@@ -152,7 +152,25 @@ INSTALL_DIR="$HOME/.needle"
 # Remove old installation if exists
 if [ -d "$INSTALL_DIR" ]; then
     print_warning "Directory $INSTALL_DIR already exists. Removing old installation..."
-    rm -rf "$INSTALL_DIR"
+    
+    # Stop any running services first
+    if [ -f "$INSTALL_DIR/docker/docker-compose.infrastructure.yaml" ]; then
+        print_status "Stopping existing Docker services..."
+        docker compose -f "$INSTALL_DIR/docker/docker-compose.infrastructure.yaml" down -v 2>/dev/null || true
+    fi
+    
+    # Remove Docker volumes (may require elevated permissions)
+    if [ -d "$INSTALL_DIR/volumes" ]; then
+        print_status "Cleaning up Docker volumes..."
+        # Use Docker to remove volume files (runs as root)
+        docker run --rm -v "$INSTALL_DIR/volumes:/volumes" alpine sh -c "rm -rf /volumes/*" 2>/dev/null || true
+    fi
+    
+    # Now remove the directory
+    rm -rf "$INSTALL_DIR" 2>/dev/null || {
+        print_error "Failed to remove $INSTALL_DIR. You may need to run: sudo rm -rf $INSTALL_DIR"
+        exit 1
+    }
 fi
 
 # Clone repository directly to ~/.needle

@@ -146,36 +146,26 @@ fi
 
 print_success "Selected ${CONFIG_MODE} configuration"
 
-# Create temporary directory
-TEMP_DIR=$(mktemp -d)
-print_status "Using temporary directory: $TEMP_DIR"
-
-# Clone repository with submodules
-print_status "Cloning Needle repository with submodules..."
-cd "$TEMP_DIR"
-git clone --recursive https://github.com/UIC-InDeXLab/Needle.git
-cd Needle
-
-# Make install script executable and run it
-print_status "Running Needle installer with ${CONFIG_MODE} configuration..."
-chmod +x scripts/install.sh
-./scripts/install.sh "$CONFIG_MODE"
-
-# Move to user's home directory
+# Installation directory
 INSTALL_DIR="$HOME/.needle"
+
+# Remove old installation if exists
 if [ -d "$INSTALL_DIR" ]; then
     print_warning "Directory $INSTALL_DIR already exists. Removing old installation..."
     rm -rf "$INSTALL_DIR"
 fi
 
-print_status "Moving installation to $INSTALL_DIR..."
-mv "$TEMP_DIR/Needle" "$INSTALL_DIR"
-
-# Clean up temporary directory
-rm -rf "$TEMP_DIR"
+# Clone repository directly to ~/.needle
+print_status "Cloning Needle repository to $INSTALL_DIR..."
+git clone --recursive https://github.com/UIC-InDeXLab/Needle.git "$INSTALL_DIR"
 
 # Change to installation directory
 cd "$INSTALL_DIR"
+
+# Make install script executable and run it
+print_status "Running Needle installer with ${CONFIG_MODE} configuration..."
+chmod +x scripts/install.sh
+./scripts/install.sh "$CONFIG_MODE"
 
 print_success "🎉 Installation complete!"
 echo ""

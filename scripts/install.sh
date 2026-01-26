@@ -92,9 +92,11 @@ print_success "Selected ${CONFIG_MODE} configuration"
 OS_TYPE="${OSTYPE}"
 if [[ "$OS_TYPE" == "darwin"* ]]; then
     SHELL_RC_FILE="${HOME}/.zshrc"
+    OS="macos"
     print_status "Detected macOS"
 else
     SHELL_RC_FILE="${HOME}/.bashrc"
+    OS="linux"
     print_status "Detected Linux"
 fi
 
@@ -246,81 +248,111 @@ fi
 print_success "Environment configuration created for ${CONFIG_MODE} mode"
 
 ### Step 7: Download and Install needlectl Binary
-print_status "Downloading and installing needlectl binary from GitHub releases..."
 
-# Detect OS
-if [[ "$OS_TYPE" == "darwin"* ]]; then
-    OS="macos"
+# First check if needlectl is already installed and working
+if command -v needlectl &> /dev/null && needlectl --version > /dev/null 2>&1; then
+    print_success "needlectl is already installed and working"
+    NEEDLECTL_VERSION=$(needlectl --version 2>&1 | head -1)
+    print_status "Current version: $NEEDLECTL_VERSION"
 else
-    OS="linux"
-fi
-
-# Download the latest needlectl binary
-print_status "Downloading latest needlectl binary for $OS..."
-RELEASE_URL="https://github.com/UIC-InDeXLab/Needle/releases/latest/download/needlectl-$OS"
-
-# Try to download the binary
-if curl -L -o /tmp/needlectl "$RELEASE_URL" 2>/dev/null; then
-    # Check if the downloaded file is valid (not a 404 page)
-    if [ -s /tmp/needlectl ] && ! grep -q "Not Found" /tmp/needlectl; then
-        # Make it executable and install
-        chmod +x /tmp/needlectl
-        sudo mv /tmp/needlectl /usr/local/bin/needlectl
-        
-        print_success "needlectl binary installed to /usr/local/bin/needlectl"
-        
-        # Verify installation
-        if needlectl --version > /dev/null 2>&1; then
-            print_success "needlectl installation verified"
-        else
-            print_warning "needlectl installed but version check failed"
-        fi
-    else
-        print_warning "Downloaded file appears to be invalid (404 or empty)"
-        rm -f /tmp/needlectl
-        print_warning "Falling back to building from source..."
-    fi
-fi
-
-# Fallback to building from source if download failed or was invalid
-if [ ! -f "/usr/local/bin/needlectl" ] || ! needlectl --version > /dev/null 2>&1; then
-    print_status "Building needlectl from source..."
+    print_status "Installing needlectl binary..."
     
-    if [ -f "needlectl/needlectl.py" ]; then
-        cd needlectl
-        
-        # Install Python dependencies for needlectl
-        print_status "Installing needlectl dependencies..."
-        pip install -r requirements.txt
-        
-        # Build needlectl binary using PyInstaller
-        print_status "Building needlectl binary with PyInstaller..."
-        ./build.sh
-        
-        if [ -f "dist/needlectl" ]; then
-            # Copy the built binary to system location
-            print_status "Installing needlectl binary to /usr/local/bin/..."
-            sudo cp dist/needlectl /usr/local/bin/needlectl
-            sudo chmod +x /usr/local/bin/needlectl
+    NEEDLECTL_INSTALLED=false
+    
+    # Download the latest needlectl binary
+    print_status "Downloading latest needlectl binary for $OS..."
+    RELEASE_URL="https://github.com/UIC-InDeXLab/Needle/releases/latest/download/needlectl-$OS"
+    
+    # Try to download the binary
+    if curl -L -f -o /tmp/needlectl "$RELEASE_URL" 2>/dev/null; then
+        # Check if the downloaded file is valid (executable binary)
+        if [ -s /tmp/needlectl ] && file /tmp/needlectl | grep -qE "(executable|ELF|Mach-O)"; then
+            chmod +x /tmp/needlectl
             
-            print_success "needlectl binary installed to /usr/local/bin/needlectl"
+            # Try to install - first try without sudo, then with sudo
+            if [ -w /usr/local/bin ]; then
+                mv /tmp/needlectl /usr/local/bin/needlectl
+                print_success "needlectl binary installed to /usr/local/bin/needlectl"
+                NEEDLECTL_INSTALLED=true
+            elif sudo -n true 2>/dev/null; then
+                # sudo without password works
+                sudo mv /tmp/needlectl /usr/local/bin/needlectl
+                print_success "needlectl binary installed to /usr/local/bin/needlectl"
+                NEEDLECTL_INSTALLED=true
+            else
+                print_warning "Cannot write to /usr/local/bin without sudo password"
+                print_status "Installing needlectl to local bin directory instead..."
+                mkdir -p "$HOME/.local/bin"
+                mv /tmp/needlectl "$HOME/.local/bin/needlectl"
+                print_success "needlectl binary installed to $HOME/.local/bin/needlectl"
+                print_warning "Make sure $HOME/.local/bin is in your PATH"
+                NEEDLECTL_INSTALLED=true
+            fi
         else
-            print_error "Failed to build needlectl binary from source"
-            exit 1
+            print_warning "Downloaded file appears to be invalid"
+            rm -f /tmp/needlectl
         fi
-        
-        cd ..
     else
-        print_error "needlectl source not found and download failed"
-        exit 1
+        print_warning "Failed to download needlectl from GitHub releases"
+    fi
+    
+    # Fallback to building from source if download failed
+    if [ "$NEEDLECTL_INSTALLED" = false ]; then
+        print_status "Building needlectl from source..."
+        
+        if [ -f "needlectl/needlectl.py" ]; then
+            cd needlectl
+            
+            # Deactivate any active virtual environment before building
+            deactivate 2>/dev/null || true
+            
+            # Build needlectl binary using PyInstaller (build.sh creates its own venv)
+            print_status "Building needlectl binary with PyInstaller..."
+            chmod +x build.sh
+            if ./build.sh 2>&1; then
+                if [ -f "dist/needlectl" ]; then
+                    # Try to install to system location or local bin
+                    if [ -w /usr/local/bin ]; then
+                        cp dist/needlectl /usr/local/bin/needlectl
+                        chmod +x /usr/local/bin/needlectl
+                        print_success "needlectl binary installed to /usr/local/bin/needlectl"
+                    elif sudo -n true 2>/dev/null; then
+                        sudo cp dist/needlectl /usr/local/bin/needlectl
+                        sudo chmod +x /usr/local/bin/needlectl
+                        print_success "needlectl binary installed to /usr/local/bin/needlectl"
+                    else
+                        mkdir -p "$HOME/.local/bin"
+                        cp dist/needlectl "$HOME/.local/bin/needlectl"
+                        chmod +x "$HOME/.local/bin/needlectl"
+                        print_success "needlectl binary installed to $HOME/.local/bin/needlectl"
+                        print_warning "Make sure $HOME/.local/bin is in your PATH"
+                    fi
+                else
+                    print_warning "Failed to build needlectl binary - needlectl will not be available"
+                fi
+            else
+                print_warning "Failed to build needlectl binary - needlectl will not be available"
+            fi
+            
+            cd ..
+        else
+            print_warning "needlectl source not found - needlectl will not be available"
+        fi
+    fi
+    
+    # Verify installation
+    if command -v needlectl &> /dev/null; then
+        print_success "needlectl installation verified"
+    else
+        print_warning "needlectl not available in PATH. You can still use ./start-needle.sh to manage services."
     fi
 fi
 
 ### Step 8: Create Service Management Scripts
 print_status "Creating service management scripts..."
 
-# Create start script
-cat > start-needle.sh << 'EOF'
+# Create start script with embedded paths
+cat > start-needle.sh << EOF
 #!/bin/bash
 
 # Start Needle Services (Unified)
@@ -328,6 +360,11 @@ set -e
 
 echo "🚀 Starting Needle Services"
 echo "=========================="
+
+# Embedded paths from installation
+NEEDLE_DIR="${NEEDLE_DIR}"
+IMAGE_GEN_HUB_DIR="${IMAGE_GEN_HUB_DIR}"
+HAS_GPU="${HAS_GPU}"
 
 # Colors
 GREEN='\033[0;32m'
@@ -337,53 +374,42 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 print_status() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+    echo -e "\${BLUE}[INFO]\${NC} \$1"
 }
 
 print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    echo -e "\${GREEN}[SUCCESS]\${NC} \$1"
 }
 
 print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo -e "\${RED}[ERROR]\${NC} \$1"
 }
 
 print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+    echo -e "\${YELLOW}[WARNING]\${NC} \$1"
 }
+
+# Change to Needle directory
+cd "\${NEEDLE_DIR}"
 
 # Check if we're in the right directory
 if [ ! -f "scripts/install.sh" ]; then
-    print_error "Please run this script from the Needle project root directory"
+    print_error "Needle installation not found at \${NEEDLE_DIR}"
     exit 1
 fi
 
-# Load environment variables from template
-load_environment() {
-    local env_template="scripts/env.template"
-    local temp_env=$(mktemp)
-    
-    if [ -f "$env_template" ]; then
-        # Replace template variables with actual values
-        sed -e "s|{{HAS_GPU}}|${HAS_GPU:-false}|g" \
-            -e "s|{{NEEDLE_DIR}}|${NEEDLE_DIR}|g" \
-            "$env_template" > "$temp_env"
-        
-        # Load environment variables
-        set -a  # automatically export all variables
-        source "$temp_env"
-        set +a  # disable automatic export
-        
-        rm -f "$temp_env"
-        print_success "Environment variables loaded from template"
-    else
-        print_error "Environment template not found: $env_template"
-        exit 1
-    fi
-}
-
-# Load environment variables
-load_environment
+# Set environment variables
+export POSTGRES__USER=myuser
+export POSTGRES__PASSWORD=mypassword
+export POSTGRES__DB=mydb
+export POSTGRES__HOST=localhost
+export POSTGRES__PORT=5432
+export MILVUS__HOST=localhost
+export MILVUS__PORT=19530
+export SERVICE__USE_CUDA=\${HAS_GPU}
+export SERVICE__CONFIG_DIR_PATH="\${NEEDLE_DIR}/configs/"
+export GENERATOR__HOST=localhost
+export GENERATOR__PORT=8010
 
 # Start infrastructure services (Docker)
 print_status "Starting infrastructure services (PostgreSQL, Milvus, etc.)..."
@@ -397,8 +423,8 @@ sleep 15
 print_status "Checking service health..."
 
 # Check PostgreSQL
-if ! docker ps | grep -q "postgres.*healthy"; then
-    print_warning "PostgreSQL health check failed, but continuing..."
+if ! docker ps | grep -q "postgres"; then
+    print_warning "PostgreSQL container not found, but continuing..."
 fi
 
 # Check Milvus
@@ -412,23 +438,27 @@ print_success "Infrastructure services are ready"
 mkdir -p logs
 
 # Start image-generator-hub
-print_status "Starting image-generator-hub..."
-cd "${IMAGE_GEN_HUB_DIR}"
-source .venv/bin/activate
-nohup uvicorn main:app --host 0.0.0.0 --port 8010 > "${NEEDLE_DIR}/logs/image-generator-hub.log" 2>&1 &
-echo $! > "${NEEDLE_DIR}/logs/image-generator-hub.pid"
-cd "${NEEDLE_DIR}"
-print_success "Image-generator-hub started on port 8010"
+if [ -d "\${IMAGE_GEN_HUB_DIR}" ] && [ -d "\${IMAGE_GEN_HUB_DIR}/.venv" ]; then
+    print_status "Starting image-generator-hub..."
+    cd "\${IMAGE_GEN_HUB_DIR}"
+    source .venv/bin/activate
+    nohup uvicorn main:app --host 0.0.0.0 --port 8010 > "\${NEEDLE_DIR}/logs/image-generator-hub.log" 2>&1 &
+    echo \$! > "\${NEEDLE_DIR}/logs/image-generator-hub.pid"
+    deactivate
+    cd "\${NEEDLE_DIR}"
+    print_success "Image-generator-hub started on port 8010"
+else
+    print_warning "ImageGeneratorsHub not found or not set up. Skipping image generator."
+fi
 
 # Start backend
 print_status "Starting Needle backend..."
 cd backend
 source venv/bin/activate
-# Set the config directory path for the backend
-export SERVICE__CONFIG_DIR_PATH="${NEEDLE_DIR}/configs/"
-nohup uvicorn main:app --host 0.0.0.0 --port 8000 --reload > "${NEEDLE_DIR}/logs/backend.log" 2>&1 &
-echo $! > "${NEEDLE_DIR}/logs/backend.pid"
-cd ..
+nohup uvicorn main:app --host 0.0.0.0 --port 8000 > "\${NEEDLE_DIR}/logs/backend.log" 2>&1 &
+echo \$! > "\${NEEDLE_DIR}/logs/backend.pid"
+deactivate
+cd "\${NEEDLE_DIR}"
 
 print_success "Needle backend started on port 8000"
 print_success "All services are running!"
@@ -446,8 +476,8 @@ echo "  - Image generator logs: tail -f logs/image-generator-hub.log"
 echo "  - Docker services: docker ps"
 EOF
 
-# Create stop script
-cat > stop-needle.sh << 'EOF'
+# Create stop script with embedded paths
+cat > stop-needle.sh << EOF
 #!/bin/bash
 
 # Stop Needle Services (Unified)
@@ -456,6 +486,9 @@ set -e
 echo "🛑 Stopping Needle Services"
 echo "=========================="
 
+# Embedded paths from installation
+NEEDLE_DIR="${NEEDLE_DIR}"
+
 # Colors
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -463,25 +496,28 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 print_status() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+    echo -e "\${BLUE}[INFO]\${NC} \$1"
 }
 
 print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    echo -e "\${GREEN}[SUCCESS]\${NC} \$1"
 }
+
+# Change to Needle directory
+cd "\${NEEDLE_DIR}"
 
 # Check if we're in the right directory
 if [ ! -f "scripts/install.sh" ]; then
-    echo "Please run this script from the Needle project root directory"
+    echo "Needle installation not found at \${NEEDLE_DIR}"
     exit 1
 fi
 
 # Stop backend
 if [ -f "logs/backend.pid" ]; then
     print_status "Stopping backend..."
-    BACKEND_PID=$(cat logs/backend.pid)
-    if kill -0 $BACKEND_PID 2>/dev/null; then
-        kill $BACKEND_PID
+    BACKEND_PID=\$(cat logs/backend.pid)
+    if kill -0 \$BACKEND_PID 2>/dev/null; then
+        kill \$BACKEND_PID
         print_success "Backend stopped"
     else
         print_status "Backend was not running"
@@ -494,9 +530,9 @@ fi
 # Stop image-generator-hub
 if [ -f "logs/image-generator-hub.pid" ]; then
     print_status "Stopping image-generator-hub..."
-    IMG_GEN_PID=$(cat logs/image-generator-hub.pid)
-    if kill -0 $IMG_GEN_PID 2>/dev/null; then
-        kill $IMG_GEN_PID
+    IMG_GEN_PID=\$(cat logs/image-generator-hub.pid)
+    if kill -0 \$IMG_GEN_PID 2>/dev/null; then
+        kill \$IMG_GEN_PID
         print_success "Image-generator-hub stopped"
     else
         print_status "Image-generator-hub was not running"
@@ -513,13 +549,16 @@ docker compose -f docker/docker-compose.infrastructure.yaml down
 print_success "All services stopped"
 EOF
 
-# Create status script
-cat > status-needle.sh << 'EOF'
+# Create status script with embedded paths
+cat > status-needle.sh << EOF
 #!/bin/bash
 
 # Check Needle Services Status (Unified)
 echo "📊 Needle Services Status"
 echo "========================"
+
+# Embedded paths from installation
+NEEDLE_DIR="${NEEDLE_DIR}"
 
 # Colors
 GREEN='\033[0;32m'
@@ -529,36 +568,39 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 print_status() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+    echo -e "\${BLUE}[INFO]\${NC} \$1"
 }
 
 print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    echo -e "\${GREEN}[SUCCESS]\${NC} \$1"
 }
 
 print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo -e "\${RED}[ERROR]\${NC} \$1"
 }
 
 print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+    echo -e "\${YELLOW}[WARNING]\${NC} \$1"
 }
+
+# Change to Needle directory
+cd "\${NEEDLE_DIR}"
 
 # Check if we're in the right directory
 if [ ! -f "scripts/install.sh" ]; then
-    echo "Please run this script from the Needle project root directory"
+    echo "Needle installation not found at \${NEEDLE_DIR}"
     exit 1
 fi
 
 # Check backend
 if [ -f "logs/backend.pid" ]; then
-    BACKEND_PID=$(cat logs/backend.pid)
-    if kill -0 $BACKEND_PID 2>/dev/null; then
-        print_success "Backend: Running (PID: $BACKEND_PID)"
+    BACKEND_PID=\$(cat logs/backend.pid)
+    if kill -0 \$BACKEND_PID 2>/dev/null; then
+        print_success "Backend: Running (PID: \$BACKEND_PID)"
         if curl -s http://localhost:8000/health > /dev/null 2>&1; then
             print_success "Backend API: Responding"
         else
-            print_warning "Backend API: Not responding"
+            print_warning "Backend API: Not responding (may still be starting)"
         fi
     else
         print_error "Backend: Not running (stale PID file)"
@@ -569,13 +611,13 @@ fi
 
 # Check image-generator-hub
 if [ -f "logs/image-generator-hub.pid" ]; then
-    IMG_GEN_PID=$(cat logs/image-generator-hub.pid)
-    if kill -0 $IMG_GEN_PID 2>/dev/null; then
-        print_success "Image-generator-hub: Running (PID: $IMG_GEN_PID)"
+    IMG_GEN_PID=\$(cat logs/image-generator-hub.pid)
+    if kill -0 \$IMG_GEN_PID 2>/dev/null; then
+        print_success "Image-generator-hub: Running (PID: \$IMG_GEN_PID)"
         if curl -s http://localhost:8010/health > /dev/null 2>&1; then
             print_success "Image-generator-hub API: Responding"
         else
-            print_warning "Image-generator-hub API: Not responding"
+            print_warning "Image-generator-hub API: Not responding (may still be starting)"
         fi
     else
         print_error "Image-generator-hub: Not running (stale PID file)"
@@ -594,65 +636,39 @@ chmod +x start-needle.sh stop-needle.sh status-needle.sh
 
 print_success "Service management scripts created"
 
-### Step 9: Download and Install UI Artifacts
-print_status "Downloading pre-built UI artifacts from GitHub releases..."
+### Step 9: Download and Install UI Artifacts (Optional)
+print_status "Attempting to download pre-built UI artifacts from GitHub releases..."
+
+# Ensure UI directory exists
+mkdir -p ui
 
 # Download the latest UI build artifacts
 print_status "Downloading latest UI build for $OS..."
 UI_RELEASE_URL="https://github.com/UIC-InDeXLab/Needle/releases/latest/download/ui-build-$OS.tar.gz"
 
-print_status "Download URL: $UI_RELEASE_URL"
+UI_INSTALLED=false
 
 # Try to download the UI artifacts with better error handling
-if curl -L -o /tmp/ui-build.tar.gz "$UI_RELEASE_URL" 2>/dev/null; then
+if curl -L -f -o /tmp/ui-build.tar.gz "$UI_RELEASE_URL" 2>/dev/null; then
     # Check if the downloaded file is valid (not a 404 page)
-    if [ -s /tmp/ui-build.tar.gz ] && ! grep -q "Not Found" /tmp/ui-build.tar.gz 2>/dev/null; then
+    if [ -s /tmp/ui-build.tar.gz ] && file /tmp/ui-build.tar.gz | grep -q "gzip"; then
         # Extract UI build artifacts
         print_status "Extracting UI build artifacts..."
-        cd ui
-        if tar -xzf /tmp/ui-build.tar.gz; then
-            cd ..
-            rm /tmp/ui-build.tar.gz
+        if tar -xzf /tmp/ui-build.tar.gz -C ui 2>/dev/null; then
+            rm -f /tmp/ui-build.tar.gz
             print_success "UI build artifacts installed successfully"
+            UI_INSTALLED=true
         else
-            print_error "Failed to extract UI build artifacts"
-            print_status "Downloaded file may be corrupted or not a valid tar.gz file"
-            print_status "File size: $(wc -c < /tmp/ui-build.tar.gz) bytes"
-            print_status "File type: $(file /tmp/ui-build.tar.gz)"
-            cd ..
-            rm /tmp/ui-build.tar.gz
-            exit 1
+            print_warning "Failed to extract UI build artifacts - UI will need to be built manually"
+            rm -f /tmp/ui-build.tar.gz
         fi
     else
-        print_error "Downloaded file appears to be invalid (404 or empty)"
-        print_status "File size: $(wc -c < /tmp/ui-build.tar.gz) bytes"
-        print_status "File content preview:"
-        head -5 /tmp/ui-build.tar.gz
-        rm /tmp/ui-build.tar.gz
-        
-        # Check what's actually available in the release
-        print_status "Checking available release assets..."
-        LATEST_TAG=$(curl -s "https://api.github.com/repos/UIC-InDeXLab/Needle/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)
-        print_status "Latest release tag: $LATEST_TAG"
-        
-        print_status "Available assets in latest release:"
-        curl -s "https://api.github.com/repos/UIC-InDeXLab/Needle/releases/latest" | grep '"name"' | sed 's/.*"name": "\(.*\)".*/  - \1/'
-        
-        print_error "UI build artifacts not found in GitHub releases"
-        print_status "This indicates that the GitHub Actions workflow for building UI artifacts is not working correctly"
-        print_status "Please check:"
-        print_status "1. GitHub Actions: https://github.com/UIC-InDeXLab/Needle/actions"
-        print_status "2. UI build workflow should create and upload ui-build-$OS.tar.gz files"
-        print_status "3. The workflow should run on every release"
-        exit 1
+        print_warning "Downloaded UI file appears to be invalid - UI will need to be built manually"
+        rm -f /tmp/ui-build.tar.gz
     fi
 else
-    print_error "Failed to download UI artifacts from GitHub releases"
-    print_status "Please check:"
-    print_status "1. GitHub releases page: https://github.com/UIC-InDeXLab/Needle/releases"
-    print_status "2. If ui-build-$OS.tar.gz exists in the latest release"
-    print_status "3. If GitHub Actions are running successfully"
-    exit 1
+    print_warning "UI artifacts not available from GitHub releases - UI will need to be built manually"
+    print_status "You can build the UI manually later with: cd ui && npm install && npm run build"
 fi
 
 ### Step 10: Create logs directory

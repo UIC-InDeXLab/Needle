@@ -108,9 +108,9 @@ else
     echo "3) Accurate - 6 models with highest accuracy but slower performance"
     echo ""
 
-    # Check if we're being run from a file (interactive) vs piped (non-interactive)
-    if [ -f "${BASH_SOURCE[0]}" ] && [ "${BASH_SOURCE[0]}" != "/dev/stdin" ]; then
-        # Interactive mode - script is being run from a file
+    # Check if we're being run interactively (terminal attached to stdin)
+    if [ -t 0 ]; then
+        # Interactive mode - stdin is a terminal
         echo -n "Enter your choice (1-3) [default: 1]: "
         read config_choice
     else

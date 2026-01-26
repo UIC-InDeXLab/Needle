@@ -170,6 +170,9 @@ fi
 ### Step 3: Initialize and update submodules
 print_status "Setting up ImageGeneratorsHub submodule..."
 
+# Change to NEEDLE_DIR to ensure all paths are correct
+cd "$NEEDLE_DIR"
+
 # Initialize and update submodules
 print_status "Initializing git submodules..."
 git submodule init
@@ -182,6 +185,7 @@ if [ -d "ImageGeneratorsHub" ] && [ -f "ImageGeneratorsHub/.git" ]; then
     print_status "ImageGeneratorsHub directory: $IMAGE_GEN_HUB_DIR"
 else
     print_error "Failed to initialize ImageGeneratorsHub submodule"
+    print_status "Try running: git submodule update --init --recursive"
     exit 1
 fi
 

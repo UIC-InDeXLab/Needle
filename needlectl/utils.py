@@ -7,8 +7,12 @@ import typer
 def get_storage_dir():
     needle_home_path = os.getenv("NEEDLE_HOME")
     if not needle_home_path:
-        typer.echo("Error: NEEDLE_HOME not set.")
-        raise typer.Exit(code=1)
+        # Default to ~/.needle for one-liner installations
+        needle_home_path = os.path.expanduser("~/.needle")
+        if not os.path.exists(needle_home_path):
+            typer.echo(f"Error: Needle installation not found at {needle_home_path}")
+            typer.echo("Please set NEEDLE_HOME environment variable or install Needle first.")
+            raise typer.Exit(code=1)
     return needle_home_path
 
 

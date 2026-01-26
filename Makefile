@@ -10,7 +10,7 @@ dev:
 	@echo "Starting backend in development mode..."
 	@cd backend && source venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-# Install Needle (unified setup)
+# Install Needle (for development - use one-liner for production)
 install:
 	@chmod +x scripts/install.sh
 	@./scripts/install.sh
@@ -28,22 +28,19 @@ install-accurate:
 	@chmod +x scripts/install.sh
 	@./scripts/install.sh accurate
 
-# Uninstall Needle
+# Uninstall Needle (only removes ~/.needle installation)
 uninstall:
 	@chmod +x scripts/uninstall.sh
 	@./scripts/uninstall.sh
 
-# Start all services
+# Start all services using needlectl
 start:
-	@chmod +x start-needle.sh
-	@./start-needle.sh
+	@needlectl service start
 
-# Stop all services
+# Stop all services using needlectl
 stop:
-	@chmod +x stop-needle.sh
-	@./stop-needle.sh
+	@needlectl service stop
 
-# Check service status
+# Check service status using needlectl
 status:
-	@chmod +x status-needle.sh
-	@./status-needle.sh
+	@needlectl service status

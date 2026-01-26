@@ -36,45 +36,15 @@ curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/in
 curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash -s accurate
 ```
 
-The one-liner installer will:
-1. Clone the Needle repository to `~/.needle`
-2. Set up virtual environments for backend and image generator services
-3. Install the `needlectl` CLI tool
-4. Configure Docker infrastructure services
-
-### Manual Installation
-
-If you prefer to install manually or need more control over the process:
-
-1. **Clone the repository:**
-
-```bash
-git clone --recursive https://github.com/UIC-InDeXLab/Needle.git
-cd Needle
-```
-
-2. **Run the installation script:**
-
-```bash
-./scripts/install.sh
-```
+This installs Needle to `~/.needle` and adds the `needlectl` command-line tool.
 
 ### Configuration Options
 
-During the installation process, you will be prompted to choose the performance configuration. The available options are:
+Choose your performance configuration:
 
 - **Fast (Default):** Single CLIP model, fastest indexing and retrieval - best for getting started quickly
 - **Balanced:** 4 models with balanced performance and accuracy
 - **Accurate:** 6 models with highest accuracy but slower performance
-
-You can also specify the configuration directly:
-
-```bash
-# Install with specific configuration
-./scripts/install.sh fast
-./scripts/install.sh balanced
-./scripts/install.sh accurate
-```
 
 > **Warning:** Once the configuration mode is set, it cannot be changed without uninstalling and reinstalling Needle, which will result in data loss.
 
@@ -88,7 +58,6 @@ The installation process sets up:
 - **Docker Infrastructure:** PostgreSQL, Milvus, MinIO, and etcd services via Docker Compose
 - **Configuration Files:** Performance-optimized settings based on your chosen mode
 - **needlectl CLI:** Command-line interface for managing Needle (installed to `/usr/local/bin/needlectl`)
-- **Service Scripts:** `start-needle.sh`, `stop-needle.sh`, `status-needle.sh` for service management
 
 ## Starting the Needle Service
 
@@ -96,12 +65,6 @@ Once installed, start the Needle service by running:
 
 ```bash
 needlectl service start
-```
-
-Or if you installed manually:
-
-```bash
-./start-needle.sh
 ```
 
 This command will start all the necessary infrastructure services (PostgreSQL, Milvus, etc.) and the Needle backend.
@@ -125,6 +88,29 @@ After starting services, you can access:
 - **Backend API:** http://localhost:8000
 - **API Documentation:** http://localhost:8000/docs
 - **Image Generator:** http://localhost:8010
+
+## Managing Services
+
+Use `needlectl` to manage all services:
+
+```bash
+# Start all services
+needlectl service start
+
+# Stop all services
+needlectl service stop
+
+# Check status
+needlectl service status
+
+# View logs
+needlectl service log backend
+needlectl service log image-generator-hub
+needlectl service log infrastructure
+
+# Restart services
+needlectl service restart
+```
 
 ## About needlectl
 

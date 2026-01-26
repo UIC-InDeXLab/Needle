@@ -41,7 +41,6 @@ NEEDLE_DIR="$(dirname "$SCRIPT_DIR")"
 IMAGE_GEN_HUB_DIR="$NEEDLE_DIR/ImageGeneratorsHub"
 
 print_status "Needle directory: $NEEDLE_DIR"
-print_status "ImageGeneratorsHub directory: $IMAGE_GEN_HUB_DIR"
 
 # Configuration selection
 CONFIG_MODE="${1:-}"
@@ -182,7 +181,6 @@ git submodule update --recursive
 if [ -d "ImageGeneratorsHub" ] && [ -f "ImageGeneratorsHub/.git" ]; then
     print_success "ImageGeneratorsHub submodule initialized"
     IMAGE_GEN_HUB_DIR="${NEEDLE_DIR}/ImageGeneratorsHub"
-    print_status "ImageGeneratorsHub directory: $IMAGE_GEN_HUB_DIR"
 else
     print_error "Failed to initialize ImageGeneratorsHub submodule"
     print_status "Try running: git submodule update --init --recursive"
@@ -208,6 +206,7 @@ cd backend
 source venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
+deactivate
 cd ..
 print_success "Backend dependencies installed"
 
@@ -235,6 +234,7 @@ else
     print_warning "No requirements.txt found for ImageGeneratorsHub"
 fi
 
+deactivate
 cd "${NEEDLE_DIR}"
 
 ### Step 6: Create Configuration Files
@@ -307,9 +307,6 @@ else
         if [ -f "needlectl/needlectl.py" ]; then
             cd needlectl
             
-            # Deactivate any active virtual environment before building
-            deactivate 2>/dev/null || true
-            
             # Build needlectl binary using PyInstaller (build.sh creates its own venv)
             print_status "Building needlectl binary with PyInstaller..."
             chmod +x build.sh
@@ -332,15 +329,18 @@ else
                         print_warning "Make sure $HOME/.local/bin is in your PATH"
                     fi
                 else
-                    print_warning "Failed to build needlectl binary - needlectl will not be available"
+                    print_error "Failed to build needlectl binary"
+                    exit 1
                 fi
             else
-                print_warning "Failed to build needlectl binary - needlectl will not be available"
+                print_error "Failed to build needlectl binary"
+                exit 1
             fi
             
             cd ..
         else
-            print_warning "needlectl source not found - needlectl will not be available"
+            print_error "needlectl source not found"
+            exit 1
         fi
     fi
     
@@ -348,364 +348,31 @@ else
     if command -v needlectl &> /dev/null; then
         print_success "needlectl installation verified"
     else
-        print_warning "needlectl not available in PATH. You can still use ./start-needle.sh to manage services."
+        print_error "needlectl not available in PATH"
+        exit 1
     fi
 fi
 
-### Step 8: Create Service Management Scripts
-print_status "Creating service management scripts..."
-
-# Create start script with embedded paths
-cat > start-needle.sh << EOF
-#!/bin/bash
-
-# Start Needle Services (Unified)
-set -e
-
-echo "🚀 Starting Needle Services"
-echo "=========================="
-
-# Embedded paths from installation
-NEEDLE_DIR="${NEEDLE_DIR}"
-IMAGE_GEN_HUB_DIR="${IMAGE_GEN_HUB_DIR}"
-HAS_GPU="${HAS_GPU}"
-
-# Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-print_status() {
-    echo -e "\${BLUE}[INFO]\${NC} \$1"
-}
-
-print_success() {
-    echo -e "\${GREEN}[SUCCESS]\${NC} \$1"
-}
-
-print_error() {
-    echo -e "\${RED}[ERROR]\${NC} \$1"
-}
-
-print_warning() {
-    echo -e "\${YELLOW}[WARNING]\${NC} \$1"
-}
-
-# Change to Needle directory
-cd "\${NEEDLE_DIR}"
-
-# Check if we're in the right directory
-if [ ! -f "scripts/install.sh" ]; then
-    print_error "Needle installation not found at \${NEEDLE_DIR}"
-    exit 1
-fi
-
-# Set environment variables
-export POSTGRES__USER=myuser
-export POSTGRES__PASSWORD=mypassword
-export POSTGRES__DB=mydb
-export POSTGRES__HOST=localhost
-export POSTGRES__PORT=5432
-export MILVUS__HOST=localhost
-export MILVUS__PORT=19530
-export SERVICE__USE_CUDA=\${HAS_GPU}
-export SERVICE__CONFIG_DIR_PATH="\${NEEDLE_DIR}/configs/"
-export GENERATOR__HOST=localhost
-export GENERATOR__PORT=8010
-
-# Start infrastructure services (Docker)
-print_status "Starting infrastructure services (PostgreSQL, Milvus, etc.)..."
-docker compose -f docker/docker-compose.infrastructure.yaml up -d
-
-# Wait for services to be ready
-print_status "Waiting for infrastructure services to be ready..."
-sleep 15
-
-# Check if services are healthy
-print_status "Checking service health..."
-
-# Check PostgreSQL
-if ! docker ps | grep -q "postgres"; then
-    print_warning "PostgreSQL container not found, but continuing..."
-fi
-
-# Check Milvus
-if ! curl -f http://localhost:9091/healthz > /dev/null 2>&1; then
-    print_warning "Milvus health check failed, but continuing..."
-fi
-
-print_success "Infrastructure services are ready"
-
-# Create logs directory
+### Step 8: Create logs directory
 mkdir -p logs
 
-# Start image-generator-hub
-if [ -d "\${IMAGE_GEN_HUB_DIR}" ] && [ -d "\${IMAGE_GEN_HUB_DIR}/.venv" ]; then
-    print_status "Starting image-generator-hub..."
-    cd "\${IMAGE_GEN_HUB_DIR}"
-    source .venv/bin/activate
-    nohup uvicorn main:app --host 0.0.0.0 --port 8010 > "\${NEEDLE_DIR}/logs/image-generator-hub.log" 2>&1 &
-    echo \$! > "\${NEEDLE_DIR}/logs/image-generator-hub.pid"
-    deactivate
-    cd "\${NEEDLE_DIR}"
-    print_success "Image-generator-hub started on port 8010"
-else
-    print_warning "ImageGeneratorsHub not found or not set up. Skipping image generator."
-fi
-
-# Start backend
-print_status "Starting Needle backend..."
-cd backend
-source venv/bin/activate
-nohup uvicorn main:app --host 0.0.0.0 --port 8000 > "\${NEEDLE_DIR}/logs/backend.log" 2>&1 &
-echo \$! > "\${NEEDLE_DIR}/logs/backend.pid"
-deactivate
-cd "\${NEEDLE_DIR}"
-
-print_success "Needle backend started on port 8000"
-print_success "All services are running!"
-echo ""
-echo "🌐 Access Points:"
-echo "  - Backend API: http://localhost:8000"
-echo "  - Image Generator: http://localhost:8010"
-echo "  - API Documentation: http://localhost:8000/docs"
-echo "  - PostgreSQL: localhost:5432"
-echo "  - Milvus: localhost:19530"
-echo ""
-echo "📊 Monitor services:"
-echo "  - Backend logs: tail -f logs/backend.log"
-echo "  - Image generator logs: tail -f logs/image-generator-hub.log"
-echo "  - Docker services: docker ps"
-EOF
-
-# Create stop script with embedded paths
-cat > stop-needle.sh << EOF
-#!/bin/bash
-
-# Stop Needle Services (Unified)
-set -e
-
-echo "🛑 Stopping Needle Services"
-echo "=========================="
-
-# Embedded paths from installation
-NEEDLE_DIR="${NEEDLE_DIR}"
-
-# Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-RED='\033[0;31m'
-NC='\033[0m'
-
-print_status() {
-    echo -e "\${BLUE}[INFO]\${NC} \$1"
-}
-
-print_success() {
-    echo -e "\${GREEN}[SUCCESS]\${NC} \$1"
-}
-
-# Change to Needle directory
-cd "\${NEEDLE_DIR}"
-
-# Check if we're in the right directory
-if [ ! -f "scripts/install.sh" ]; then
-    echo "Needle installation not found at \${NEEDLE_DIR}"
-    exit 1
-fi
-
-# Stop backend
-if [ -f "logs/backend.pid" ]; then
-    print_status "Stopping backend..."
-    BACKEND_PID=\$(cat logs/backend.pid)
-    if kill -0 \$BACKEND_PID 2>/dev/null; then
-        kill \$BACKEND_PID
-        print_success "Backend stopped"
-    else
-        print_status "Backend was not running"
-    fi
-    rm -f logs/backend.pid
-else
-    print_status "No backend PID file found"
-fi
-
-# Stop image-generator-hub
-if [ -f "logs/image-generator-hub.pid" ]; then
-    print_status "Stopping image-generator-hub..."
-    IMG_GEN_PID=\$(cat logs/image-generator-hub.pid)
-    if kill -0 \$IMG_GEN_PID 2>/dev/null; then
-        kill \$IMG_GEN_PID
-        print_success "Image-generator-hub stopped"
-    else
-        print_status "Image-generator-hub was not running"
-    fi
-    rm -f logs/image-generator-hub.pid
-else
-    print_status "No image-generator-hub PID file found"
-fi
-
-# Stop infrastructure services
-print_status "Stopping infrastructure services..."
-docker compose -f docker/docker-compose.infrastructure.yaml down
-
-print_success "All services stopped"
-EOF
-
-# Create status script with embedded paths
-cat > status-needle.sh << EOF
-#!/bin/bash
-
-# Check Needle Services Status (Unified)
-echo "📊 Needle Services Status"
-echo "========================"
-
-# Embedded paths from installation
-NEEDLE_DIR="${NEEDLE_DIR}"
-
-# Colors
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-print_status() {
-    echo -e "\${BLUE}[INFO]\${NC} \$1"
-}
-
-print_success() {
-    echo -e "\${GREEN}[SUCCESS]\${NC} \$1"
-}
-
-print_error() {
-    echo -e "\${RED}[ERROR]\${NC} \$1"
-}
-
-print_warning() {
-    echo -e "\${YELLOW}[WARNING]\${NC} \$1"
-}
-
-# Change to Needle directory
-cd "\${NEEDLE_DIR}"
-
-# Check if we're in the right directory
-if [ ! -f "scripts/install.sh" ]; then
-    echo "Needle installation not found at \${NEEDLE_DIR}"
-    exit 1
-fi
-
-# Check backend
-if [ -f "logs/backend.pid" ]; then
-    BACKEND_PID=\$(cat logs/backend.pid)
-    if kill -0 \$BACKEND_PID 2>/dev/null; then
-        print_success "Backend: Running (PID: \$BACKEND_PID)"
-        if curl -s http://localhost:8000/health > /dev/null 2>&1; then
-            print_success "Backend API: Responding"
-        else
-            print_warning "Backend API: Not responding (may still be starting)"
-        fi
-    else
-        print_error "Backend: Not running (stale PID file)"
-    fi
-else
-    print_error "Backend: Not running"
-fi
-
-# Check image-generator-hub
-if [ -f "logs/image-generator-hub.pid" ]; then
-    IMG_GEN_PID=\$(cat logs/image-generator-hub.pid)
-    if kill -0 \$IMG_GEN_PID 2>/dev/null; then
-        print_success "Image-generator-hub: Running (PID: \$IMG_GEN_PID)"
-        if curl -s http://localhost:8010/health > /dev/null 2>&1; then
-            print_success "Image-generator-hub API: Responding"
-        else
-            print_warning "Image-generator-hub API: Not responding (may still be starting)"
-        fi
-    else
-        print_error "Image-generator-hub: Not running (stale PID file)"
-    fi
-else
-    print_warning "Image-generator-hub: Not running"
-fi
-
-# Check infrastructure services
-print_status "Infrastructure Services (Docker):"
-docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "(postgres|milvus|etcd|minio)" || print_warning "No infrastructure services running"
-EOF
-
-# Make scripts executable
-chmod +x start-needle.sh stop-needle.sh status-needle.sh
-
-print_success "Service management scripts created"
-
-### Step 9: Download and Install UI Artifacts (Optional)
-print_status "Attempting to download pre-built UI artifacts from GitHub releases..."
-
-# Ensure UI directory exists
-mkdir -p ui
-
-# Download the latest UI build artifacts
-print_status "Downloading latest UI build for $OS..."
-UI_RELEASE_URL="https://github.com/UIC-InDeXLab/Needle/releases/latest/download/ui-build-$OS.tar.gz"
-
-UI_INSTALLED=false
-
-# Try to download the UI artifacts with better error handling
-if curl -L -f -o /tmp/ui-build.tar.gz "$UI_RELEASE_URL" 2>/dev/null; then
-    # Check if the downloaded file is valid (not a 404 page)
-    if [ -s /tmp/ui-build.tar.gz ] && file /tmp/ui-build.tar.gz | grep -q "gzip"; then
-        # Extract UI build artifacts
-        print_status "Extracting UI build artifacts..."
-        if tar -xzf /tmp/ui-build.tar.gz -C ui 2>/dev/null; then
-            rm -f /tmp/ui-build.tar.gz
-            print_success "UI build artifacts installed successfully"
-            UI_INSTALLED=true
-        else
-            print_warning "Failed to extract UI build artifacts - UI will need to be built manually"
-            rm -f /tmp/ui-build.tar.gz
-        fi
-    else
-        print_warning "Downloaded UI file appears to be invalid - UI will need to be built manually"
-        rm -f /tmp/ui-build.tar.gz
-    fi
-else
-    print_warning "UI artifacts not available from GitHub releases - UI will need to be built manually"
-    print_status "You can build the UI manually later with: cd ui && npm install && npm run build"
-fi
-
-### Step 10: Create logs directory
-mkdir -p logs
-
-### Step 11: Final message
+### Step 9: Final message
 print_success "🎉 Installation complete!"
 echo ""
-echo "📋 Next steps:"
-echo "1. Start services: ./start-needle.sh"
-echo "2. Check status: ./status-needle.sh"
-echo "3. Stop services: ./stop-needle.sh"
+echo "📋 Usage:"
+echo "  needlectl service start    - Start all services"
+echo "  needlectl service stop     - Stop all services"
+echo "  needlectl service status   - Check service status"
+echo "  needlectl service log      - View logs"
 echo ""
-echo "🛠️  Using needlectl:"
-echo "  - Start services: needlectl service start"
-echo "  - Stop services: needlectl service stop"
-echo "  - Check status: needlectl service status"
-echo "  - View logs: needlectl service log [backend|image-generator-hub|infrastructure]"
-echo "  - Start UI: needlectl ui start"
-echo "  - Stop UI: needlectl ui stop"
-echo "  - UI status: needlectl ui status"
-echo ""
-echo "🌐 Access Points:"
+echo "🌐 Access Points (after starting services):"
 echo "  - Backend API: http://localhost:8000"
 echo "  - Image Generator: http://localhost:8010"
-echo "  - Web UI: http://localhost:3000 (when started with 'needlectl ui start')"
 echo "  - API Documentation: http://localhost:8000/docs"
 echo ""
 echo "📊 Configuration:"
 echo "  - Mode: ${CONFIG_MODE}"
 echo "  - GPU Support: ${HAS_GPU}"
-echo "  - Backend: Virtual Environment"
-echo "  - Image Generator: Virtual Environment"
-echo "  - Infrastructure: Docker Containers"
+echo "  - Installation: ${NEEDLE_DIR}"
 echo ""
-print_warning "Make sure to run './start-needle.sh' or 'needlectl service start' to start all services."
+print_warning "Run 'needlectl service start' to start all services."

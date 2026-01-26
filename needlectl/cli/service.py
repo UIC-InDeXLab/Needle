@@ -116,8 +116,15 @@ class ServiceManager:
         # Use provided working directory or default to needle_home
         cwd = working_dir if working_dir else self.needle_home
         
-        # Prepare environment variables
+        # Prepare environment variables - clean PyInstaller env vars to avoid library conflicts
         env = os.environ.copy()
+        
+        # Remove PyInstaller-specific environment variables that can cause library conflicts
+        pyinstaller_vars = ['_MEIPASS', '_MEIPASS2', 'LD_LIBRARY_PATH', 'DYLD_LIBRARY_PATH', 
+                           'DYLD_FRAMEWORK_PATH', 'TCL_LIBRARY', 'TK_LIBRARY']
+        for var in pyinstaller_vars:
+            env.pop(var, None)
+        
         if env_vars:
             env.update(env_vars)
         

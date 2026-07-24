@@ -6,7 +6,15 @@ from core import embedder_manager
 
 class EmbedderService:
     def __init__(self):
-        self.embedders = embedder_manager.get_image_embedders()
+        # Do NOT cache the embedders dict here: ``embedder_manager.load()``
+        # reassigns its internal dict when models finish loading, so a value
+        # captured at construction time can become permanently stale (empty).
+        # Always read the current embedders live via the ``embedders`` property.
+        pass
+
+    @property
+    def embedders(self):
+        return embedder_manager.get_image_embedders()
 
     def compute_batch_embeddings(self, image_paths: List[str]) -> Dict[str, Dict[str, List[float]]]:
         # Load images from disk
@@ -37,15 +45,20 @@ class EmbedderService:
                 # Stack the processed images into a batch tensor
                 batch = torch.stack(processed, dim=0).to(embedder.device)
 
-                with torch.no_grad():
+                with torch.inference_mode():
                     # Forward pass: DataParallel will split the batch among GPUs if applicable
                     output = embedder.model(batch)
                 # Assume output shape is [batch_size, embedding_dim]
-                embeddings_np = output.cpu().numpy()
+                embeddings_np = output.detach().cpu().numpy()
                 # Convert each sample's embedding to a list
                 embeddings_list = embeddings_np.tolist()
                 batch_embeddings[embedder_name] = embeddings_list
                 logger.debug(f"Computed batch embeddings for embedder {embedder_name}")
+                # Release activations/inputs promptly so peak memory stays bounded
+                # when several large models run over the same batch.
+                del batch, output, embeddings_np, processed
+                if embedder.device.type == "cuda":
+                    torch.cuda.empty_cache()
             except Exception as e:
                 logger.error(f"Error processing batch with embedder {embedder_name}: {e}", exc_info=True)
                 batch_embeddings[embedder_name] = [None] * len(image_paths)

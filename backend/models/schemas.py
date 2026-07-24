@@ -107,6 +107,18 @@ class GeneratorInfo(BaseModel):
     name: str
     description: str
     required_params: List[GeneratorRequirement]
+    available: bool = True
+    requires_credentials: bool = False
+    credentials_set: bool = True
+
+
+class SetCredentialsRequest(BaseModel):
+    params: Dict[str, str] = Field(..., description="Credential key/value pairs (e.g. api_key)")
+
+
+class ConfigureSetupRequest(BaseModel):
+    profile: str = Field(..., description="Embedder profile: fast | balanced | accurate")
+    use_gpu: bool = Field(False, description="Enable GPU (CUDA/MPS) for embeddings and generation")
 
 
 class QueryLogEntry(BaseModel):

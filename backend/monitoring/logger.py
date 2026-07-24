@@ -8,33 +8,43 @@ class NeedleLogger:
     def __init__(self):
         self._logger = self._setup_logger()
 
+    @staticmethod
+    def _resolve_log_dir():
+        # Write logs to a writable per-user location, never the (possibly
+        # read-only) install/working directory.
+        base = os.environ.get("NEEDLE_DATA_DIR")
+        if not base:
+            base = os.path.join(os.path.expanduser("~"), ".needle", "data")
+        return os.path.join(base, "logs")
+
     def _setup_logger(self):
-        log_directory = 'logs'
-        os.makedirs(log_directory, exist_ok=True)
-
-        # Use a fixed logger name for the entire application
         logger_name = "Needle Logger"
-        # Create one log file per app run using a timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_filename = os.path.join(log_directory, f"app_{timestamp}.log")
-
         logger = logging.getLogger(logger_name)
-        if not logger.handlers:
-            logger.setLevel(logging.DEBUG)
+        if logger.handlers:
+            return logger
 
+        logger.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s - %(filename)s - %(levelname)s - %(message)s')
+
+        # Console logging always works.
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.DEBUG)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+
+        # File logging is best-effort; skip it if the directory isn't writable.
+        try:
+            log_directory = self._resolve_log_dir()
+            os.makedirs(log_directory, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_filename = os.path.join(log_directory, f"app_{timestamp}.log")
             file_handler = logging.FileHandler(log_filename)
             file_handler.setLevel(logging.DEBUG)
-
-            console_handler = logging.StreamHandler()
-            console_handler.setLevel(logging.DEBUG)
-
-            # Include the caller's filename in each log record via %(filename)s
-            formatter = logging.Formatter('%(asctime)s - %(filename)s - %(levelname)s - %(message)s')
             file_handler.setFormatter(formatter)
-            console_handler.setFormatter(formatter)
-
             logger.addHandler(file_handler)
-            logger.addHandler(console_handler)
+        except OSError:
+            pass
+
         return logger
 
     def __getattr__(self, name):

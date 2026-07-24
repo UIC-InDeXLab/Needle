@@ -10,38 +10,41 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pymilvus import Collection
 
-from core import embedder_manager, image_generator, query_manager
+from core import embedder_manager, image_generator, query_manager, setup_manager
 from core.query import Query
+from indexing.repositories.repositories import VectorRepository
 from models.models import SessionLocal, Directory, Image
-from initialize import initialize
 from models.schemas import AddDirectoryRequest, AddDirectoryResponse, HealthCheckResponse, DirectoryListResponse, \
     DirectoryModel, DirectoryDetailResponse, RemoveDirectoryResponse, RemoveDirectoryRequest, CreateQueryRequest, \
     CreateQueryResponse, GeneratorInfo, SearchLogsResponse, QueryLogEntry, \
     ServiceStatusResponse, ServiceLogResponse, SearchResponse, SearchRequest, UpdateDirectoryResponse, \
     UpdateDirectoryRequest, GeneratePoolRequest, GeneratePoolResponse, GuideImageData, EmbeddingData, \
-    ComputeEmbeddingsRequest, ComputeEmbeddingsResponse, ImageEmbeddingsResponse
+    ComputeEmbeddingsRequest, ComputeEmbeddingsResponse, ImageEmbeddingsResponse, SetCredentialsRequest, \
+    ConfigureSetupRequest
 from indexing import image_indexing_service
 from utils import aggregate_rankings, pil_image_to_base64, Timer
 from version import VERSION as BACKEND_VERSION
 
-origins = ["http://localhost:3000", "http://127.0.0.1:3000", os.getenv("PUBLIC_IP", "http://127.0.0.1:3000")]
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    initialize()
+    # Keep first launch lightweight: do not load any models here. The setup manager
+    # only performs heavy initialization if the user has already completed onboarding.
+    setup_manager.startup()
     yield
     # directory_watcher.finalize()
 
 
 app = FastAPI(lifespan=lifespan)
 
+# This backend only listens on localhost and is the private companion of the
+# desktop app (whose webview origin is e.g. http://tauri.localhost) or the CLI.
+# Allow any origin so the bundled UI can read responses; no credentials are used.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -55,6 +58,35 @@ async def health_check():
     return HealthCheckResponse(status="running")
 
 
+@app.get("/setup/options")
+async def setup_options():
+    """Available profiles and whether a usable GPU is present (for onboarding)."""
+    return setup_manager.options()
+
+
+@app.get("/setup/status")
+async def setup_status():
+    """Current setup/initialization state (for the welcome screen + progress)."""
+    return setup_manager.status()
+
+
+@app.post("/setup/configure")
+async def setup_configure(request: ConfigureSetupRequest):
+    """Apply the chosen profile + GPU option and begin background initialization."""
+    try:
+        return setup_manager.configure(request.profile, request.use_gpu)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+def _require_ready():
+    if not setup_manager.is_ready():
+        status = setup_manager.status()
+        detail = "Needle is not ready yet. Complete setup first." if not status["configured"] \
+            else f"Needle is initializing ({status['state']}). Please wait."
+        raise HTTPException(status_code=503, detail=detail)
+
+
 @app.get("/version")
 async def get_version():
     return {"version": BACKEND_VERSION}
@@ -62,6 +94,7 @@ async def get_version():
 
 @app.post("/directory", response_model=AddDirectoryResponse)
 async def add_directory(request: AddDirectoryRequest):
+    _require_ready()
     try:
         did = image_indexing_service.add_directory(request.path)
         return AddDirectoryResponse(status="directory added", id=did)
@@ -174,6 +207,7 @@ async def search(
         request: SearchRequest,
         request_obj: Request = None
 ):
+    _require_ready()
     timings = {}
     total_timer_start = time.perf_counter()
     query_object = query_manager.get_query(request.qid)
@@ -186,6 +220,7 @@ async def search(
     if not query_object.generated_images:
         # Add the query text to each engine config
         generation_request = request.generation_config.model_dump()
+        generation_request["prompt"] = query
         for engine in generation_request["engines"]:
             engine["prompt"] = query
 
@@ -212,38 +247,31 @@ async def search(
             preview_url=str(request_obj.url_for("gallery", qid=request.qid))
         )
 
-    # Create an expression for Milvus search
-    directory_expr = f"directory_id in {indexed_directory_ids}"
+    # Restrict search to indexed & enabled directories
+    directory_ids = indexed_directory_ids
 
     results = {}
     ranking_weights = []
     verbose = {}
+    vector_repo = VectorRepository()
     for embedder_name, embedder in embedders.items():
-        collection_name = f"{embedder_name}"
-        collection = Collection(name=collection_name)
-        collection.load()
         verbose[embedder_name] = defaultdict(list)
 
         for i, (image, engine_name) in enumerate(generated_images):
             with Timer(f"embedding_{embedder_name}", timings, aggregate=True):
                 query_embedding = embedder.embed(image)
 
-            search_params = {
-                "metric_type": "COSINE"
-            }
-
             with Timer(f"retrieval_{embedder_name}", timings, aggregate=True):
-                search_results = collection.search(
-                    data=[query_embedding],
-                    anns_field="embedding",
-                    param=search_params,
+                hit_paths = vector_repo.search(
+                    embedder_name,
+                    query_embedding,
                     limit=request.num_images_to_retrieve,
-                    expr=directory_expr
+                    directory_ids=directory_ids,
                 )
 
-            results[f"{embedder_name}_{i}"] = [hit.id for hit in search_results[0]]
+            results[f"{embedder_name}_{i}"] = hit_paths
 
-            verbose[embedder_name][engine_name].append([hit.id for hit in search_results[0]])
+            verbose[embedder_name][engine_name].append(hit_paths)
 
         rankings = [ranking for e, ranking in results.items() if e.startswith(embedder_name)]
         embedder_top_results = aggregate_rankings(rankings, weights=[1] * len(generated_images),
@@ -289,6 +317,55 @@ async def get_file(file_path: str):
 @app.get("/generator", response_model=List[GeneratorInfo])
 async def get_generators():
     return image_generator.get_available_engines()
+
+
+@app.post("/generator/{name}/credentials")
+async def set_generator_credentials(name: str, request: SetCredentialsRequest):
+    try:
+        image_generator.set_credentials(name, request.params)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"status": "credentials saved", "engine": name}
+
+
+@app.get("/generator/{name}/capabilities")
+async def get_generator_capabilities(name: str, base_url: str | None = None):
+    """Proxy the connected companion service's ``/capabilities`` (avoids browser
+    CORS by fetching server-side). Returns {} when the service is unreachable."""
+    params = {"base_url": base_url} if base_url else {}
+    try:
+        return image_generator.get_capabilities(name, params)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/generator/{name}/test")
+async def test_generator(name: str, request: SetCredentialsRequest):
+    """Generate a single small test image with one engine. Also warms the model
+    so the first real search is fast. Returns the image as a data URL + timing."""
+    params = request.params or {}
+    prompt = params.pop("prompt", None) or "a scenic landscape, high detail"
+    gen_config = {
+        "engines": [{"name": name, "params": params, "prompt": prompt}],
+        "num_images": 1,
+        "image_size": "SMALL",
+        "num_engines_to_use": 1,
+        "use_fallback": False,
+        "prompt": prompt,
+    }
+    started = time.perf_counter()
+    try:
+        images = image_generator.generate(gen_config)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    if not images:
+        raise HTTPException(status_code=502, detail="Engine returned no image")
+    image, engine_name = images[0]
+    return {
+        "engine": engine_name,
+        "elapsed_ms": int((time.perf_counter() - started) * 1000),
+        "image": pil_image_to_base64(image),
+    }
 
 
 @app.get("/search/logs", response_model=SearchLogsResponse)

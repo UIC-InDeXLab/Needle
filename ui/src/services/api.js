@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -36,6 +36,12 @@ api.interceptors.response.use(
 // Health Check
 export const getHealth = () => api.get('/health');
 
+// Setup / onboarding
+export const getSetupStatus = () => api.get('/setup/status');
+export const getSetupOptions = () => api.get('/setup/options');
+export const configureSetup = (profile, useGpu) =>
+  api.post('/setup/configure', { profile, use_gpu: useGpu });
+
 // Service Status
 export const getServiceStatus = () => api.get('/service/status');
 
@@ -52,31 +58,16 @@ export const getSearchLogs = () => api.get('/search/logs');
 
 // Search
 export const search = (queryId, config) => {
-  // Get user's generator configuration
-  const generatorConfig = getGeneratorConfig();
-  const enabledGenerators = generatorConfig.filter(g => g.enabled && g.activated);
-  
-  // Build engines array from user's configuration
-  const engines = enabledGenerators.map(generator => {
-    const engine = {
-      name: generator.name,
-      params: {}
-    };
-    
-    // Add required parameters if they exist
-    if (generator.params) {
-      Object.keys(generator.params).forEach(key => {
-        engine.params[key] = generator.params[key];
-      });
-    }
-    
-    // Add default params for specific generators
-    if (generator.name === "SDTurbo") {
-      engine.params.additionalProp1 = {};
-    }
-    
-    return engine;
-  });
+  // Ordered, enabled generators define the fallback chain (first = highest
+  // priority). When fallback is off, only the first enabled generator is used.
+  const fallbackOn = getGeneratorFallback();
+  const ordered = getGeneratorConfig().filter((g) => g.enabled);
+  const active = fallbackOn ? ordered : ordered.slice(0, 1);
+
+  const engines = active.map((generator) => ({
+    name: generator.name,
+    params: { ...(generator.params || {}) },
+  }));
 
   const searchRequest = {
     qid: queryId,
@@ -85,17 +76,29 @@ export const search = (queryId, config) => {
     verbose: config.verbose || false,
     generation_config: {
       engines: engines,
-      num_engines_to_use: config.num_engines_to_use || Math.min(engines.length, 1),
+      num_engines_to_use: 1,
       num_images: config.num_images_to_generate || 1,
       image_size: config.generated_image_size || "SMALL",
-      use_fallback: config.use_fallback !== false
-    }
+      use_fallback: fallbackOn,
+    },
   };
   return api.post('/search', searchRequest);
 };
 
 // Generators
 export const getGenerators = () => api.get('/generator');
+// Discover the models/limits a connected Needle Generator service advertises.
+// Returns {} when the service is unreachable. base_url is optional (falls back
+// to saved credentials on the backend).
+export const getGeneratorCapabilities = (name, baseUrl) =>
+  api.get(`/generator/${name}/capabilities`, { params: baseUrl ? { base_url: baseUrl } : {} });
+// Persist API credentials for an engine (e.g. { api_key: '...' }) on the backend.
+export const setGeneratorCredentials = (name, params) =>
+  api.post(`/generator/${name}/credentials`, { params });
+// Generate a single test image with an engine (also warms the model). Longer
+// timeout since generation can take a while, especially on first (cold) run.
+export const testGenerator = (name, params, prompt) =>
+  api.post(`/generator/${name}/test`, { params: { ...params, ...(prompt ? { prompt } : {}) } }, { timeout: 180000 });
 export const getGeneratorConfig = () => {
   // Get from localStorage or return default
   const config = localStorage.getItem('generatorConfig');
@@ -120,6 +123,16 @@ export const reorderGenerators = (newOrder) => {
   ).filter(Boolean);
   saveGeneratorConfig(reorderedConfig);
   return reorderedConfig;
+};
+// Global fallback flag: when on, failed generators fall through to the next one
+// in the ordered list; when off, only the first enabled generator is used.
+export const getGeneratorFallback = () => {
+  const v = localStorage.getItem('generatorFallback');
+  return v === null ? true : v === 'true';
+};
+export const setGeneratorFallback = (on) => {
+  localStorage.setItem('generatorFallback', on ? 'true' : 'false');
+  return on;
 };
 
 // File Access

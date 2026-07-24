@@ -6,7 +6,7 @@ from watchdog.events import FileSystemEventHandler
 
 from models.models import SessionLocal, Image
 from indexing.queue_manager.index_queue_manager import IndexQueueManager
-from indexing.repositories.repositories import ImageRepository, MilvusRepository
+from indexing.repositories.repositories import ImageRepository, VectorRepository
 
 
 class ImageChangeHandler(FileSystemEventHandler):
@@ -65,7 +65,7 @@ class ImageChangeHandler(FileSystemEventHandler):
             image = image_repo.get_by_path(path)
             if image:
                 for embedder_name in self.embedders.keys():
-                    MilvusRepository().delete_entries(embedder_name, f"image_path == '{path}'")
+                    VectorRepository().delete_by_path(embedder_name, path)
                 image_repo.delete(image)
                 logger.info(f"Deleted image from database: {path}")
         except Exception as e:
@@ -83,8 +83,7 @@ class ImageChangeHandler(FileSystemEventHandler):
                 logger.info(f"Re-indexing modified image: {path}")
                 image.is_indexed = False
                 for embedder_name in self.embedders.keys():
-                    MilvusRepository().delete_entries(embedder_name,
-                                                      f"directory_id == {self.directory_id} && image_path == '{path}'")
+                    VectorRepository().delete_by_path(embedder_name, path)
                 session.commit()
                 IndexQueueManager.instance().add_to_queue(self.directory_id, self.directory_path, priority=0)
         except Exception as e:
@@ -100,22 +99,12 @@ class ImageChangeHandler(FileSystemEventHandler):
             image = image_repo.get_by_path(src_path)
             if image:
                 for embedder_name in self.embedders.keys():
-                    milvus_repo = MilvusRepository()
-                    # Query current embeddings
-                    results = milvus_repo.query_entries(
-                        embedder_name,
-                        f"directory_id == {self.directory_id} and image_path == '{src_path}'",
-                        ["embedding"]
-                    )
-                    embeddings = []
-                    # Collect embeddings from query results
-                    for res in results:
-                        for item in res:
-                            embeddings.append(item["embedding"])
-                    milvus_repo.delete_entries(embedder_name,
-                                               f"directory_id == {self.directory_id} and image_path == '{src_path}'")
+                    vector_repo = VectorRepository()
+                    # Query current embeddings for the source path
+                    embeddings = vector_repo.get_embeddings_by_path(embedder_name, src_path)
+                    vector_repo.delete_by_path(embedder_name, src_path)
                     for emb in embeddings:
-                        milvus_repo.insert_entries(embedder_name, [{
+                        vector_repo.insert_entries(embedder_name, [{
                             "directory_id": self.directory_id,
                             "image_path": dest_path,
                             "embedding": emb

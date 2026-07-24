@@ -9,7 +9,7 @@ from models.models import SessionLocal, Image
 from indexing.consistency.consistency_checker import ConsistencyChecker
 from indexing.watchers.file_watcher_service import FileWatcherService
 from indexing.queue_manager.index_queue_manager import IndexQueueManager
-from indexing.repositories.repositories import DirectoryRepository, ImageRepository, MilvusRepository
+from indexing.repositories.repositories import DirectoryRepository, ImageRepository, VectorRepository
 from settings import settings
 
 
@@ -19,7 +19,11 @@ class ImageIndexingService:
         self.index_queue_manager = IndexQueueManager.instance()
         self.file_watcher_service = FileWatcherService.instance()
         self.consistency_checker = ConsistencyChecker(settings.directory.consistency_check_interval)
-        self.embedders = embedder_manager.get_image_embedders()
+
+    @property
+    def embedders(self):
+        # Resolved dynamically because models are loaded lazily after onboarding.
+        return embedder_manager.get_image_embedders()
 
     def add_directory(self, path: str) -> int:
         logger.info(f"Attempting to add directory: {path}")
@@ -59,9 +63,9 @@ class ImageIndexingService:
             directory_repo = DirectoryRepository(session)
             directory = directory_repo.get_by_path(path)
             if directory:
-                # Delete Milvus entries for all embedders
+                # Delete vector entries for all embedders
                 for embedder_name in self.embedders.keys():
-                    MilvusRepository().delete_entries(embedder_name, f"directory_id == {directory.id}")
+                    VectorRepository().delete_by_directory(embedder_name, directory.id)
                 session.query(Image).filter(Image.directory_id == directory.id).delete()
                 directory_repo.delete(directory)
                 session.commit()

@@ -21,6 +21,7 @@ class DirectoryIndexer:
             return
 
         batch_size = settings.directory.batch_size
+        indexed_any = False
         for i in range(0, total_images, batch_size):
             batch = unindexed_images[i:i + batch_size]
             batch_paths = [img.path for img in batch]
@@ -32,15 +33,24 @@ class DirectoryIndexer:
             # Accumulate Milvus entries for each embedder in this batch
             embedder_batches = {}
             for img in batch:
-                if img.path in embeddings:
-                    for embedder_name, emb in embeddings[img.path].items():
-                        embedder_batches.setdefault(embedder_name, []).append({
-                            "directory_id": directory_id,
-                            "image_path": img.path,
-                            "embedding": emb
-                        })
-                    # Mark the image as indexed in the DB
-                    img.is_indexed = True
+                # Only accept images for which at least one embedder produced a
+                # usable embedding. Without this guard an image could be marked
+                # indexed while no vector is stored (e.g. if embedders were not
+                # yet loaded), silently breaking search.
+                img_embeddings = embeddings.get(img.path) or {}
+                usable = {n: e for n, e in img_embeddings.items() if e is not None}
+                if not usable:
+                    logger.warning(f"No embeddings produced for '{img.path}'; leaving it unindexed")
+                    continue
+                for embedder_name, emb in usable.items():
+                    embedder_batches.setdefault(embedder_name, []).append({
+                        "directory_id": directory_id,
+                        "image_path": img.path,
+                        "embedding": emb
+                    })
+                # Mark the image as indexed in the DB
+                img.is_indexed = True
+                indexed_any = True
 
             # Insert all embeddings for each embedder in one batch call
             for embedder_name, entries in embedder_batches.items():
@@ -48,8 +58,14 @@ class DirectoryIndexer:
 
             session.commit()
 
-        # Mark the directory as fully indexed
-        directory = session.query(Directory).get(directory_id)
-        directory.is_indexed = True
-        session.commit()
-        logger.info(f"Completed indexing for directory {directory_path}")
+        # Mark the directory as fully indexed only if we actually stored vectors.
+        if indexed_any:
+            directory = session.query(Directory).get(directory_id)
+            directory.is_indexed = True
+            session.commit()
+            logger.info(f"Completed indexing for directory {directory_path}")
+        else:
+            logger.error(
+                f"Indexing produced no embeddings for '{directory_path}'; "
+                "directory left unindexed (are the embedder models loaded?)"
+            )

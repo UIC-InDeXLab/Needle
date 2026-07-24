@@ -18,48 +18,35 @@ Or if you have the repository cloned:
 
 By default, the uninstallation script removes:
 
-- **Needle installation directory** (`~/.needle`)
+- **The Needle desktop app** (`/Applications/Needle.app` on macOS; the `.deb`
+  package or `~/.local/bin/Needle.AppImage` on Linux)
 - **needlectl binary** (from `/usr/local/bin` or `~/.local/bin`)
-- **Virtual environments** for backend and ImageGeneratorsHub
-- **Service management scripts**
-- **Log files and PID files**
 
-## Optional Cleanup
-
-In interactive mode, you'll be prompted to optionally remove:
-
-- **Docker volumes** - Contains indexed data and images (not removed by default)
+Your indexed data at `~/.needle` is **kept by default**.
 
 ## Complete Cleanup
 
-To completely remove all Needle data including Docker volumes:
+To also remove all indexed data, vectors, saved credentials, and cached models
+(`~/.needle`), run with `--purge`:
 
 ```bash
-# Run uninstall script and choose to remove Docker volumes when prompted
-./scripts/uninstall.sh
-
-# Additionally, remove Docker images
-docker system prune -a
+./scripts/uninstall.sh --purge
 ```
 
 ## Manual Cleanup
 
-If the automatic uninstall fails (e.g., due to permission issues with Docker volumes), you can manually clean up:
+If you prefer to remove things by hand:
 
 ```bash
-# Stop any running services first
-needlectl service stop 2>/dev/null || true
+# Remove the app
+rm -rf /Applications/Needle.app            # macOS
+sudo dpkg -r needle                        # Linux (.deb)
+rm -f ~/.local/bin/Needle.AppImage         # Linux (AppImage)
 
-# Remove Docker containers and volumes
-docker compose -f ~/.needle/docker/docker-compose.infrastructure.yaml down -v 2>/dev/null || true
+# Remove the CLI
+sudo rm -f /usr/local/bin/needlectl ~/.local/bin/needlectl
 
-# Remove the installation directory (may need sudo for Docker volume files)
-sudo rm -rf ~/.needle
-
-# Remove needlectl binary
-sudo rm -f /usr/local/bin/needlectl
-rm -f ~/.local/bin/needlectl
-
-# Clean up Docker images (optional)
-docker system prune -a
+# Remove all user data (optional)
+rm -rf ~/.needle
 ```
+

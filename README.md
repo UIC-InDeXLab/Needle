@@ -58,34 +58,28 @@ Try Needle's capabilities with our interactive demo! Experience the complete wor
 
 ## ⚙️ Installation
 
-Needle uses a unified installation system that sets up two virtual environments (backend and image generator hub) with Docker infrastructure services.
+Needle is a self-contained desktop app for macOS and Linux. **No Docker,
+PostgreSQL, or Milvus required** — metadata (SQLite), vectors (LanceDB), and
+on-device image generation all run locally inside the app.
 
-### 🚀 One-Liner Installation (Recommended)
+### 🚀 Download an installer (Recommended)
 
-Install Needle with a single command - no cloning required:
+Grab the installer for your platform from the
+[releases page](https://github.com/UIC-InDeXLab/Needle/releases):
 
-```bash
-# Interactive installation (download first, then run)
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh -o install-needle.sh
-bash install-needle.sh
+- **macOS:** `Needle_x.y.z.dmg`
+- **Linux:** `Needle_x.y.z.deb` or `Needle_x.y.z.AppImage`
 
-# Or one-liner with specific configuration (non-interactive)
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash -s fast
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash -s balanced
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash -s accurate
+### 🛠️ Build & install from source
 
-# Or one-liner with default configuration (fast)
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash
-```
-
-### 🛠️ Manual Installation
+Requires Python 3.12+, Node.js 18+, and the Rust toolchain.
 
 ```bash
 # Clone the repository
 git clone https://github.com/UIC-InDeXLab/Needle.git
 cd Needle
 
-# Run the unified installer
+# Build the app + CLI and install them (choose: fast | balanced | accurate)
 chmod +x scripts/install.sh
 ./scripts/install.sh
 
@@ -161,12 +155,12 @@ make dev
 ```
 
 **Architecture:**
-- **Backend**: Python virtual environment with direct GPU access
-- **Image Generator Hub**: Python virtual environment
-- **Infrastructure**: Docker containers (PostgreSQL, Milvus, MinIO, etcd)
-- **Cross-Platform**: Works on Linux and macOS with automatic GPU detection
-
-For detailed setup instructions, see [README_UNIFIED.md](README_UNIFIED.md).
+- **Desktop shell**: Tauri (Rust) wrapping the React UI
+- **Backend**: Python (FastAPI) bundled as a sidecar, auto-started by the app
+- **Metadata**: SQLite (embedded)
+- **Vectors**: LanceDB (embedded, on-disk)
+- **Image generation**: on-device (SD-Turbo) with optional API engines (OpenAI, Stability)
+- **Cross-Platform**: Linux and macOS with automatic GPU/MPS detection
 
 ## 🏭 Production
 

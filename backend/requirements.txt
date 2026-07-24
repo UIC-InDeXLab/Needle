@@ -2,22 +2,21 @@ fastapi
 uvicorn
 python-dotenv
 
-pymilvus
+lancedb
+pyarrow
 watchdog
 
 torch
+torchvision
 pillow
 requests
-transformers
 timm
-scikit-learn
 websockets
 asyncio
 
 pydantic-settings
 typer
 sqlalchemy
-psycopg2-binary
 
 pyyaml
 

@@ -1,291 +1,117 @@
 # cli/service.py
 
 import os
+import shutil
 import subprocess
 import time
 import typer
 from pathlib import Path
 from typing import Optional
 
+import requests
+
 from cli.utils import print_result
 from config.config_manager import EnvConfigManager
-from docker.docker_compose_manager import DockerComposeManager
 
-service_app = typer.Typer(help="Manage Needle services (Virtual Environment + Docker Infrastructure).")
+service_app = typer.Typer(help="Manage the local Needle backend (embedded, no Docker).")
 
 
 class ServiceManager:
-    """Manages both virtual environment services and Docker infrastructure services."""
-    
+    """Manages the local Needle backend (embedded SQLite + LanceDB, no Docker).
+
+    In the desktop build the app auto-starts the backend; these commands let CLI
+    users launch/attach to it and check health.
+    """
+
+    API_URL = "http://127.0.0.1:8000"
+    BACKEND_PROC_NAME = "needle-backend"
+
     def __init__(self, needle_home: str):
         self.needle_home = Path(needle_home)
-        self.backend_pid_file = self.needle_home / "logs" / "backend.pid"
-        self.image_gen_pid_file = self.needle_home / "logs" / "image-generator-hub.pid"
-        self.docker_manager = DockerComposeManager()
-    
-    def _load_environment_vars(self) -> dict:
-        """Load environment variables from template or use defaults."""
-        env_vars = {
-            # Database Configuration
-            "POSTGRES__USER": "myuser",
-            "POSTGRES__PASSWORD": "mypassword", 
-            "POSTGRES__DB": "mydb",
-            "POSTGRES__HOST": "localhost",
-            "POSTGRES__PORT": "5432",
-            
-            # Vector Database Configuration
-            "MILVUS__HOST": "localhost",
-            "MILVUS__PORT": "19530",
-            
-            # Service Configuration
-            "SERVICE__USE_CUDA": "true",  # Will be detected at runtime
-            "SERVICE__CONFIG_DIR_PATH": str(self.needle_home / "configs"),
-            
-            # Image Generator Configuration
-            "GENERATOR__HOST": "localhost",
-            "GENERATOR__PORT": "8010",
-            
-            # Directory Indexing Configuration
-            "DIRECTORY__NUM_WATCHER_WORKERS": "4",
-            "DIRECTORY__BATCH_SIZE": "50",
-            "DIRECTORY__RECURSIVE_INDEXING": "true",
-            "DIRECTORY__CONSISTENCY_CHECK_INTERVAL": "1800",
-            
-            # Query Configuration
-            "QUERY__NUM_IMAGES_TO_RETRIEVE": "10",
-            "QUERY__NUM_IMAGES_TO_GENERATE": "1",
-            "QUERY__GENERATED_IMAGE_SIZE": "SMALL",
-            "QUERY__NUM_ENGINES_TO_USE": "1",
-            "QUERY__USE_FALLBACK": "true",
-            "QUERY__INCLUDE_BASE_IMAGES_IN_PREVIEW": "false",
-        }
-        
-        # Try to load from template if it exists
-        env_template = self.needle_home / "scripts" / "env.template"
-        if env_template.exists():
-            try:
-                with open(env_template, 'r') as f:
-                    for line in f:
-                        line = line.strip()
-                        if line and not line.startswith('#') and '=' in line:
-                            key, value = line.split('=', 1)
-                            # Replace template variables
-                            value = value.replace('{{HAS_GPU}}', 'true')
-                            value = value.replace('{{NEEDLE_DIR}}', str(self.needle_home))
-                            env_vars[key] = value
-            except Exception as e:
-                typer.echo(f"Warning: Could not load environment template: {e}")
-        
-        return env_vars
 
-    def _is_service_running(self, pid_file: Path) -> bool:
-        """Check if a service is running based on PID file."""
-        if not pid_file.exists():
-            return False
-        
+    def _is_backend_healthy(self) -> bool:
         try:
-            with open(pid_file, 'r') as f:
-                pid = int(f.read().strip())
-            
-            # Check if process is still running
-            os.kill(pid, 0)
-            return True
-        except (OSError, ValueError, FileNotFoundError):
+            r = requests.get(f"{self.API_URL}/health", timeout=3)
+            return r.ok and r.json().get("status") == "running"
+        except requests.RequestException:
             return False
-    
-    def _get_service_pid(self, pid_file: Path) -> Optional[int]:
-        """Get the PID of a service if it's running."""
-        if not self._is_service_running(pid_file):
-            return None
-        
-        try:
-            with open(pid_file, 'r') as f:
-                return int(f.read().strip())
-        except (OSError, ValueError, FileNotFoundError):
-            return None
-    
-    def _start_virtual_env_service(self, service_name: str, command: list, pid_file: Path, log_file: Path, working_dir: Path = None, env_vars: dict = None):
-        """Start a virtual environment service."""
-        if self._is_service_running(pid_file):
-            typer.echo(f"{service_name} is already running (PID: {self._get_service_pid(pid_file)})")
-            return True
-        
-        # Ensure logs directory exists
-        log_file.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Use provided working directory or default to needle_home
-        cwd = working_dir if working_dir else self.needle_home
-        
-        # Prepare environment variables - clean PyInstaller env vars to avoid library conflicts
-        env = os.environ.copy()
-        
-        # Remove PyInstaller-specific environment variables that can cause library conflicts
-        pyinstaller_vars = ['_MEIPASS', '_MEIPASS2', 'LD_LIBRARY_PATH', 'DYLD_LIBRARY_PATH', 
-                           'DYLD_FRAMEWORK_PATH', 'TCL_LIBRARY', 'TK_LIBRARY']
-        for var in pyinstaller_vars:
-            env.pop(var, None)
-        
-        if env_vars:
-            env.update(env_vars)
-        
-        # Start service in background
-        with open(log_file, 'w') as log_f:
-            process = subprocess.Popen(
-                command,
-                stdout=log_f,
-                stderr=subprocess.STDOUT,
-                cwd=cwd,
-                env=env
-            )
-        
-        # Save PID
-        with open(pid_file, 'w') as f:
-            f.write(str(process.pid))
-        
-        typer.echo(f"{service_name} started (PID: {process.pid})")
-        return True
-    
-    def _stop_virtual_env_service(self, service_name: str, pid_file: Path):
-        """Stop a virtual environment service."""
-        if not self._is_service_running(pid_file):
-            typer.echo(f"{service_name} is not running")
-            return True
-        
-        pid = self._get_service_pid(pid_file)
-        if pid:
-            try:
-                os.kill(pid, 15)  # SIGTERM
-                time.sleep(2)
-                
-                # Check if still running
-                if self._is_service_running(pid_file):
-                    os.kill(pid, 9)  # SIGKILL
-                    time.sleep(1)
-                
-                typer.echo(f"{service_name} stopped")
-            except OSError:
-                typer.echo(f"Error stopping {service_name}")
-                return False
-            finally:
-                # Remove PID file
-                if pid_file.exists():
-                    pid_file.unlink()
-        
-        return True
-    
-    def start_services(self):
-        """Start all Needle services (infrastructure + virtual environment services)."""
-        typer.echo("Starting Needle services...")
-        
-        # Start infrastructure services (Docker)
-        typer.echo("Starting infrastructure services (PostgreSQL, Milvus, etc.)...")
-        self.docker_manager.start_containers()
-        
-        # Wait for infrastructure services to be ready
-        typer.echo("Waiting for infrastructure services to be ready...")
-        time.sleep(15)
-        
-        # Start image generator hub
-        image_gen_dir = self.needle_home / "ImageGeneratorsHub"
-        if image_gen_dir.exists() and (image_gen_dir / ".venv").exists():
-            typer.echo("Starting image-generator-hub...")
-            python_path = image_gen_dir / ".venv" / "bin" / "python"
-            command = [
-                str(python_path), "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8010"
-            ]
-            log_file = self.needle_home / "logs" / "image-generator-hub.log"
-            # Load environment variables for image generator
-            env_vars = self._load_environment_vars()
-            self._start_virtual_env_service("Image-generator-hub", command, self.image_gen_pid_file, log_file, image_gen_dir, env_vars)
-        else:
-            typer.echo("Warning: ImageGeneratorsHub not found or virtual environment not set up. Image generation will not be available.")
-        
-        # Start backend
-        typer.echo("Starting Needle backend...")
-        backend_dir = self.needle_home / "backend"
-        python_path = backend_dir / "venv" / "bin" / "python"
-        command = [
-            str(python_path), "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"
+
+    def _find_app_launcher(self):
+        candidates = [
+            Path.home() / ".local" / "bin" / "Needle.AppImage",
+            Path("/Applications/Needle.app/Contents/MacOS/Needle"),
         ]
-        log_file = self.needle_home / "logs" / "backend.log"
-        # Load environment variables
-        env_vars = self._load_environment_vars()
-        self._start_virtual_env_service("Backend", command, self.backend_pid_file, log_file, backend_dir, env_vars)
-        
-        typer.echo("All services started!")
-        typer.echo("🌐 Access Points:")
-        typer.echo("  - Backend API: http://localhost:8000")
-        typer.echo("  - Image Generator: http://localhost:8010")
-        typer.echo("  - API Documentation: http://localhost:8000/docs")
-    
+        for c in candidates:
+            if c.exists():
+                return [str(c)]
+        exe = shutil.which("needle") or shutil.which("Needle")
+        return [exe] if exe else None
+
+    def _backend_pids(self):
+        try:
+            out = subprocess.run(
+                ["pgrep", "-f", self.BACKEND_PROC_NAME],
+                capture_output=True, text=True
+            )
+            return [int(p) for p in out.stdout.split() if p.strip()]
+        except Exception:
+            return []
+
+    def start_services(self):
+        if self._is_backend_healthy():
+            typer.echo(f"Needle backend is already running at {self.API_URL}")
+            return
+        launcher = self._find_app_launcher()
+        if not launcher:
+            typer.echo("Could not find the Needle desktop app.")
+            typer.echo("Launch Needle from your applications menu, or install it first.")
+            return
+        typer.echo("Launching the Needle app...")
+        subprocess.Popen(
+            launcher, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True
+        )
+        typer.echo("Waiting for the backend to become ready...")
+        for _ in range(60):
+            if self._is_backend_healthy():
+                typer.echo(f"Backend is running at {self.API_URL}")
+                return
+            time.sleep(1)
+        typer.echo("Backend did not become ready in time. Check the app window.")
+
     def stop_services(self):
-        """Stop all Needle services."""
-        typer.echo("Stopping Needle services...")
-        
-        # Stop virtual environment services
-        self._stop_virtual_env_service("Backend", self.backend_pid_file)
-        self._stop_virtual_env_service("Image-generator-hub", self.image_gen_pid_file)
-        
-        # Stop infrastructure services
-        typer.echo("Stopping infrastructure services...")
-        self.docker_manager.stop_containers()
-        
-        typer.echo("All services stopped!")
-    
+        pids = self._backend_pids()
+        if not pids:
+            typer.echo("No running Needle backend found. If the app is open, quit it from its window.")
+            return
+        for pid in pids:
+            try:
+                os.kill(pid, 15)
+            except OSError:
+                pass
+        time.sleep(2)
+        for pid in self._backend_pids():
+            try:
+                os.kill(pid, 9)
+            except OSError:
+                pass
+        typer.echo("Stopped the Needle backend.")
+
     def restart_services(self):
-        """Restart all Needle services."""
-        typer.echo("Restarting Needle services...")
         self.stop_services()
         time.sleep(2)
         self.start_services()
-    
+
     def get_status(self):
-        """Get status of all services."""
-        status = {
-            "infrastructure": {},
-            "virtual_env_services": {}
-        }
-        
-        # Check infrastructure services
-        try:
-            result = subprocess.run(
-                ["docker", "ps", "--format", "json"],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            
-            containers = []
-            for line in result.stdout.strip().split('\n'):
-                if line:
-                    import json
-                    container = json.loads(line)
-                    containers.append({
-                        "name": container.get("Names", ""),
-                        "status": container.get("Status", ""),
-                        "ports": container.get("Ports", "")
-                    })
-            
-            status["infrastructure"]["containers"] = containers
-        except subprocess.CalledProcessError:
-            status["infrastructure"]["error"] = "Failed to get Docker container status"
-        
-        # Check virtual environment services
-        backend_running = self._is_service_running(self.backend_pid_file)
-        image_gen_running = self._is_service_running(self.image_gen_pid_file)
-        
-        status["virtual_env_services"] = {
-            "backend": {
-                "running": backend_running,
-                "pid": self._get_service_pid(self.backend_pid_file) if backend_running else None
-            },
-            "image_generator_hub": {
-                "running": image_gen_running,
-                "pid": self._get_service_pid(self.image_gen_pid_file) if image_gen_running else None
-            }
-        }
-        
-        return status
+        healthy = self._is_backend_healthy()
+        info = {"backend": {"running": healthy, "url": self.API_URL}}
+        if healthy:
+            try:
+                version = requests.get(f"{self.API_URL}/version", timeout=3).json().get("version")
+                info["backend"]["version"] = version
+            except requests.RequestException:
+                pass
+        return info
 
 
 class UpdateManager:
@@ -558,28 +384,16 @@ def service_status_cmd(ctx: typer.Context):
 
 
 @service_app.command("log")
-def service_log_cmd(ctx: typer.Context, service: str = typer.Argument("backend", help="Service to show logs for (backend, image-generator-hub, or infrastructure)")):
-    """Show logs for a specific service."""
-    needle_home = ctx.obj.get("needle_home", ".")
-    manager = ServiceManager(needle_home)
-    
-    if service == "infrastructure":
-        # Show Docker logs
-        from docker.docker_compose_manager import DockerComposeManager
-        docker_manager = DockerComposeManager()
-        docker_manager.log_services("postgres")
-        docker_manager.log_services("milvus-standalone")
-    else:
-        # Show virtual environment service logs
-        from pathlib import Path
-        log_file = Path(needle_home) / "logs" / f"{service}.log"
-        
-        if log_file.exists():
-            typer.echo(f"Showing logs for {service}:")
-            with open(log_file, 'r') as f:
-                typer.echo(f.read())
-        else:
-            typer.echo(f"Log file not found: {log_file}")
+def service_log_cmd(ctx: typer.Context, service: str = typer.Argument("backend", help="(kept for compatibility)")):
+    """Show where backend logs can be found.
+
+    In the desktop build the backend runs as a sidecar and its logs are streamed
+    to the Needle app process. When run from source, logs go to the terminal
+    running the backend.
+    """
+    typer.echo("The Needle backend runs inside the desktop app; its logs stream to the app process.")
+    typer.echo("If you started the backend from source (make backend), logs appear in that terminal.")
+    typer.echo("Application data (SQLite + LanceDB): ~/.needle/data")
 
 
 @service_app.command("update")

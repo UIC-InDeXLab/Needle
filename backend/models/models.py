@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String, Integer, ForeignKey, Boolean, Index
+from sqlalchemy import create_engine, Column, String, Integer, ForeignKey, Boolean, Index, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from settings import settings
@@ -6,7 +6,25 @@ from settings import settings
 
 Base = declarative_base()
 
-engine = create_engine(settings.postgres.url, echo=False)
+# Embedded SQLite metadata store (replaces PostgreSQL for the desktop app).
+# check_same_thread=False allows the indexing worker threads to share the engine;
+# WAL mode + a busy timeout are enabled below for safe concurrent read/write.
+engine = create_engine(
+    settings.storage.sqlite_url,
+    echo=False,
+    connect_args={"check_same_thread": False},
+)
+
+
+@event.listens_for(engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, _connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

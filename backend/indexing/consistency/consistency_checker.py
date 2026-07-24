@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from core import embedder_manager
 from models.models import SessionLocal, Directory, Image
-from indexing.repositories.repositories import DirectoryRepository, ImageRepository, MilvusRepository
+from indexing.repositories.repositories import DirectoryRepository, ImageRepository, VectorRepository
 from monitoring import logger
 from settings import settings
 
@@ -77,6 +77,6 @@ class ConsistencyChecker:
             image = image_repo.get_by_path(path)
             if image:
                 for embedder_name in embedder_manager.get_image_embedders().keys():
-                    MilvusRepository().delete_entries(embedder_name, f"image_path == '{path}'")
+                    VectorRepository().delete_by_path(embedder_name, path)
                 image_repo.delete(image)
         session.commit()

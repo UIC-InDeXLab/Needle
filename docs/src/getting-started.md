@@ -2,80 +2,53 @@
 
 ## Prerequisites
 
-Before installing Needle, ensure that you have the following prerequisites installed:
+Needle is a self-contained desktop application. **End users do not need Docker,
+PostgreSQL, or any external services** — everything (metadata via SQLite, vectors
+via LanceDB, and on-device image generation) runs locally inside the app.
 
-- **Docker:** Needle relies on Docker to containerize its infrastructure services.  
-  [Install Docker](https://docs.docker.com/get-docker/)
+To **build** Needle from source you need:
 
-- **Docker Compose:** This tool is required to orchestrate the multi-container setup.  
-  [Install Docker Compose](https://docs.docker.com/compose/install/)
+- **Python 3.12+** — for the bundled backend. [Install Python](https://www.python.org/downloads/)
+- **Node.js 18+** — for the UI. [Install Node.js](https://nodejs.org/)
+- **Rust toolchain** — for the Tauri desktop shell. [Install Rust](https://rustup.rs/)
 
-- **Python 3.8+:** Required for the backend and image generator services (Python 3.12+ recommended).  
-  [Install Python](https://www.python.org/downloads/)
-
-- **Git:** Required for cloning the repository and managing updates.  
-  [Install Git](https://git-scm.com/downloads)
-
-> **Warning:** Make sure your user account is added to the Docker group so you can run Docker commands (e.g., `docker ps`) without needing root privileges.
-
-> **Note:** Currently, Needle is supported on **Linux** and **macOS**.
+> **Note:** Needle is supported on **Linux** and **macOS**.
 
 ## Installation
 
-### Quick Install (Recommended)
+### Option A — Download an installer (recommended)
 
-Install Needle with a single command - no cloning required:
+Download the installer for your platform from the
+[releases page](https://github.com/UIC-InDeXLab/Needle/releases):
 
-```bash
-# Default installation (fast mode - recommended for getting started)
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash
+- **macOS:** `Needle_x.y.z.dmg` — open it and drag Needle to Applications.
+- **Linux:** `Needle_x.y.z.deb` (`sudo dpkg -i Needle_*.deb`) or `Needle_x.y.z.AppImage`
+  (`chmod +x` and run).
 
-# Or with a specific configuration mode
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash -s fast
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash -s balanced
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash -s accurate
-```
-
-This installs Needle to `~/.needle` and adds the `needlectl` command-line tool.
-
-### Configuration Options
-
-Choose your performance configuration:
-
-- **Fast (Default):** Single CLIP model, fastest indexing and retrieval - best for getting started quickly
-- **Balanced:** 4 models with balanced performance and accuracy
-- **Accurate:** 6 models with highest accuracy but slower performance
-
-> **Warning:** Once the configuration mode is set, it cannot be changed without uninstalling and reinstalling Needle, which will result in data loss.
-
-> **Note:** Needle automatically checks for GPU accessibility and will use the GPU if available to optimize performance.
-
-### What Gets Installed
-
-The installation process sets up:
-
-- **Virtual Environments:** Separate Python environments for backend and image generator services
-- **Docker Infrastructure:** PostgreSQL, Milvus, MinIO, and etcd services via Docker Compose
-- **Configuration Files:** Performance-optimized settings based on your chosen mode
-- **needlectl CLI:** Command-line interface for managing Needle (installed to `/usr/local/bin/needlectl`)
-
-## Starting the Needle Service
-
-Once installed, start the Needle service by running:
+### Option B — Build & install from source
 
 ```bash
-needlectl service start
+git clone https://github.com/UIC-InDeXLab/Needle.git
+cd Needle
+./scripts/install.sh            # or: fast | balanced | accurate
 ```
 
-This command will start all the necessary infrastructure services (PostgreSQL, Milvus, etc.) and the Needle backend.
+This builds the desktop app (with a bundled backend) and the `needlectl` CLI,
+then installs both. Your data is stored in `~/.needle/data`.
 
-To verify that everything is running as expected, check the service status:
+### Configuration modes
 
-```bash
-needlectl service status
-```
+Pass a mode to `install.sh` to control accuracy vs. speed:
 
-And confirm the installed version using:
+- **fast** (default): single model, fastest indexing/retrieval.
+- **balanced**: 4 models, balanced accuracy.
+- **accurate**: 6 models, best accuracy (slower).
+
+> **Note:** Needle automatically uses your GPU (CUDA) or Apple Silicon (MPS) when available.
+
+## Verifying the installation
+
+Confirm the CLI is installed:
 
 ```bash
 needlectl --version
@@ -83,11 +56,10 @@ needlectl --version
 
 ### Access Points
 
-After starting services, you can access:
+The app starts its backend automatically on launch. When running, you can access:
 
-- **Backend API:** http://localhost:8000
-- **API Documentation:** http://localhost:8000/docs
-- **Image Generator:** http://localhost:8010
+- **Backend API:** http://127.0.0.1:8000
+- **API Documentation:** http://127.0.0.1:8000/docs
 
 ## Managing Services
 

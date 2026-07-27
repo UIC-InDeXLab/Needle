@@ -13,7 +13,7 @@ from PIL import Image
 from core.generation.api_engines import OpenAIEngine, StabilityEngine
 from core.generation.base import GenerationEngine
 from core.generation.credentials import credentials_set, set_credentials
-from core.generation.remote_engine import RemoteGeneratorEngine
+from core.generation.local_engine import LocalDiffusionEngine
 from core.singleton import Singleton
 from monitoring import logger
 from settings import settings
@@ -22,10 +22,11 @@ from settings import settings
 @Singleton
 class ImageGenerator:
     def __init__(self):
-        # Registration order defines fallback preference. No model is bundled;
-        # generation is delegated to a remote service or an API provider.
+        # Registration order defines fallback preference. The built-in on-device
+        # engine comes first: it needs no credentials and no network once its
+        # weights are cached. The API engines are used when configured.
         engines: List[GenerationEngine] = [
-            RemoteGeneratorEngine(),
+            LocalDiffusionEngine(),
             OpenAIEngine(),
             StabilityEngine(),
         ]
@@ -57,6 +58,9 @@ class ImageGenerator:
         if engine_name not in self._engines:
             raise ValueError(f"Unknown engine '{engine_name}'")
         set_credentials(engine_name, params)
+
+    def local_engine(self) -> LocalDiffusionEngine:
+        return self._engines[LocalDiffusionEngine.name]
 
     # -- generation -------------------------------------------------------
     def _first_available(self) -> GenerationEngine:

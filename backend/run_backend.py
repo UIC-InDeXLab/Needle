@@ -14,11 +14,10 @@ import uvicorn
 # (diffusers) doesn't crash on ops not yet implemented in the Metal backend.
 os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 
-# Force huggingface_hub's classic HTTP download path. The Xet backend streams
-# through its own reporter and bypasses tqdm, so byte-level download progress
-# would never surface on the onboarding screen. This must be set before
-# huggingface_hub is imported (it is read into a module constant at import).
-os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+# NOTE: the Xet transfer backend is deliberately left enabled. It is roughly 4x
+# faster than the classic HTTP path (measured ~53 MB/s vs ~14 MB/s), and
+# core.download_progress hooks its progress reporter, so the onboarding screen
+# still gets byte-level progress.
 
 # Let CPU inference use all cores. Frozen apps / some BLAS backends otherwise
 # default to a single thread, making embedding (search + indexing) very slow.

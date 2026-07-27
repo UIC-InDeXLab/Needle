@@ -1,17 +1,27 @@
+import base64
 import os
+import re
+import threading
 import time
 
 from collections import defaultdict
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import List
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from core import embedder_manager, image_generator, query_manager, setup_manager
+from core.generation.local_engine import (
+    DEFAULT_MODEL as LOCAL_DEFAULT_MODEL,
+    MODELS as LOCAL_MODELS,
+    is_downloaded as is_model_downloaded,
+)
 from core.query import Query
 from indexing.repositories.repositories import VectorRepository
 from models.models import SessionLocal, Directory, Image
@@ -21,8 +31,9 @@ from models.schemas import AddDirectoryRequest, AddDirectoryResponse, HealthChec
     ServiceStatusResponse, ServiceLogResponse, SearchResponse, SearchRequest, UpdateDirectoryResponse, \
     UpdateDirectoryRequest, GeneratePoolRequest, GeneratePoolResponse, GuideImageData, EmbeddingData, \
     ComputeEmbeddingsRequest, ComputeEmbeddingsResponse, ImageEmbeddingsResponse, SetCredentialsRequest, \
-    ConfigureSetupRequest
+    ConfigureSetupRequest, SetGpuRequest, GenerateImagesRequest, LoadModelRequest, SaveImageRequest
 from indexing import image_indexing_service
+from monitoring import logger
 from utils import aggregate_rankings, pil_image_to_base64, Timer
 from version import VERSION as BACKEND_VERSION
 
@@ -79,6 +90,16 @@ async def setup_configure(request: ConfigureSetupRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.post("/setup/gpu")
+async def setup_set_gpu(request: SetGpuRequest):
+    """Turn GPU acceleration on/off after onboarding and reload models onto the
+    new device. Weights are already cached, so this does not re-download."""
+    try:
+        return setup_manager.set_use_gpu(request.use_gpu)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 def _require_ready():
     if not setup_manager.is_ready():
         status = setup_manager.status()
@@ -93,7 +114,9 @@ async def get_version():
 
 
 @app.post("/directory", response_model=AddDirectoryResponse)
-async def add_directory(request: AddDirectoryRequest):
+# Declared sync on purpose: scanning a folder blocks, and FastAPI runs sync
+# handlers in a threadpool so the event loop stays responsive.
+def add_directory(request: AddDirectoryRequest):
     _require_ready()
     try:
         did = image_indexing_service.add_directory(request.path)
@@ -203,7 +226,11 @@ async def create_query(request: CreateQueryRequest):
 
 
 @app.post("/search", response_model=SearchResponse)
-async def search(
+# Declared sync on purpose. This runs image generation and embedding, which take
+# seconds and hold the GIL; as an ``async def`` it would block the event loop and
+# freeze every other request (status polling, directory listing, ...) until done.
+# FastAPI runs sync handlers in a threadpool instead.
+def search(
         request: SearchRequest,
         request_obj: Request = None
 ):
@@ -340,11 +367,24 @@ async def get_generator_capabilities(name: str, base_url: str | None = None):
 
 
 @app.post("/generator/{name}/test")
-async def test_generator(name: str, request: SetCredentialsRequest):
+# Sync on purpose: generation blocks for seconds. See the note on /search.
+def test_generator(name: str, request: SetCredentialsRequest):
     """Generate a single small test image with one engine. Also warms the model
     so the first real search is fast. Returns the image as a data URL + timing."""
     params = request.params or {}
     prompt = params.pop("prompt", None) or "a scenic landscape, high detail"
+
+    # Testing must not silently pull several GB of weights: the caller asked for
+    # a quick check, not a download. Downloading is an explicit action instead.
+    engine = image_generator.local_engine()
+    if name in (engine.name, *engine.aliases):
+        model_id = params.get("model") or LOCAL_DEFAULT_MODEL
+        if model_id in LOCAL_MODELS and not is_model_downloaded(model_id):
+            raise HTTPException(
+                status_code=409,
+                detail=f"{LOCAL_MODELS[model_id]['label']} is not downloaded yet. "
+                       "Download it first, then run the test.",
+            )
     gen_config = {
         "engines": [{"name": name, "params": params, "prompt": prompt}],
         "num_images": 1,
@@ -366,6 +406,105 @@ async def test_generator(name: str, request: SetCredentialsRequest):
         "elapsed_ms": int((time.perf_counter() - started) * 1000),
         "image": pil_image_to_base64(image),
     }
+
+
+# -- on-device generation ---------------------------------------------------
+
+@app.get("/generate/models")
+async def generate_models():
+    """Catalog of on-device models, which are already downloaded, and the
+    device generation would run on."""
+    engine = image_generator.local_engine()
+    return {
+        "available": engine.is_available(),
+        "error": engine.import_error(),
+        "device": engine.device(),
+        "default_model": LOCAL_DEFAULT_MODEL,
+        "loaded_model": engine.state().get("loaded_model"),
+        "models": [engine.model_card(m) for m in LOCAL_MODELS],
+    }
+
+
+@app.get("/generate/state")
+async def generate_state():
+    """Current download/load/generation progress for the on-device engine."""
+    return image_generator.local_engine().state()
+
+
+@app.post("/generate/load")
+async def generate_load(request: LoadModelRequest):
+    """Download (if needed) and load a model in the background so the UI can
+    show progress instead of blocking on the first generate call."""
+    engine = image_generator.local_engine()
+    if not engine.is_available():
+        raise HTTPException(status_code=503, detail="On-device generation is not available in this build")
+    threading.Thread(target=_load_model_quietly, args=(engine, request.model), daemon=True).start()
+    return engine.state()
+
+
+def _load_model_quietly(engine, model_id: str):
+    try:
+        engine.ensure_loaded(model_id)
+    except Exception as exc:
+        logger.error(f"Failed to load generation model '{model_id}': {exc}", exc_info=True)
+
+
+@app.post("/generate/images")
+async def generate_images(request: GenerateImagesRequest):
+    """Generate images on-device and return them as data URLs."""
+    engine = image_generator.local_engine()
+    if not engine.is_available():
+        raise HTTPException(status_code=503, detail="On-device generation is not available in this build")
+    if not request.prompt.strip():
+        raise HTTPException(status_code=400, detail="Prompt is required")
+
+    params = {
+        "model": request.model,
+        "width": request.width,
+        "height": request.height,
+        "steps": request.steps,
+        "seed": request.seed,
+    }
+    try:
+        images, meta = await run_in_threadpool(
+            engine.generate_detailed, request.prompt, request.num_images, request.size, params
+        )
+    except Exception as e:
+        logger.error(f"On-device generation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {
+        "images": [pil_image_to_base64(im) for im in images],
+        "prompt": request.prompt,
+        **meta,
+    }
+
+
+@app.post("/generate/save")
+async def generate_save(request: SaveImageRequest):
+    """Write a generated image into a user-chosen folder."""
+    directory = Path(request.directory).expanduser()
+    if not directory.is_dir():
+        raise HTTPException(status_code=400, detail="Destination folder does not exist")
+
+    # Keep only the basename so a crafted filename can't escape the chosen
+    # folder, and force the extension we actually write.
+    stem = Path(request.filename or "needle").name
+    stem = re.sub(r"[^A-Za-z0-9._-]", "_", stem).lstrip(".") or "needle"
+    stem = Path(stem).stem
+
+    target = directory / f"{stem}.png"
+    counter = 1
+    while target.exists():
+        target = directory / f"{stem}-{counter}.png"
+        counter += 1
+
+    payload = request.image.split(",", 1)[-1]
+    try:
+        target.write_bytes(base64.b64decode(payload))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not save image: {e}")
+    return {"path": str(target)}
 
 
 @app.get("/search/logs", response_model=SearchLogsResponse)

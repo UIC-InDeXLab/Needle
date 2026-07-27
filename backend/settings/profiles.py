@@ -8,9 +8,13 @@ the active ``embedders.json`` into the (writable) app data directory.
 PROFILES = {
     "fast": {
         "label": "Fast",
-        "description": "1–2 lightweight models. Fastest indexing and search, lowest memory.",
+        "description": "2 lightweight models. Fastest indexing and search, lowest memory.",
+        # DINOv2 rather than RegNetY-1280: the accurate profile below scores the
+        # two identically (0.8235), but DINOv2 is a 1.2GB download instead of
+        # 2.6GB and produces 1024-dim vectors instead of 7392, so indexing,
+        # search and storage are all substantially cheaper.
         "image_embedders": [
-            {"name": "regnet", "model_name": "regnety_1280.swag_ft_in1k", "weight": 0.5},
+            {"name": "dino", "model_name": "vit_large_patch14_reg4_dinov2.lvd142m", "weight": 0.5},
             {"name": "eva", "model_name": "eva02_large_patch14_448.mim_m38m_ft_in22k_in1k", "weight": 0.5},
         ],
     },

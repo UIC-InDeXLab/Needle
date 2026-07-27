@@ -9,7 +9,8 @@ const WelcomeScreen = ({ onReady }) => {
   const [phase, setPhase] = useState('connecting'); // connecting | choose | initializing | error
   const [options, setOptions] = useState(null);
   const [selectedProfile, setSelectedProfile] = useState('fast');
-  const [useGpu, setUseGpu] = useState(false);
+  // Opt in to the GPU by default; unchecked below if none is detected.
+  const [useGpu, setUseGpu] = useState(true);
   const [status, setStatus] = useState(null);
   const [error, setError] = useState(null);
   const pollRef = useRef(null);
@@ -40,6 +41,7 @@ const WelcomeScreen = ({ onReady }) => {
         if (cancelled) return;
         setOptions(opts.data);
         setSelectedProfile(opts.data.default_profile || 'fast');
+        setUseGpu(Boolean(opts.data.gpu_available));
         if (data.configured) { setPhase('initializing'); startPolling(); }
         else setPhase('choose');
       } catch {
@@ -157,7 +159,7 @@ const WelcomeScreen = ({ onReady }) => {
         <button onClick={start} className="btn btn-primary w-full py-3.5 text-base">
           Download models &amp; continue
         </button>
-        <p className="text-center text-xs text-ink-500 mt-3">You can change this later in settings.</p>
+        <p className="text-center text-xs text-ink-500 mt-3">You can change this later on the Status page.</p>
       </div>
     </div>
   );

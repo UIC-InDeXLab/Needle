@@ -8,14 +8,14 @@ export const isTauri = () =>
  * Open a native folder picker and return the selected absolute path,
  * or null if the user cancelled. Returns null when not running in Tauri.
  */
-export const pickDirectory = async () => {
+export const pickDirectory = async (title = 'Select a folder to index') => {
   if (!isTauri()) return null;
   try {
     const { open } = await import('@tauri-apps/plugin-dialog');
     const selected = await open({
       directory: true,
       multiple: false,
-      title: 'Select a folder to index',
+      title,
     });
     if (!selected) return null;
     return Array.isArray(selected) ? selected[0] : selected;

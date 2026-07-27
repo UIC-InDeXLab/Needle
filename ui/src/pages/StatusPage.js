@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   RefreshCw, CheckCircle2, XCircle,
-  FolderOpen, Sparkles, Search as SearchIcon,
+  FolderOpen, Sparkles, Search as SearchIcon, Cpu, Loader2,
 } from 'lucide-react';
-import { getHealth, getDirectories, getGenerators, getSearchLogs } from '../services/api';
+import { getHealth, getDirectories, getGenerators, getSearchLogs, getSetupStatus, setSetupGpu } from '../services/api';
 
 const StatCard = ({ icon: Icon, label, value, sub }) => (
   <div className="card !p-5">
@@ -22,13 +22,18 @@ const StatCard = ({ icon: Icon, label, value, sub }) => (
 
 const StatusPage = () => {
   const [data, setData] = useState({ health: null, directories: [], generators: [], logs: [] });
+  const [setup, setSetup] = useState(null);
+  const [gpuBusy, setGpuBusy] = useState(false);
+  const [gpuError, setGpuError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updated, setUpdated] = useState(null);
+  const gpuPollRef = useRef(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [h, d, g, l] = await Promise.allSettled([
+    const [h, d, g, l, s] = await Promise.allSettled([
       getHealth(), getDirectories(), getGenerators(), getSearchLogs().catch(() => ({ data: { queries: [] } })),
+      getSetupStatus(),
     ]);
     setData({
       health: h.status === 'fulfilled' ? h.value.data : null,
@@ -36,11 +41,40 @@ const StatusPage = () => {
       generators: g.status === 'fulfilled' ? g.value.data || [] : [],
       logs: l.status === 'fulfilled' ? l.value.data.queries || [] : [],
     });
+    if (s.status === 'fulfilled') setSetup(s.value.data);
     setUpdated(new Date());
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, [load]);
+  useEffect(() => () => { if (gpuPollRef.current) clearInterval(gpuPollRef.current); }, []);
+
+  // Switching device rebuilds the embedders in the background (weights are
+  // already cached), so poll until the backend reports ready again.
+  const toggleGpu = async (next) => {
+    setGpuError(null);
+    setGpuBusy(true);
+    try {
+      const { data: s } = await setSetupGpu(next);
+      setSetup(s);
+      if (gpuPollRef.current) clearInterval(gpuPollRef.current);
+      gpuPollRef.current = setInterval(async () => {
+        try {
+          const { data: cur } = await getSetupStatus();
+          setSetup(cur);
+          if (cur.ready || cur.state === 'error') {
+            clearInterval(gpuPollRef.current);
+            gpuPollRef.current = null;
+            setGpuBusy(false);
+            if (cur.state === 'error') setGpuError(cur.message || 'Failed to switch device');
+          }
+        } catch { /* backend busy; keep polling */ }
+      }, 1000);
+    } catch (e) {
+      setGpuBusy(false);
+      setGpuError(e.response?.data?.detail || e.message || 'Failed to switch device');
+    }
+  };
 
   const online = data.health?.status === 'running';
   const indexed = data.directories.filter((d) => d.is_indexed).length;
@@ -79,6 +113,38 @@ const StatusPage = () => {
           sub={`${data.generators.length} available`} />
         <StatCard icon={SearchIcon} label="Searches run" value={data.logs.length} />
       </div>
+
+      {setup?.configured && (
+        <div className="card !p-5 mb-6">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-xl bg-needle-50 grid place-items-center shrink-0">
+              <Cpu className="h-5 w-5 text-needle-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-ink-900">Hardware acceleration</div>
+              <p className="text-xs text-ink-500 mt-1">
+                {setup.gpu_available
+                  ? 'Use the GPU for indexing and search. Switching reloads the models — no re-download.'
+                  : 'No compatible GPU detected on this machine — Needle runs on the CPU.'}
+              </p>
+              {gpuBusy && (
+                <p className="text-xs text-ink-500 mt-2 flex items-center gap-1.5">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-needle-600" />
+                  {setup.message || 'Reloading models…'}
+                </p>
+              )}
+              {gpuError && <p className="text-xs text-red-600 mt-2 break-words">{gpuError}</p>}
+            </div>
+            <label className={`flex items-center gap-2 shrink-0 ${setup.gpu_available && !gpuBusy ? 'cursor-pointer' : 'opacity-50'}`}>
+              <input type="checkbox" checked={Boolean(setup.use_gpu)}
+                disabled={!setup.gpu_available || gpuBusy}
+                onChange={(e) => toggleGpu(e.target.checked)}
+                className="rounded border-ink-300 text-needle-600 focus:ring-needle-500" />
+              <span className="text-sm text-ink-700">Use GPU</span>
+            </label>
+          </div>
+        </div>
+      )}
 
       {data.logs.length > 0 && (
         <div className="card">

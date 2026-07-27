@@ -68,10 +68,29 @@ pyinstaller \
   --collect-all torch \
   --collect-all torchvision \
   --collect-all timm \
+  --collect-all diffusers \
+  --collect-all transformers \
   --collect-all safetensors \
   --collect-all huggingface_hub \
+  --collect-all packaging \
   --collect-submodules sqlalchemy \
   --hidden-import PIL._tkinter_finder \
+  --copy-metadata torch \
+  --copy-metadata torchvision \
+  --copy-metadata diffusers \
+  --copy-metadata transformers \
+  --copy-metadata tokenizers \
+  --copy-metadata accelerate \
+  --copy-metadata safetensors \
+  --copy-metadata huggingface-hub \
+  --copy-metadata packaging \
+  --copy-metadata requests \
+  --copy-metadata filelock \
+  --copy-metadata numpy \
+  --copy-metadata pyyaml \
+  --copy-metadata regex \
+  --copy-metadata tqdm \
+  --copy-metadata pillow \
   "$BACKEND/run_backend.py"
 
 echo ">> Copying runtime config into Tauri resources"

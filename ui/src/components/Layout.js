@@ -1,11 +1,12 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Search, FolderOpen, Sparkles, Activity } from 'lucide-react';
+import { Search, FolderOpen, Sparkles, Activity, Wand2 } from 'lucide-react';
 import logoImage from '../assets/images/logo.png';
 
 const navigation = [
   { name: 'Search', href: '/search', icon: Search },
   { name: 'Library', href: '/directories', icon: FolderOpen },
+  { name: 'Generate', href: '/generate', icon: Wand2 },
   { name: 'Generators', href: '/generators', icon: Sparkles },
   { name: 'Status', href: '/status', icon: Activity },
 ];

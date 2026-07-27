@@ -1,0 +1,145 @@
+name: Release desktop app
+
+# Publishes the macOS desktop app as an **unsigned** DMG.
+#
+# The build is not code-signed or notarized, because that needs a paid Apple
+# Developer ID. macOS therefore quarantines the download and refuses to open it
+# until the user clears that flag -- see docs/src/getting-started.md
+# ("Opening Needle on macOS"). The release notes below repeat the instructions
+# so they are visible right next to the download button.
+#
+# Apple Silicon only: PyTorch has not shipped macOS x86_64 wheels since 2.2, so
+# the bundled backend cannot be built for Intel Macs.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g. 1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    name: Build macOS (Apple Silicon)
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ui/src-tauri
+
+      - name: Free up disk space
+        # The bundled backend (torch + diffusers) plus the PyInstaller work
+        # directory need well over the headroom a clean runner leaves.
+        run: |
+          sudo rm -rf /Applications/Xcode_14*.app /Applications/Xcode_15.0*.app || true
+          df -h /
+
+      - name: Build app + DMG
+        # build-app.sh already sets CI on macOS so create-dmg skips the Finder
+        # AppleScript, which cannot run on a headless runner.
+        run: ./scripts/build-app.sh
+
+      - name: Collect artifacts
+        id: out
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.v.outputs.version }}"
+          BUNDLE=ui/src-tauri/target/release/bundle
+          mkdir -p dist
+          DMG=$(find "$BUNDLE/dmg" -name '*.dmg' | head -1)
+          if [ -z "$DMG" ]; then echo "::error::no DMG produced"; exit 1; fi
+          cp "$DMG" "dist/Needle_${VERSION}_macos_arm64.dmg"
+          cd dist
+          shasum -a 256 *.dmg > "Needle_${VERSION}_macos_arm64.dmg.sha256"
+          ls -lh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64
+          path: dist/*
+          retention-days: 7
+
+  release:
+    name: Publish release
+    needs: build-macos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh dist
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          draft: false
+          generate_release_notes: true
+          body: |
+            ## Install (macOS, Apple Silicon)
+
+            Requires **macOS 14 (Sonoma) or later** on an Apple Silicon Mac.
+            Intel Macs are not supported: PyTorch no longer ships macOS x86_64
+            builds, so the bundled backend cannot be built for them.
+
+            1. Download the `.dmg` below and drag **Needle** to Applications.
+            2. The app is **not signed with an Apple Developer ID**, so macOS
+               will refuse to open it with a message such as
+               *"Needle is damaged and can't be opened."* That message is
+               misleading -- the app is not damaged, it is simply unsigned, so
+               macOS cannot identify who built it.
+            3. Clear the quarantine flag that your browser attached to the
+               download:
+
+               ```sh
+               xattr -dr com.apple.quarantine /Applications/Needle.app
+               ```
+
+               Then open the app normally. This is only needed once.
+
+            Prefer not to run that command? Build from source instead --
+            locally built apps are never quarantined:
+
+            ```sh
+            git clone https://github.com/UIC-InDeXLab/Needle.git
+            cd Needle && ./scripts/install.sh
+            ```
+
+            Verify your download:
+
+            ```sh
+            shasum -a 256 -c Needle_*_macos_arm64.dmg.sha256
+            ```

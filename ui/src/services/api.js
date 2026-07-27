@@ -41,6 +41,18 @@ export const getSetupStatus = () => api.get('/setup/status');
 export const getSetupOptions = () => api.get('/setup/options');
 export const configureSetup = (profile, useGpu) =>
   api.post('/setup/configure', { profile, use_gpu: useGpu });
+export const setSetupGpu = (useGpu) => api.post('/setup/gpu', { use_gpu: useGpu });
+
+// On-device image generation
+export const getGenerateModels = () => api.get('/generate/models');
+export const getGenerateState = () => api.get('/generate/state');
+export const loadGenerateModel = (model) => api.post('/generate/load', { model });
+// Generation can take a while on the first call (model load + warmup).
+export const generateImages = (payload) =>
+  api.post('/generate/images', payload, { timeout: 600000 });
+export const saveGeneratedImage = (image, directory, filename) =>
+  api.post('/generate/save', { image, directory, filename });
+
 
 // Service Status
 export const getServiceStatus = () => api.get('/service/status');

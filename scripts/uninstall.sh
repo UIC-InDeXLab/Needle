@@ -60,20 +60,50 @@ done
 # ---------------------------------------------------------------------------
 # Optionally remove user data
 # ---------------------------------------------------------------------------
-DATA_DIR="$HOME/.needle"
-if [ -d "$DATA_DIR" ]; then
+# Data lives in more than one place: source/CLI installs use ~/.needle, while
+# the packaged desktop app uses the OS per-app data directory, and model weights
+# are cached by huggingface outside both.
+DATA_DIRS=("$HOME/.needle")
+if [[ "$OSTYPE" == darwin* ]]; then
+  DATA_DIRS+=("$HOME/Library/Application Support/com.needle.app")
+else
+  DATA_DIRS+=("${XDG_DATA_HOME:-$HOME/.local/share}/com.needle.app")
+fi
+
+EXISTING=()
+for d in "${DATA_DIRS[@]}"; do
+  [ -d "$d" ] && EXISTING+=("$d")
+done
+
+remove_data() {
+  for d in "${EXISTING[@]}"; do
+    rm -rf "$d" && print_success "Removed user data at $d"
+  done
+  # Cached model weights are several GB and are shared with other tools that use
+  # the huggingface cache, so only the Needle-specific entries are removed.
+  local hub="$HOME/.cache/huggingface/hub"
+  if [ -d "$hub" ]; then
+    find "$hub" -maxdepth 1 -type d \
+      \( -name 'models--timm--*' -o -name 'models--stabilityai--*' \) \
+      -exec rm -rf {} + 2>/dev/null || true
+    print_success "Removed cached Needle models from $hub"
+  fi
+}
+
+if [ ${#EXISTING[@]} -gt 0 ]; then
   if [ "$PURGE" = true ]; then
-    rm -rf "$DATA_DIR" && print_success "Removed user data at $DATA_DIR"
+    remove_data
   else
+    printf '%s\n' "${EXISTING[@]}" | sed 's/^/  /'
     if [ -t 0 ]; then
-      read -p "Remove indexed data and settings at $DATA_DIR? (y/N): " -n 1 -r; echo
+      read -p "Remove the indexed data and settings listed above? (y/N): " -n 1 -r; echo
       if [[ $REPLY =~ ^[Yy]$ ]]; then
-        rm -rf "$DATA_DIR" && print_success "Removed $DATA_DIR"
+        remove_data
       else
-        print_status "Kept user data at $DATA_DIR (use --purge to remove)."
+        print_status "Kept user data (use --purge to remove)."
       fi
     else
-      print_status "Kept user data at $DATA_DIR (run with --purge to remove)."
+      print_status "Kept user data (run with --purge to remove)."
     fi
   fi
 fi

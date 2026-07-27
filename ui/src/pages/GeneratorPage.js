@@ -1,17 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Sparkles, RefreshCw, Loader2, AlertCircle, Settings2, CheckCircle2,
-  KeyRound, X, Save, Wand2, Cpu, Plug, PlugZap, Download, Boxes,
-  FlaskConical, ToggleLeft, ToggleRight, XCircle, GripVertical,
+  KeyRound, X, Save, Wand2, Cpu, Boxes, Download,
+  FlaskConical, ToggleLeft, ToggleRight, XCircle, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import {
   getGenerators, getGeneratorConfig, saveGeneratorConfig,
-  updateGeneratorConfig, setGeneratorCredentials, getGeneratorCapabilities,
+  updateGeneratorConfig, setGeneratorCredentials, getGenerateModels,
   testGenerator, getGeneratorFallback, setGeneratorFallback,
+  loadGenerateModel, getGenerateState,
 } from '../services/api';
 
-const NEEDLE = 'needle-generator';
-const DEFAULT_LOCAL_URL = 'http://127.0.0.1:8001';
+// The built-in on-device engine. Older builds shipped a separate "Needle
+// Generator" companion service; that is now the same thing, in-process.
+const BUILTIN = 'needle-local';
 const CLOUD_ICON = { openai: Sparkles, stability: Sparkles };
 
 const GeneratorPage = () => {
@@ -21,12 +24,12 @@ const GeneratorPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Needle Generator connection state
-  const [url, setUrl] = useState(DEFAULT_LOCAL_URL);
+  // Built-in engine capabilities
   const [caps, setCaps] = useState(null);
-  const [connecting, setConnecting] = useState(false);
-  const [probeMsg, setProbeMsg] = useState(null);
   const [selModel, setSelModel] = useState(null);
+  const [downloadingModel, setDownloadingModel] = useState(null);
+  const [dlState, setDlState] = useState(null);
+  const dlPoll = useRef(null);
 
   // Test results keyed by model id / engine name
   const [tests, setTests] = useState({});
@@ -36,42 +39,22 @@ const GeneratorPage = () => {
   const [params, setParams] = useState({});
   const [saving, setSaving] = useState(false);
 
-  // Drag-to-reorder
-  const [dragIndex, setDragIndex] = useState(null);
-
   const engineInfo = useCallback((name) => engines.find((e) => e.name === name) || {}, [engines]);
   const confOf = useCallback(
     (name) => cfg.find((c) => c.name === name) || { enabled: false, params: {} },
     [cfg]
   );
 
-  const detect = useCallback(async (tryUrl, { persist = false } = {}) => {
-    setConnecting(true); setProbeMsg(null);
+  const detect = useCallback(async () => {
     try {
-      const r = await getGeneratorCapabilities(NEEDLE, tryUrl);
-      const data = r.data || {};
-      if (data.models && data.models.length) {
-        setCaps(data);
-        const c = getGeneratorConfig().find((x) => x.name === NEEDLE) || { params: {} };
-        const model = c.params?.model && data.models.some((m) => m.id === c.params.model)
-          ? c.params.model : data.default_model || data.models[0].id;
-        setSelModel(model);
-        if (persist) {
-          await setGeneratorCredentials(NEEDLE, { base_url: tryUrl });
-          const updated = updateGeneratorConfig(NEEDLE, { params: { ...(c.params || {}), base_url: tryUrl, model } });
-          setCfg([...updated]);
-        }
-        return true;
-      }
-      setCaps(null);
-      if (persist) setProbeMsg('No Needle Generator responded at that URL.');
-      return false;
+      const { data } = await getGenerateModels();
+      setCaps(data);
+      const stored = getGeneratorConfig().find((x) => x.name === BUILTIN) || { params: {} };
+      const model = stored.params?.model && data.models?.some((m) => m.id === stored.params.model)
+        ? stored.params.model : data.default_model;
+      setSelModel(model);
     } catch {
       setCaps(null);
-      if (persist) setProbeMsg('Could not reach a Needle Generator at that URL.');
-      return false;
-    } finally {
-      setConnecting(false);
     }
   }, []);
 
@@ -83,19 +66,18 @@ const GeneratorPage = () => {
       setEngines(list);
       setFallback(getGeneratorFallback());
       let stored = getGeneratorConfig();
-      // Seed/repair config: keep order, ensure every engine present, drop stale.
+      // Seed/repair config: keep order, ensure every engine present, drop stale
+      // entries (e.g. the retired companion-service engine).
       const names = list.map((e) => e.name);
       if (!stored || stored.length === 0) {
-        stored = list.map((e) => ({ name: e.name, enabled: e.name === NEEDLE, params: {} }));
+        stored = list.map((e) => ({ name: e.name, enabled: e.name === BUILTIN, params: {} }));
       } else {
         stored = stored.filter((c) => names.includes(c.name));
-        for (const n of names) if (!stored.some((c) => c.name === n)) stored.push({ name: n, enabled: false, params: {} });
+        for (const n of names) if (!stored.some((c) => c.name === n)) stored.push({ name: n, enabled: n === BUILTIN, params: {} });
       }
       saveGeneratorConfig(stored);
       setCfg(stored);
-      const savedUrl = stored.find((c) => c.name === NEEDLE)?.params?.base_url || DEFAULT_LOCAL_URL;
-      setUrl(savedUrl);
-      detect(savedUrl);
+      detect();
     } catch (err) {
       setError(err.response?.data?.detail || err.message || 'Failed to load generators');
     } finally {
@@ -104,10 +86,12 @@ const GeneratorPage = () => {
   }, [detect]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => () => { if (dlPoll.current) clearInterval(dlPoll.current); }, []);
 
-  const connected = !!(caps && caps.models && caps.models.length);
-  const needleConf = confOf(NEEDLE);
-  const activeModel = selModel || needleConf.params?.model || caps?.default_model;
+  const connected = !!(caps && caps.available);
+  const builtinConf = confOf(BUILTIN);
+  const activeModel = selModel || builtinConf.params?.model || caps?.default_model;
+  const dlPct = dlState?.total ? Math.round((dlState.current / dlState.total) * 100) : null;
 
   const persist = (next) => { saveGeneratorConfig(next); setCfg([...next]); };
 
@@ -134,7 +118,7 @@ const GeneratorPage = () => {
 
   const chooseModel = (id) => {
     setSelModel(id);
-    const updated = updateGeneratorConfig(NEEDLE, { params: { ...(needleConf.params || {}), base_url: url, model: id } });
+    const updated = updateGeneratorConfig(BUILTIN, { params: { ...(builtinConf.params || {}), model: id } });
     setCfg([...updated]);
   };
 
@@ -146,6 +130,35 @@ const GeneratorPage = () => {
     } catch (err) {
       setTests((t) => ({ ...t, [key]: { error: err.response?.data?.detail || err.message || 'Test failed' } }));
     }
+  };
+
+  // Downloading is explicit so that pressing "Test" can never kick off a
+  // multi-gigabyte transfer behind the user's back.
+  const downloadModel = async (id) => {
+    setError(null);
+    setDownloadingModel(id);
+    setDlState(null);
+    try {
+      await loadGenerateModel(id);
+    } catch (err) {
+      setDownloadingModel(null);
+      setError(err.response?.data?.detail || err.message || 'Could not start the download');
+      return;
+    }
+    if (dlPoll.current) clearInterval(dlPoll.current);
+    dlPoll.current = setInterval(async () => {
+      try {
+        const { data } = await getGenerateState();
+        setDlState(data);
+        if (['ready', 'idle', 'error'].includes(data.state)) {
+          clearInterval(dlPoll.current);
+          dlPoll.current = null;
+          setDownloadingModel(null);
+          if (data.state === 'error') setError(data.message);
+          detect();
+        }
+      } catch { /* keep polling */ }
+    }, 1000);
   };
 
   const openConfig = (engine) => { setEditing(engine); setParams({ ...(confOf(engine.name).params || {}) }); };
@@ -170,18 +183,15 @@ const GeneratorPage = () => {
   };
 
   // ---- reorder ----
-  const onDrop = (toIdx, e) => {
-    if (e) e.preventDefault();
-    let from = dragIndex;
-    if (from === null && e) {
-      const raw = e.dataTransfer?.getData('text/plain');
-      if (raw !== undefined && raw !== '') from = parseInt(raw, 10);
-    }
-    if (from === null || Number.isNaN(from) || from === toIdx) { setDragIndex(null); return; }
+  // HTML5 drag-and-drop is unreliable inside the Tauri webview (the shell
+  // intercepts drag events for file drops), so priority is moved with explicit
+  // buttons instead.
+  const move = (idx, delta) => {
+    const to = idx + delta;
+    if (to < 0 || to >= cfg.length) return;
     const next = [...cfg];
-    const [moved] = next.splice(from, 1);
-    next.splice(toIdx, 0, moved);
-    setDragIndex(null);
+    const [moved] = next.splice(idx, 1);
+    next.splice(to, 0, moved);
     persist(next);
   };
 
@@ -213,41 +223,42 @@ const GeneratorPage = () => {
     return <span className="badge badge-muted">#{rank}</span>;
   };
 
-  const DragHandle = ({ idx }) => (
-    <span draggable
-      onDragStart={(e) => {
-        setDragIndex(idx);
-        // WebKit (Tauri) only initiates a drag when dataTransfer is set;
-        // without this it just selects text instead of dragging.
-        e.dataTransfer.effectAllowed = 'move';
-        try { e.dataTransfer.setData('text/plain', String(idx)); } catch { /* ignore */ }
-      }}
-      onDragEnd={() => setDragIndex(null)}
-      className="shrink-0 cursor-grab active:cursor-grabbing select-none text-ink-300 hover:text-ink-500" title="Drag to reorder">
-      <GripVertical className="h-5 w-5 pointer-events-none" />
+  const DragHandle = ({ idx, dark }) => (
+    <span className={`shrink-0 flex flex-col -my-1 ${dark ? 'text-white/70' : 'text-ink-300'}`}>
+      <button type="button" onClick={() => move(idx, -1)} disabled={idx === 0}
+        title="Higher priority"
+        className={`p-0.5 rounded disabled:opacity-25 ${dark ? 'hover:bg-white/20' : 'hover:text-ink-600 hover:bg-ink-100'}`}>
+        <ChevronUp className="h-4 w-4" />
+      </button>
+      <button type="button" onClick={() => move(idx, 1)} disabled={idx === cfg.length - 1}
+        title="Lower priority"
+        className={`p-0.5 rounded disabled:opacity-25 ${dark ? 'hover:bg-white/20' : 'hover:text-ink-600 hover:bg-ink-100'}`}>
+        <ChevronDown className="h-4 w-4" />
+      </button>
     </span>
   );
 
-  // ---- Needle Generator card ----
+  // ---- Built-in engine card ----
   const NeedleCard = (idx) => {
-    const on = !!needleConf.enabled;
+    const on = !!builtinConf.enabled;
     return (
-      <div onDragOver={(e) => e.preventDefault()} onDrop={(e) => onDrop(idx, e)}
-        className={`card overflow-hidden !p-0 ${dragIndex === idx ? 'ring-2 ring-needle-300' : ''}`}>
+      <div className="card overflow-hidden !p-0">
         <div className="p-4 bg-gradient-to-br from-needle-600 to-needle-500 text-white flex items-start gap-3">
-          <DragHandle idx={idx} />
+          <DragHandle idx={idx} dark />
           <div className="h-10 w-10 rounded-xl bg-white/15 grid place-items-center shrink-0 backdrop-blur">
             <Wand2 className="h-5 w-5" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-semibold">Needle Generator</h3>
+              <h3 className="font-semibold">Built-in generator</h3>
               <PriorityBadge idx={idx} on={on} />
               {connected
-                ? <span className="badge bg-white/20 text-white border-white/20"><CheckCircle2 className="h-3 w-3" />Connected</span>
-                : <span className="badge bg-white/10 text-white/90 border-white/20">Not connected</span>}
+                ? <span className="badge bg-white/20 text-white border-white/20"><CheckCircle2 className="h-3 w-3" />Ready</span>
+                : <span className="badge bg-white/10 text-white/90 border-white/20">Unavailable</span>}
             </div>
-            <p className="text-sm text-white/80 mt-0.5">Companion app · switch models per search.</p>
+            <p className="text-sm text-white/80 mt-0.5">
+              Runs on this machine. No server, no API key.
+            </p>
             {connected && (
               <div className="flex items-center gap-3 mt-2 text-xs text-white/80">
                 <span className="inline-flex items-center gap-1"><Cpu className="h-3.5 w-3.5" />{caps.device?.toUpperCase()}</span>
@@ -255,7 +266,7 @@ const GeneratorPage = () => {
               </div>
             )}
           </div>
-          <button onClick={() => setUse(NEEDLE, !on)}
+          <button onClick={() => setUse(BUILTIN, !on)}
             className="shrink-0 inline-flex items-center gap-2 rounded-lg bg-white/15 hover:bg-white/25 px-3 py-1.5 text-sm font-medium transition">
             {on ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5 opacity-80" />}
             {on ? 'On' : 'Off'}
@@ -263,46 +274,63 @@ const GeneratorPage = () => {
         </div>
 
         <div className="p-4 space-y-4">
-          <div className="flex gap-2">
-            <input value={url} onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && detect(url, { persist: true })}
-              placeholder={DEFAULT_LOCAL_URL} className="input flex-1" />
-            <button onClick={() => detect(url, { persist: true })} disabled={connecting} className="btn btn-primary shrink-0">
-              {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : connected ? <PlugZap className="h-4 w-4" /> : <Plug className="h-4 w-4" />}
-              {connected ? 'Reconnect' : 'Connect'}
-            </button>
-          </div>
-          {probeMsg && <p className="text-xs text-amber-600">{probeMsg}</p>}
-
           {connected ? (
-            <div className="grid gap-2">
-              {caps.models.map((m) => {
-                const active = activeModel === m.id;
-                const ts = tests[m.id];
-                return (
-                  <div key={m.id} className={`rounded-xl border p-3 ${active ? 'border-needle-400 bg-needle-50 ring-1 ring-needle-200' : 'border-ink-200 bg-white'}`}>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => chooseModel(m.id)} className="flex items-center gap-2 min-w-0 flex-1 text-left">
-                        <div className={`h-4 w-4 rounded-full border-2 grid place-items-center shrink-0 ${active ? 'border-needle-500' : 'border-ink-300'}`}>
-                          {active && <div className="h-1.5 w-1.5 rounded-full bg-needle-500" />}
+            <>
+              <div className="grid gap-2">
+                {caps.models.map((m) => {
+                  const active = activeModel === m.id;
+                  const ts = tests[m.id];
+                  const busy = downloadingModel === m.id;
+                  return (
+                    <div key={m.id} className={`rounded-xl border p-3 ${active ? 'border-needle-400 bg-needle-50 ring-1 ring-needle-200' : 'border-ink-200 bg-white'}`}>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => chooseModel(m.id)} className="flex items-center gap-2 min-w-0 flex-1 text-left">
+                          <div className={`h-4 w-4 rounded-full border-2 grid place-items-center shrink-0 ${active ? 'border-needle-500' : 'border-ink-300'}`}>
+                            {active && <div className="h-1.5 w-1.5 rounded-full bg-needle-500" />}
+                          </div>
+                          <span className="font-medium text-ink-900">{m.label}</span>
+                          {m.downloaded
+                            ? <span className="badge badge-muted">Downloaded</span>
+                            : <span className="badge badge-warn">{(m.download_mb / 1000).toFixed(1)} GB not downloaded</span>}
+                          {active && on && m.downloaded && <span className="badge badge-ok">Used for search</span>}
+                        </button>
+                        {m.downloaded ? (
+                          <button onClick={() => runTest(m.id, BUILTIN, { model: m.id })} disabled={ts?.loading}
+                            className="btn btn-secondary btn-sm shrink-0"><FlaskConical className="h-3.5 w-3.5" />Test</button>
+                        ) : (
+                          <button onClick={() => downloadModel(m.id)} disabled={!!downloadingModel}
+                            className="btn btn-secondary btn-sm shrink-0">
+                            {busy
+                              ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Downloading…</>
+                              : <><Download className="h-3.5 w-3.5" />Download</>}
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-xs text-ink-500 mt-1 ml-6">{m.description}</p>
+                      {busy && (
+                        <div className="mt-2 ml-6">
+                          <div className="h-1.5 w-full bg-ink-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-needle-500 rounded-full transition-all duration-500"
+                              style={{ width: dlPct !== null ? `${dlPct}%` : '35%' }} />
+                          </div>
+                          <p className="text-xs text-ink-500 mt-1">{dlState?.message || 'Starting…'}</p>
                         </div>
-                        <span className="font-medium text-ink-900">{m.label}</span>
-                        {active && on && <span className="badge badge-ok">Used for search</span>}
-                        {active && !on && <span className="badge badge-muted">Selected</span>}
-                      </button>
-                      <button onClick={() => runTest(m.id, NEEDLE, { base_url: url, model: m.id })} disabled={ts?.loading}
-                        className="btn btn-secondary btn-sm shrink-0"><FlaskConical className="h-3.5 w-3.5" />Test</button>
+                      )}
+                      {ts && <div className="mt-2 ml-6"><TestResult state={ts} /></div>}
                     </div>
-                    <p className="text-xs text-ink-500 mt-1 ml-6">{m.description}</p>
-                    {ts && <div className="mt-2 ml-6"><TestResult state={ts} /></div>}
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-ink-500">
+                Want to create images yourself? Use the{' '}
+                <Link to="/generate" className="text-needle-600 font-medium hover:underline">Generate</Link> page.
+              </p>
+            </>
           ) : (
             <div className="rounded-xl border border-dashed border-ink-200 p-3 bg-ink-50/50 text-sm text-ink-600">
-              <p className="font-medium text-ink-800 flex items-center gap-2"><Download className="h-4 w-4" />Not installed?</p>
-              <code className="block mt-2 text-xs bg-white px-2.5 py-1.5 rounded-lg border border-ink-200 text-ink-700">cd generator-service &amp;&amp; ./run.sh</code>
+              {caps?.error
+                ? <>On-device generation failed to load: <span className="text-red-600 break-words">{caps.error}</span></>
+                : 'On-device generation is not available in this build.'}
             </div>
           )}
         </div>
@@ -318,8 +346,7 @@ const GeneratorPage = () => {
     const on = !!c.enabled;
     const ts = tests[name];
     return (
-      <div onDragOver={(ev) => ev.preventDefault()} onDrop={(ev) => onDrop(idx, ev)}
-        className={`card !p-4 ${dragIndex === idx ? 'ring-2 ring-needle-300' : ''}`}>
+      <div className="card !p-4">
         <div className="flex items-start gap-3">
           <DragHandle idx={idx} />
           <div className="h-10 w-10 rounded-xl bg-ink-100 grid place-items-center shrink-0">
@@ -387,7 +414,7 @@ const GeneratorPage = () => {
               </div>
               <p className="text-sm text-ink-500 mt-0.5">
                 {fallback
-                  ? 'Generators are tried top-to-bottom; if one fails, the next enabled one is used. Drag to reorder priority.'
+                  ? 'Generators are tried top-to-bottom; if one fails, the next enabled one is used. Use the arrows to reorder priority.'
                   : 'Only the first enabled generator is used. Turning others on will switch the active one.'}
               </p>
             </div>
@@ -397,7 +424,7 @@ const GeneratorPage = () => {
           <div className="space-y-3">
             {cfg.map((c, idx) => (
               <React.Fragment key={c.name}>
-                {c.name === NEEDLE ? NeedleCard(idx) : CloudRow(c.name, idx)}
+                {c.name === BUILTIN ? NeedleCard(idx) : CloudRow(c.name, idx)}
               </React.Fragment>
             ))}
           </div>

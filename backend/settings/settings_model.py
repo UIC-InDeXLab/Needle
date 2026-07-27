@@ -100,7 +100,7 @@ class ImageGeneratorSettings(BaseModel):
     port: int = Field(8001)
     # Generation is delegated to the Needle Generator companion or an API
     # provider (no bundled model). "remote" is still accepted as an alias.
-    default_engine: str = Field("needle-generator")
+    default_engine: str = Field("needle-local")
 
     @property
     def url(self) -> str:

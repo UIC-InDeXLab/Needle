@@ -21,6 +21,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 UI="$ROOT/ui"
 SRC_TAURI="$UI/src-tauri"
 LOGO="$UI/src/assets/images/logo.png"
+# `tauri icon` requires a square source. The logo is portrait, so a pre-squared
+# copy is kept alongside it (icons/ itself is generated at build time and not
+# tracked, so the source has to live with the other assets).
+LOGO_SQUARE="$UI/src/assets/images/logo-square.png"
 
 require() {
   if ! command -v "$1" &>/dev/null; then
@@ -46,11 +50,25 @@ info "Installing frontend dependencies..."
 npm install
 
 # Generate application icons from the logo if they don't exist yet.
+# `tauri icon` requires a square source image, so prefer the pre-squared
+# source-icon.png when it is present and fall back to the raw logo.
 if [ ! -f "$SRC_TAURI/icons/icon.icns" ] && [ ! -f "$SRC_TAURI/icons/128x128.png" ]; then
-  if [ -f "$LOGO" ]; then
-    info "Generating application icons from $LOGO ..."
-    npx tauri icon "$LOGO"
-    ok "Icons generated."
+  ICON_SRC=""
+  if [ -f "$LOGO_SQUARE" ]; then
+    ICON_SRC="$LOGO_SQUARE"
+  elif [ -f "$SRC_TAURI/icons/source-icon.png" ]; then
+    ICON_SRC="$SRC_TAURI/icons/source-icon.png"
+  elif [ -f "$LOGO" ]; then
+    ICON_SRC="$LOGO"
+  fi
+
+  if [ -n "$ICON_SRC" ]; then
+    info "Generating application icons from $ICON_SRC ..."
+    if npx tauri icon "$ICON_SRC"; then
+      ok "Icons generated."
+    else
+      warn "Icon generation failed (the source image must be square); Tauri will use its default icon."
+    fi
   else
     warn "Logo not found at $LOGO; Tauri will use its default icon."
   fi
@@ -78,7 +96,17 @@ bash "$SRC_TAURI/scripts/build-sidecar.sh"
 ok "Backend sidecar built."
 
 info "Building the desktop app + installers (tauri build)..."
-npm run tauri:build
+# On macOS, create-dmg runs an AppleScript that drives Finder to lay out the DMG
+# window. That requires Automation (TCC) permission for the calling terminal and
+# fails in headless/CI shells, aborting the whole bundle. Tauri passes
+# `--skip-jenkins` to create-dmg when CI is set, which skips the cosmetic step
+# and still produces a fully functional .dmg.
+# Note: CI=true also makes react-scripts treat frontend warnings as errors.
+if [ "$(uname -s)" = "Darwin" ]; then
+  CI="${CI:-true}" npm run tauri:build
+else
+  npm run tauri:build
+fi
 
 BUNDLE_DIR="$SRC_TAURI/target/release/bundle"
 ok "Build complete."

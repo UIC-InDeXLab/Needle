@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import WelcomeScreen from './components/WelcomeScreen';
 import SearchPage from './pages/SearchPage';
 import DirectoryPage from './pages/DirectoryPage';
+import GeneratePage from './pages/GeneratePage';
 import GeneratorPage from './pages/GeneratorPage';
 import StatusPage from './pages/StatusPage';
 import { getSetupStatus } from './services/api';
@@ -44,6 +45,7 @@ function App() {
             <Route path="/" element={<Navigate to="/search" replace />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/directories" element={<DirectoryPage />} />
+            <Route path="/generate" element={<GeneratePage />} />
             <Route path="/generators" element={<GeneratorPage />} />
             <Route path="/status" element={<StatusPage />} />
           </Routes>

@@ -2,6 +2,7 @@
 
 * [Overview](overview.md)
 * [Getting Started](getting-started.md)
+* [Image Generation](generating.md)
 * [Demo](demo.md)
 * [Needlectl](needlectl/README.md)
     * [Service](needlectl/service.md)

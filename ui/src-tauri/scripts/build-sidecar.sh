@@ -6,6 +6,8 @@
 #
 # Usage:  ./scripts/build-sidecar.sh
 # Requires: python3, rustc (for the target triple), and network access for pip.
+#
+# Runs on Linux, macOS and Windows (Git Bash / MSYS).
 
 set -euo pipefail
 
@@ -13,6 +15,16 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 SRC_TAURI="$(cd "$HERE/.." && pwd)"
 ROOT="$(cd "$SRC_TAURI/../.." && pwd)"
 BACKEND="$ROOT/backend"
+
+# Platform differences: virtualenv layout, PyInstaller's --add-data separator
+# and the executable suffix.
+OS_NAME="$(uname -s)"
+case "$OS_NAME" in
+  MINGW*|MSYS*|CYGWIN*)
+    VENV_BIN="Scripts"; SEP=";"; EXE_SUFFIX=".exe" ;;
+  *)
+    VENV_BIN="bin"; SEP=":"; EXE_SUFFIX="" ;;
+esac
 
 BUILD_DIR="$SRC_TAURI/.sidecar-build"
 RES_DIR="$SRC_TAURI/resources"
@@ -22,9 +34,15 @@ rm -rf "$BACKEND_DIST"
 mkdir -p "$RES_DIR"
 
 echo ">> Creating build virtualenv"
-python3 -m venv "$BUILD_DIR/venv"
+# Windows installs the interpreter as `python`; most Unix distros as `python3`.
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN="python3"
+else
+  PYTHON_BIN="python"
+fi
+"$PYTHON_BIN" -m venv "$BUILD_DIR/venv"
 # shellcheck disable=SC1091
-source "$BUILD_DIR/venv/bin/activate"
+source "$BUILD_DIR/venv/$VENV_BIN/activate"
 python -m pip install --upgrade pip wheel
 
 # PyTorch acceleration: CPU by default (smaller, portable); CUDA is opt-in.
@@ -32,7 +50,6 @@ python -m pip install --upgrade pip wheel
 # torch and torchvision MUST come from the same index/version or torchvision's
 # compiled ops (e.g. torchvision::nms) fail to register at runtime.
 NEEDLE_ACCEL="${NEEDLE_ACCEL:-cpu}"
-OS_NAME="$(uname -s)"
 if [ "$OS_NAME" = "Darwin" ]; then
   # macOS has no CUDA; the default wheel is MPS-enabled (Apple Silicon).
   echo ">> Installing macOS PyTorch + torchvision (MPS-enabled)"
@@ -47,9 +64,6 @@ fi
 
 # Install the remaining requirements (torch/torchvision already satisfied) + PyInstaller.
 python -m pip install -r "$BACKEND/requirements.txt" pyinstaller
-
-# Data separator differs by platform (':' on unix, ';' on windows).
-SEP=":"
 
 echo ">> Building backend (PyInstaller onedir; unpacked at install time, not at launch)"
 pyinstaller \
@@ -105,3 +119,12 @@ else
 fi
 
 echo ">> Done ($NEEDLE_ACCEL build). Backend dir: $BACKEND_DIST/needle-backend"
+
+# Fail loudly if the expected executable is missing: the Tauri shell resolves it
+# by an exact path, so a silently renamed/missing binary would only surface as a
+# blank app at runtime.
+if [ ! -f "$BACKEND_DIST/needle-backend/needle-backend$EXE_SUFFIX" ]; then
+  echo ">> ERROR: expected backend executable not found:" >&2
+  echo "   $BACKEND_DIST/needle-backend/needle-backend$EXE_SUFFIX" >&2
+  exit 1
+fi

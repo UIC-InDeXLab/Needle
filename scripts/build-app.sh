@@ -2,8 +2,9 @@
 #
 # Build the Needle desktop application (and its bundled backend) into native
 # installers for the current platform:
-#   - Linux : .AppImage and .deb
-#   - macOS : .dmg and .app
+#   - Linux   : .AppImage and .deb
+#   - macOS   : .dmg and .app
+#   - Windows : .exe (NSIS installer), via Git Bash
 #
 # Output: ui/src-tauri/target/release/bundle/
 #
@@ -41,8 +42,12 @@ require node   "Install Node.js 18+ (https://nodejs.org)."
 require npm    "Install npm (bundled with Node.js)."
 require cargo  "Install Rust (https://rustup.rs)."
 require rustc  "Install Rust (https://rustup.rs)."
-require python3 "Install Python 3.12+."
-ok "Build tools present."
+# Windows ships the interpreter as `python`; Unix distros as `python3`.
+if command -v python3 &>/dev/null; then
+  ok "Build tools present."
+else
+  require python "Install Python 3.12+."
+fi
 
 cd "$UI"
 
@@ -112,4 +117,4 @@ BUNDLE_DIR="$SRC_TAURI/target/release/bundle"
 ok "Build complete."
 echo ""
 echo "Installers are in: $BUNDLE_DIR"
-find "$BUNDLE_DIR" -maxdepth 2 -type f \( -name "*.AppImage" -o -name "*.deb" -o -name "*.dmg" \) 2>/dev/null || true
+find "$BUNDLE_DIR" -maxdepth 2 -type f \( -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" -o -name "*.dmg" -o -name "*-setup.exe" -o -name "*.msi" \) 2>/dev/null || true

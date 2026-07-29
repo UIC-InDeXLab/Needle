@@ -6,26 +6,90 @@ use std::sync::Mutex;
 
 use tauri::{Manager, RunEvent, State};
 
+/// Spawn child processes without flashing a console window on Windows.
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
 /// Holds the spawned backend child so we can terminate it on exit.
 #[derive(Default)]
 struct BackendProcess(Mutex<Option<Child>>);
 
 /// Best-effort: kill any leftover backend from a previous run so we don't stack
 /// duplicate processes (e.g. after a crash or a package reinstall).
+#[cfg(unix)]
 fn kill_stale_backend() {
     let _ = Command::new("pkill").args(["-x", "needle-backend"]).status();
+}
+
+#[cfg(target_os = "windows")]
+fn kill_stale_backend() {
+    use std::os::windows::process::CommandExt;
+    let _ = Command::new("taskkill")
+        .args(["/F", "/IM", "needle-backend.exe"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status();
+}
+
+/// Windows has no `PR_SET_PDEATHSIG`. Instead the backend is placed in a job
+/// object marked "kill on job close": when this process exits for any reason the
+/// job handle is released and Windows terminates the backend with it. The handle
+/// is deliberately held for the lifetime of the process — closing it early would
+/// kill the backend immediately.
+#[cfg(target_os = "windows")]
+mod win_job {
+    use std::process::Child;
+    use std::sync::OnceLock;
+
+    use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+        SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+    use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE};
+
+    // Keeps the job handle alive for the whole process lifetime.
+    static JOB: OnceLock<usize> = OnceLock::new();
+
+    pub fn attach(child: &Child) {
+        unsafe {
+            let job: HANDLE = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+            if job.is_null() {
+                return;
+            }
+            let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+            info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            SetInformationJobObject(
+                job,
+                JobObjectExtendedLimitInformation,
+                &info as *const _ as *const core::ffi::c_void,
+                std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+            );
+
+            let handle = OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, 0, child.id());
+            if !handle.is_null() {
+                AssignProcessToJobObject(job, handle);
+                CloseHandle(handle);
+            }
+            let _ = JOB.set(job as usize);
+        }
+    }
 }
 
 fn main() {
     // WebKitGTK on some GPU/driver combinations (e.g. newer Mesa on Fedora) fails
     // to create an EGL display and renders a blank window. Disabling the DMABUF
     // renderer and hardware compositing avoids this. Users can override by
-    // presetting these variables.
-    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
-        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-    }
-    if std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_none() {
-        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+    // presetting these variables. (Linux only: macOS uses WKWebView and Windows
+    // uses WebView2, neither of which is affected.)
+    #[cfg(target_os = "linux")]
+    {
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+        if std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+        }
     }
 
     kill_stale_backend();
@@ -48,7 +112,15 @@ fn main() {
                 .resource_dir()
                 .expect("failed to resolve resource dir");
             let config_dir = resource_dir.join("resources");
-            let backend_exe = config_dir.join("backend").join("needle-backend").join("needle-backend");
+            let backend_name = if cfg!(target_os = "windows") {
+                "needle-backend.exe"
+            } else {
+                "needle-backend"
+            };
+            let backend_exe = config_dir
+                .join("backend")
+                .join("needle-backend")
+                .join(backend_name);
 
             // Ensure the backend executable is runnable (perms may be lost by bundlers).
             #[cfg(unix)]
@@ -78,8 +150,20 @@ fn main() {
                 });
             }
 
+            // The backend is a console subsystem binary; without this Windows
+            // would show a stray console window next to the app.
+            #[cfg(target_os = "windows")]
+            {
+                use std::os::windows::process::CommandExt;
+                cmd.creation_flags(CREATE_NO_WINDOW);
+            }
+
             match cmd.spawn() {
                 Ok(child) => {
+                    // Tie the backend's lifetime to this process (see win_job).
+                    #[cfg(target_os = "windows")]
+                    win_job::attach(&child);
+
                     let state: State<BackendProcess> = app.state();
                     *state.0.lock().unwrap() = Some(child);
                 }

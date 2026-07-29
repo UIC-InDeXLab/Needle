@@ -12,11 +12,13 @@ To **build** Needle from source you need:
 - **Node.js 18+** — for the UI. [Install Node.js](https://nodejs.org/)
 - **Rust toolchain** — for the Tauri desktop shell. [Install Rust](https://rustup.rs/)
 
-> **Note:** Needle is supported on **Linux** and **macOS**.
+> **Note:** Needle is supported on **Linux**, **macOS** and **Windows**.
 >
 > On macOS, Needle requires **macOS 14 (Sonoma) or later** on an **Apple Silicon**
 > Mac. Intel Macs are not supported: PyTorch stopped publishing macOS x86_64
 > builds after 2.2, so the bundled backend cannot be built for them.
+>
+> On Windows, Needle requires **Windows 10 or later** (x64).
 
 ## Installation
 
@@ -27,8 +29,10 @@ Download the installer for your platform from the
 
 - **macOS:** `Needle_x.y.z_macos_arm64.dmg` — open it and drag Needle to
   Applications, then see [Opening Needle on macOS](#opening-needle-on-macos) below.
-- **Linux:** `Needle_x.y.z.deb` (`sudo dpkg -i Needle_*.deb`) or `Needle_x.y.z.AppImage`
-  (`chmod +x` and run).
+- **Linux:** `Needle_x.y.z_linux_amd64.deb` (`sudo apt install ./Needle_*.deb`) or
+  `Needle_x.y.z_linux_x86_64.rpm` (`sudo dnf install ./Needle_*.rpm`).
+- **Windows:** `Needle_x.y.z_windows_x64-setup.exe` — run it, then see
+  [Opening Needle on Windows](#opening-needle-on-windows) below.
 
 Each release also ships a `.sha256` file so you can verify the download:
 
@@ -57,6 +61,22 @@ xattr -dr com.apple.quarantine /Applications/Needle.app
 ```
 
 Then launch Needle normally. You only need to do this once per install.
+
+### Opening Needle on Windows
+
+The released installer is **not code-signed**, because a signing certificate is
+a paid, per-year purchase. Windows SmartScreen therefore blocks it the first
+time with:
+
+> **"Windows protected your PC"**
+
+Click **More info**, then **Run anyway** to continue. The installer places
+Needle under your user profile, so no administrator prompt is needed.
+
+Some antivirus products also flag freshly built PyInstaller executables as
+suspicious. This is a known false positive caused by the way the Python runtime
+is bundled; verify the download against the published `.sha256` if in doubt, or
+build from source.
 
 > **Why not just right-click → Open?** That shortcut no longer works for
 > unsigned apps on recent macOS versions. Removing the quarantine attribute (or

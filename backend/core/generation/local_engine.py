@@ -89,13 +89,18 @@ class LocalDiffusionEngine(GenerationEngine):
         self._pipe_model: Optional[str] = None
         self._lock = threading.Lock()
         self._state = {"state": "idle", "message": "", "current": 0, "total": 0, "model": None}
+        # Guards `_pending`, the model a background load is currently running for.
+        self._pending_lock = threading.Lock()
+        self._pending: Optional[str] = None
         self._last_progress_ts = 0.0
         self._last_used = 0.0
         self._reaper: Optional[threading.Thread] = None
         self._import_error: Optional[str] = None
 
     # -- availability -----------------------------------------------------
-    def is_available(self) -> bool:
+    def libraries_available(self) -> bool:
+        """True if this build can run on-device generation at all (the diffusion
+        libraries are importable). Says nothing about downloaded weights."""
         try:
             import diffusers  # noqa: F401
 
@@ -108,6 +113,15 @@ class LocalDiffusionEngine(GenerationEngine):
                 self._import_error = f"{type(exc).__name__}: {exc}"
                 logger.error(f"On-device generation unavailable: {self._import_error}", exc_info=True)
             return False
+
+    def has_downloaded_model(self) -> bool:
+        return any(is_downloaded(m) for m in MODELS)
+
+    def is_available(self) -> bool:
+        """Usable for generation *right now*. Weights are several GB and are only
+        fetched on request, so an engine without any downloaded model is not
+        available -- otherwise search would silently trigger a huge download."""
+        return self.libraries_available() and self.has_downloaded_model()
 
     def import_error(self) -> Optional[str]:
         return self._import_error
@@ -281,9 +295,32 @@ class LocalDiffusionEngine(GenerationEngine):
         except Exception:
             pass
 
+    def begin_load(self, model_id: str) -> Optional[Dict]:
+        """Mark a load as starting and report whether a worker should be spawned.
+
+        Returns ``None`` when a load/download for this model is already running,
+        so repeated clicks do not queue duplicate threads that would then block
+        on the pipeline lock.
+        """
+        model_id = model_id if model_id in MODELS else DEFAULT_MODEL
+        with self._pending_lock:
+            if self._pending == model_id:
+                return None
+            self._pending = model_id
+        spec = MODELS[model_id]
+        verb = "Loading" if is_downloaded(model_id) else "Preparing download of"
+        self._set_state("loading", f"{verb} {spec['label']}…", model=model_id)
+        return self._state
+
+    def _end_load(self, model_id: str):
+        with self._pending_lock:
+            if self._pending == model_id:
+                self._pending = None
+
     def ensure_loaded(self, model_id: str):
         model_id = model_id if model_id in MODELS else DEFAULT_MODEL
         if self._pipe is not None and self._pipe_model == model_id:
+            self._end_load(model_id)
             return self._pipe
         with self._lock:
             if self._pipe is not None and self._pipe_model == model_id:
@@ -293,6 +330,8 @@ class LocalDiffusionEngine(GenerationEngine):
             except Exception as exc:
                 self._set_state("error", str(exc), model=model_id)
                 raise
+            finally:
+                self._end_load(model_id)
 
     def unload(self):
         with self._lock:

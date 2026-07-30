@@ -56,6 +56,10 @@ export const saveGeneratedImage = (image, directory, filename) =>
 
 // Service Status
 export const getServiceStatus = () => api.get('/service/status');
+// Version, platform, library counts and on-disk usage.
+export const getSystemInfo = () => api.get('/system/info', { timeout: 60000 });
+// Explicit check against GitHub releases (never called automatically).
+export const checkForUpdate = () => api.get('/system/update', { timeout: 20000 });
 
 // Directory Management
 export const getDirectories = () => api.get('/directory');

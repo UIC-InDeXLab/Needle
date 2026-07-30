@@ -4,11 +4,11 @@ import time
 
 from sqlalchemy.orm import Session
 
-from core import embedder_manager
-from models.models import SessionLocal, Directory, Image
+from models.models import SessionLocal, Directory
+from indexing.file_types import scan_image_paths
+from indexing.queue_manager.index_queue_manager import IndexQueueManager
 from indexing.repositories.repositories import DirectoryRepository, ImageRepository, VectorRepository
 from monitoring import logger
-from settings import settings
 
 
 class ConsistencyChecker:
@@ -25,14 +25,26 @@ class ConsistencyChecker:
             self.check_consistency()
 
     def check_consistency(self):
-        logger.info("Running system-wide consistency check")
+        logger.debug("Running system-wide consistency check")
         session = SessionLocal()
         try:
             directory_repo = DirectoryRepository(session)
-            directories = directory_repo.get_all()
-            for directory in directories:
-                self.check_directory(session, directory)
-            logger.info("Consistency check completed")
+            # Snapshot the ids first: check_directory commits (and may delete a
+            # directory), which expires the ORM objects and would make the loop
+            # re-fetch each one from the database.
+            directory_ids = [d.id for d in directory_repo.get_all()]
+            for directory_id in directory_ids:
+                directory = session.get(Directory, directory_id)
+                if directory is None:
+                    continue
+                try:
+                    self.check_directory(session, directory)
+                except Exception as exc:
+                    # One bad directory (permissions, unmounted drive) must not
+                    # stop the others from being checked.
+                    logger.error(f"Consistency check failed for directory {directory_id}: {exc}", exc_info=True)
+                    session.rollback()
+            logger.debug("Consistency check completed")
         except Exception as e:
             logger.error(f"Consistency check error: {e}", exc_info=True)
             session.rollback()
@@ -40,43 +52,35 @@ class ConsistencyChecker:
             session.close()
 
     def check_directory(self, session: Session, directory: Directory):
-        logger.info(f"Checking consistency for directory {directory.path} (ID: {directory.id})")
+        logger.debug(f"Checking consistency for directory {directory.path} (ID: {directory.id})")
         if not os.path.exists(directory.path):
             logger.warning(f"Directory missing: {directory.path}. Removing from system.")
+            # Also clears the directory's images and vectors, which used to be
+            # left behind pointing at a path that no longer exists.
             DirectoryRepository(session).delete(directory)
             return
 
-        # Gather filesystem image paths
-        fs_paths = set()
-        for entry in os.scandir(directory.path):
-            if entry.is_file() and entry.name.lower().endswith(('.png', '.jpg', '.jpeg')):
-                fs_paths.add(entry.path)
-            elif entry.is_dir() and settings.directory.recursive_indexing:
-                for root, _, files in os.walk(entry.path):
-                    for file in files:
-                        if file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                            fs_paths.add(os.path.join(root, file))
-
-        # Get database image paths
+        fs_paths = scan_image_paths(directory.path)
         image_repo = ImageRepository(session)
-        db_images = session.query(Image).filter(Image.directory_id == directory.id).all()
-        db_paths = {img.path for img in db_images}
+        db_paths = image_repo.get_paths(directory.id)
 
         new_paths = fs_paths - db_paths
         deleted_paths = db_paths - fs_paths
-        logger.info(f"Directory {directory.path}: {len(new_paths)} new images, {len(deleted_paths)} missing images")
+        if not new_paths and not deleted_paths:
+            return
 
-        # Add new images to DB
-        for path in new_paths:
-            if not image_repo.get_by_path(path):
-                session.add(Image(path=path, directory_id=directory.id, is_indexed=False))
-        session.commit()
+        logger.info(
+            f"Directory {directory.path}: {len(new_paths)} new image(s), "
+            f"{len(deleted_paths)} missing image(s)"
+        )
 
-        # Remove deleted images from DB and Milvus
-        for path in deleted_paths:
-            image = image_repo.get_by_path(path)
-            if image:
-                for embedder_name in embedder_manager.get_image_embedders().keys():
-                    VectorRepository().delete_by_path(embedder_name, path)
-                image_repo.delete(image)
-        session.commit()
+        if deleted_paths:
+            # One batched delete per embedder table instead of one call per
+            # path per table: removing a thousand files used to mean thousands
+            # of individual table rewrites.
+            VectorRepository().delete_paths_all_embedders(list(deleted_paths))
+            image_repo.delete_by_paths(list(deleted_paths))
+
+        if new_paths:
+            image_repo.add_new_images(directory.id, sorted(new_paths))
+            IndexQueueManager.instance().add_to_queue(directory.id, directory.path, priority=1)

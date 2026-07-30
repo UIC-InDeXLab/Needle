@@ -136,6 +136,9 @@ fn main() {
             let mut cmd = Command::new(&backend_exe);
             cmd.env("NEEDLE_DATA_DIR", data_dir.to_string_lossy().to_string())
                 .env("SERVICE__CONFIG_DIR_PATH", config_dir.to_string_lossy().to_string())
+                // The packaged backend has no git checkout to derive a version
+                // from, so hand it the bundle's version instead.
+                .env("NEEDLE_APP_VERSION", app.package_info().version.to_string())
                 .stdout(Stdio::inherit())
                 .stderr(Stdio::inherit());
 

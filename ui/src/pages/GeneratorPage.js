@@ -69,11 +69,21 @@ const GeneratorPage = () => {
       // Seed/repair config: keep order, ensure every engine present, drop stale
       // entries (e.g. the retired companion-service engine).
       const names = list.map((e) => e.name);
+      const availability = Object.fromEntries(list.map((e) => [e.name, !!e.available]));
       if (!stored || stored.length === 0) {
         stored = list.map((e) => ({ name: e.name, enabled: e.name === BUILTIN, params: {} }));
       } else {
         stored = stored.filter((c) => names.includes(c.name));
         for (const n of names) if (!stored.some((c) => c.name === n)) stored.push({ name: n, enabled: n === BUILTIN, params: {} });
+      }
+      // An engine that cannot actually run must not read as "on for search":
+      // the built-in one has no downloaded weights yet, a cloud one has no API
+      // key. Search also uses this list to decide whether it is ready.
+      stored = stored.map((c) => ({ ...c, enabled: c.enabled && availability[c.name] }));
+      // Once the built-in engine becomes usable (the user downloaded a model)
+      // adopt it by default rather than leaving every engine off.
+      if (!stored.some((c) => c.enabled) && availability[BUILTIN]) {
+        stored = stored.map((c) => ({ ...c, enabled: c.name === BUILTIN }));
       }
       saveGeneratorConfig(stored);
       setCfg(stored);
@@ -134,17 +144,7 @@ const GeneratorPage = () => {
 
   // Downloading is explicit so that pressing "Test" can never kick off a
   // multi-gigabyte transfer behind the user's back.
-  const downloadModel = async (id) => {
-    setError(null);
-    setDownloadingModel(id);
-    setDlState(null);
-    try {
-      await loadGenerateModel(id);
-    } catch (err) {
-      setDownloadingModel(null);
-      setError(err.response?.data?.detail || err.message || 'Could not start the download');
-      return;
-    }
+  const startDlPoll = useCallback(() => {
     if (dlPoll.current) clearInterval(dlPoll.current);
     dlPoll.current = setInterval(async () => {
       try {
@@ -156,10 +156,45 @@ const GeneratorPage = () => {
           setDownloadingModel(null);
           if (data.state === 'error') setError(data.message);
           detect();
+          load();
         }
       } catch { /* keep polling */ }
     }, 1000);
+  }, [detect, load]);
+
+  const downloadModel = async (id) => {
+    setError(null);
+    setDownloadingModel(id);
+    // The backend publishes "loading" before returning, so show the progress
+    // panel straight away instead of waiting a poll interval for it to appear.
+    try {
+      const { data } = await loadGenerateModel(id);
+      setDlState(data);
+    } catch (err) {
+      setDownloadingModel(null);
+      setError(err.response?.data?.detail || err.message || 'Could not start the download');
+      return;
+    }
+    startDlPoll();
   };
+
+  // A download started here keeps running in the backend while the user is on
+  // another tab, so reattach to it on mount instead of losing the progress bar.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await getGenerateState();
+        if (cancelled) return;
+        if (['downloading', 'loading', 'warming'].includes(data.state)) {
+          setDlState(data);
+          setDownloadingModel(data.model);
+          startDlPoll();
+        }
+      } catch { /* nothing in flight */ }
+    })();
+    return () => { cancelled = true; };
+  }, [startDlPoll]);
 
   const openConfig = (engine) => { setEditing(engine); setParams({ ...(confOf(engine.name).params || {}) }); };
 

@@ -71,6 +71,25 @@ class VectorStore:
     def delete_by_path(self, name: str, image_path: str) -> None:
         self._table(name).delete(f"image_path = {_sql_str(image_path)}")
 
+    def delete_by_paths(self, name: str, image_paths: Sequence[str]) -> int:
+        """Delete many paths in as few table rewrites as possible.
+
+        Every ``delete`` rewrites the table's manifest, so deleting a thousand
+        removed files one call at a time is dramatically slower than a handful
+        of ``IN (...)`` predicates. The batch size keeps the generated filter
+        well inside any expression-length limits.
+        """
+        paths = [p for p in dict.fromkeys(image_paths) if p]
+        if not paths:
+            return 0
+        table = self._table(name)
+        batch = 500
+        for start in range(0, len(paths), batch):
+            chunk = paths[start:start + batch]
+            predicate = ", ".join(_sql_str(p) for p in chunk)
+            table.delete(f"image_path IN ({predicate})")
+        return len(paths)
+
     def delete_by_directory(self, name: str, directory_id: int) -> None:
         self._table(name).delete(f"directory_id = {int(directory_id)}")
 

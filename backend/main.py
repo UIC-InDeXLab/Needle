@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List
 
+import requests
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from core import embedder_manager, image_generator, query_manager, setup_manager
+from core.device import gpu_available, select_device
 from core.generation.local_engine import (
     DEFAULT_MODEL as LOCAL_DEFAULT_MODEL,
     MODELS as LOCAL_MODELS,
@@ -34,6 +36,7 @@ from models.schemas import AddDirectoryRequest, AddDirectoryResponse, HealthChec
     ConfigureSetupRequest, SetGpuRequest, GenerateImagesRequest, LoadModelRequest, SaveImageRequest
 from indexing import image_indexing_service
 from monitoring import logger
+from settings import settings
 from utils import aggregate_rankings, pil_image_to_base64, Timer
 from version import VERSION as BACKEND_VERSION
 
@@ -416,7 +419,9 @@ async def generate_models():
     device generation would run on."""
     engine = image_generator.local_engine()
     return {
-        "available": engine.is_available(),
+        # Whether this build *can* generate on-device. Downloaded weights are
+        # reported per model below, so the page can offer a download.
+        "available": engine.libraries_available(),
         "error": engine.import_error(),
         "device": engine.device(),
         "default_model": LOCAL_DEFAULT_MODEL,
@@ -436,9 +441,16 @@ async def generate_load(request: LoadModelRequest):
     """Download (if needed) and load a model in the background so the UI can
     show progress instead of blocking on the first generate call."""
     engine = image_generator.local_engine()
-    if not engine.is_available():
+    if not engine.libraries_available():
         raise HTTPException(status_code=503, detail="On-device generation is not available in this build")
-    threading.Thread(target=_load_model_quietly, args=(engine, request.model), daemon=True).start()
+
+    # Report the requested model immediately. The worker thread has to import
+    # diffusers before it can publish any progress, and during that window the
+    # state would otherwise still read "idle" and the UI would conclude that
+    # nothing is happening.
+    state = engine.begin_load(request.model)
+    if state is not None:
+        threading.Thread(target=_load_model_quietly, args=(engine, request.model), daemon=True).start()
     return engine.state()
 
 
@@ -453,10 +465,20 @@ def _load_model_quietly(engine, model_id: str):
 async def generate_images(request: GenerateImagesRequest):
     """Generate images on-device and return them as data URLs."""
     engine = image_generator.local_engine()
-    if not engine.is_available():
+    if not engine.libraries_available():
         raise HTTPException(status_code=503, detail="On-device generation is not available in this build")
     if not request.prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt is required")
+
+    # Weights are several GB, so never fetch them as a side effect of pressing
+    # Generate: ask for an explicit download instead (the UI offers a button).
+    model_id = request.model if request.model in LOCAL_MODELS else LOCAL_DEFAULT_MODEL
+    if not is_model_downloaded(model_id):
+        raise HTTPException(
+            status_code=409,
+            detail=f"{LOCAL_MODELS[model_id]['label']} is not downloaded yet. "
+                   "Download it first, then generate.",
+        )
 
     params = {
         "model": request.model,
@@ -520,6 +542,161 @@ async def get_search_logs():
 @app.get("/service/status", response_model=ServiceStatusResponse)
 async def service_status():
     return ServiceStatusResponse(status="running")
+
+
+# -- system information -----------------------------------------------------
+
+_STARTED_AT = time.time()
+_GITHUB_REPO = "UIC-InDeXLab/Needle"
+
+
+def _dir_size(path) -> int:
+    """Total bytes under ``path`` (0 when missing). Symlinks are not followed so
+    a library folder linked into the data dir is never counted twice."""
+    total = 0
+    p = Path(path)
+    if not p.exists():
+        return 0
+    if p.is_file():
+        return p.stat().st_size
+    for entry in p.rglob("*"):
+        try:
+            if entry.is_file() and not entry.is_symlink():
+                total += entry.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def _model_cache_size() -> int:
+    """Bytes used by downloaded model weights in the shared Hugging Face cache."""
+    try:
+        from huggingface_hub import scan_cache_dir
+
+        return int(scan_cache_dir().size_on_disk)
+    except Exception:
+        return 0
+
+
+def _system_info() -> dict:
+    import platform as _platform
+
+    storage = settings.storage
+    data_dir = Path(storage.data_dir)
+    vectors = _dir_size(storage.lancedb_path)
+    metadata = _dir_size(storage.sqlite_path)
+    logs = _dir_size(data_dir / "logs")
+    data_total = _dir_size(data_dir)
+    models = _model_cache_size()
+
+    with SessionLocal() as session:
+        directories = session.query(Directory).count()
+        images = session.query(Image).count()
+        indexed_images = session.query(Image).filter(Image.is_indexed == True).count()  # noqa: E712
+
+    try:
+        import torch
+
+        torch_version = torch.__version__
+    except Exception:
+        torch_version = None
+
+    return {
+        "version": BACKEND_VERSION,
+        "repo": _GITHUB_REPO,
+        "uptime_seconds": int(time.time() - _STARTED_AT),
+        "platform": {
+            "system": _platform.system(),
+            "release": _platform.release(),
+            "machine": _platform.machine(),
+            "python": _platform.python_version(),
+            "torch": torch_version,
+            "device": str(select_device()),
+            "gpu_available": gpu_available(),
+        },
+        "library": {
+            "directories": directories,
+            "images": images,
+            "indexed_images": indexed_images,
+            "embedders": [e for e in embedder_manager.get_image_embedders()],
+        },
+        "storage": {
+            "data_dir": str(data_dir),
+            "vectors_bytes": vectors,
+            "metadata_bytes": metadata,
+            "logs_bytes": logs,
+            # Whatever else lives in the data dir (configs, credentials, caches).
+            "other_bytes": max(data_total - vectors - metadata - logs, 0),
+            "data_total_bytes": data_total,
+            "models_bytes": models,
+            "total_bytes": data_total + models,
+        },
+    }
+
+
+@app.get("/system/info")
+def system_info():
+    """Version, platform, library counts and on-disk usage for the Status page.
+
+    Sync so FastAPI runs it in a threadpool: walking the data directory and the
+    model cache is blocking I/O.
+    """
+    return _system_info()
+
+
+@app.get("/system/update")
+def system_update():
+    """Check GitHub for a newer release.
+
+    Done server-side to avoid a cross-origin request from the webview, and only
+    when the user asks: Needle never phones home on its own.
+    """
+    current = BACKEND_VERSION
+    try:
+        # The repository also tags needlectl releases (needlectl/vX.Y.Z), and
+        # /releases/latest would happily return one of those, so list releases
+        # and keep only the desktop app's own "vX.Y.Z" tags.
+        resp = requests.get(
+            f"https://api.github.com/repos/{_GITHUB_REPO}/releases",
+            headers={"Accept": "application/vnd.github+json"},
+            params={"per_page": 30},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        releases = resp.json()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not reach GitHub: {exc}")
+
+    release = next(
+        (
+            r for r in releases
+            if not r.get("draft") and not r.get("prerelease")
+            and re.fullmatch(r"v\d+(\.\d+)*", str(r.get("tag_name") or ""))
+        ),
+        None,
+    )
+    if release is None:
+        return {"current": current, "latest": None, "update_available": False,
+                "message": "No desktop releases published yet."}
+
+    latest = str(release.get("tag_name") or "").lstrip("v")
+    return {
+        "current": current,
+        "latest": latest or None,
+        "update_available": bool(latest) and _is_newer(latest, current),
+        "url": release.get("html_url"),
+        "published_at": release.get("published_at"),
+        "notes": (release.get("body") or "")[:4000],
+    }
+
+
+def _parse_version(value: str):
+    parts = re.findall(r"\d+", value or "")
+    return tuple(int(p) for p in parts[:3]) or (0,)
+
+
+def _is_newer(latest: str, current: str) -> bool:
+    return _parse_version(latest) > _parse_version(current)
 
 
 @app.get("/service/log", response_model=ServiceLogResponse)

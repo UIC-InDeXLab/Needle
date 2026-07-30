@@ -9,6 +9,9 @@ import { isTauri, pickDirectory } from '../services/tauri';
 
 const TIER_LABEL = { fast: 'Fastest', balanced: 'Balanced', quality: 'Best quality' };
 
+// Engine states that mean work is still running in the backend.
+const IN_FLIGHT = ['downloading', 'loading', 'warming', 'generating'];
+
 const formatSize = (mb) => (mb >= 1000 ? `${(mb / 1000).toFixed(1)} GB` : `${mb} MB`);
 
 const GeneratePage = () => {
@@ -64,15 +67,35 @@ const GeneratePage = () => {
     }, 1000);
   }, [loadCatalog]);
 
+  // A download/load started on this page keeps running in the backend even
+  // while another tab is open, so pick it back up on mount instead of showing
+  // no progress at all until the user clicks again.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await getGenerateState();
+        if (cancelled) return;
+        setEngineState(data);
+        if (IN_FLIGHT.includes(data.state)) pollState();
+      } catch { /* engine unreachable; the catalog call reports it */ }
+    })();
+    return () => { cancelled = true; };
+  }, [pollState]);
+
   const download = async (id) => {
     setError(null);
     setModel(id);
+    // The backend flips to "loading" before returning, so render the progress
+    // panel immediately rather than waiting for the first poll tick.
     try {
-      await loadGenerateModel(id);
-      pollState();
+      const { data } = await loadGenerateModel(id);
+      setEngineState(data);
     } catch (e) {
       setError(e.response?.data?.detail || e.message);
+      return;
     }
+    pollState();
   };
 
   const run = async () => {
@@ -110,7 +133,7 @@ const GeneratePage = () => {
     }
   };
 
-  const downloading = engineState?.state === 'downloading' || engineState?.state === 'loading';
+  const downloading = ['downloading', 'loading', 'warming'].includes(engineState?.state);
   const pct = engineState?.total ? Math.round((engineState.current / engineState.total) * 100) : null;
 
   if (catalog && !catalog.available) {

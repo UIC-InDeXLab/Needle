@@ -130,28 +130,29 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Build & install the needlectl CLI
+# Install the needlectl CLI
 # ---------------------------------------------------------------------------
-print_status "Building the needlectl CLI..."
-if [ -f "needlectl/build.sh" ]; then
-  (cd needlectl && chmod +x build.sh && ./build.sh)
-  if [ -f "needlectl/dist/needlectl" ]; then
-    if [ -w /usr/local/bin ]; then
-      cp needlectl/dist/needlectl /usr/local/bin/needlectl
-    elif sudo -n true 2>/dev/null; then
-      sudo cp needlectl/dist/needlectl /usr/local/bin/needlectl
-    else
-      mkdir -p "$HOME/.local/bin"
-      cp needlectl/dist/needlectl "$HOME/.local/bin/needlectl"
-      print_warning "Installed needlectl to ~/.local/bin (ensure it is on your PATH)."
-    fi
-    chmod +x /usr/local/bin/needlectl 2>/dev/null || true
-    print_success "needlectl installed."
+# The CLI is built alongside the backend by build-sidecar.sh and ships inside
+# the app bundle, so there is nothing to compile here: it only has to be put on
+# PATH. The packaged .deb/.rpm do this for you; this covers source installs.
+print_status "Installing the needlectl CLI..."
+CLI_BIN="ui/src-tauri/resources/bin/needlectl"
+if [ -f "$CLI_BIN" ]; then
+  if [ -w /usr/local/bin ]; then
+    cp "$CLI_BIN" /usr/local/bin/needlectl
+    chmod +x /usr/local/bin/needlectl
+  elif sudo -n true 2>/dev/null; then
+    sudo cp "$CLI_BIN" /usr/local/bin/needlectl
+    sudo chmod +x /usr/local/bin/needlectl
   else
-    print_warning "needlectl build did not produce a binary; skipping CLI install."
+    mkdir -p "$HOME/.local/bin"
+    cp "$CLI_BIN" "$HOME/.local/bin/needlectl"
+    chmod +x "$HOME/.local/bin/needlectl"
+    print_warning "Installed needlectl to ~/.local/bin (ensure it is on your PATH)."
   fi
+  print_success "needlectl installed."
 else
-  print_warning "needlectl/build.sh not found; skipping CLI install."
+  print_warning "needlectl binary not found at $CLI_BIN; skipping CLI install."
 fi
 
 # ---------------------------------------------------------------------------

@@ -33,7 +33,7 @@ from models.schemas import AddDirectoryRequest, AddDirectoryResponse, HealthChec
     ServiceStatusResponse, ServiceLogResponse, SearchResponse, SearchRequest, UpdateDirectoryResponse, \
     UpdateDirectoryRequest, GeneratePoolRequest, GeneratePoolResponse, GuideImageData, EmbeddingData, \
     ComputeEmbeddingsRequest, ComputeEmbeddingsResponse, ImageEmbeddingsResponse, SetCredentialsRequest, \
-    ConfigureSetupRequest, SetGpuRequest, GenerateImagesRequest, LoadModelRequest, SaveImageRequest
+    ConfigureSetupRequest, GeneratorPreferencesRequest, SetGpuRequest, GenerateImagesRequest, LoadModelRequest, SaveImageRequest
 from indexing import image_indexing_service
 from monitoring import logger
 from settings import settings
@@ -248,10 +248,11 @@ def search(
     generated_images = []
 
     if not query_object.generated_images:
-        # Add the query text to each engine config
         generation_request = request.generation_config.model_dump()
         generation_request["prompt"] = query
-        for engine in generation_request["engines"]:
+        # Engines are optional: when the client omits them the orchestrator
+        # applies the saved preferences, which is the shared path.
+        for engine in generation_request.get("engines") or []:
             engine["prompt"] = query
 
         with Timer("image_generation", timings):
@@ -347,6 +348,25 @@ async def get_file(file_path: str):
 @app.get("/generator", response_model=List[GeneratorInfo])
 async def get_generators():
     return image_generator.get_available_engines()
+
+
+@app.get("/generator/preferences")
+def get_generator_preferences():
+    """Which engines are enabled, in what order, and the fallback flag.
+
+    Shared by every client so the desktop app and needlectl never disagree.
+    """
+    return image_generator.get_preferences()
+
+
+@app.put("/generator/preferences")
+def set_generator_preferences(request: GeneratorPreferencesRequest):
+    try:
+        return image_generator.set_preferences(
+            [e.model_dump() for e in request.engines], request.fallback
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/generator/{name}/credentials")

@@ -14,6 +14,9 @@ name: Release desktop app
 #             conflicts with the host driver and renders a blank window on some
 #             distributions (observed on Fedora).
 #   Windows - x64 NSIS installer, installed per-user so no UAC prompt is needed.
+#
+# The needlectl CLI is built with the backend and ships inside every package, so
+# installing Needle installs both. The Linux packages put it on PATH directly.
 
 on:
   push:
@@ -332,6 +335,8 @@ jobs:
             AppImage: it ships its own Mesa/libEGL, which clashes with the host
             driver and renders a blank window on some distributions.
 
+            Both packages also install the `needlectl` command.
+
             ## Windows (x64)
 
             Requires **Windows 10 or later**. Run the `-setup.exe` installer; it
@@ -340,6 +345,25 @@ jobs:
             Windows SmartScreen will show *"Windows protected your PC"* because
             the installer is unsigned. Choose **More info -> Run anyway** to
             continue.
+
+            ## Command line
+
+            Every package ships `needlectl`, which drives the same backend and
+            shares its settings with the app. On Linux it is installed for you.
+            On macOS and Windows it lives inside the app; put it on PATH with:
+
+            ```sh
+            # macOS
+            sudo ln -sf /Applications/Needle.app/Contents/Resources/bin/needlectl \
+              /usr/local/bin/needlectl
+            ```
+
+            ```powershell
+            # Windows (PowerShell)
+            $dir = "$env:LOCALAPPDATA\Needle\resources\bin"
+            [Environment]::SetEnvironmentVariable(
+              "Path", "$([Environment]::GetEnvironmentVariable('Path','User'));$dir", "User")
+            ```
 
             ## Build from source instead
 

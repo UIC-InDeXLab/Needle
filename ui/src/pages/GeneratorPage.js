@@ -6,10 +6,9 @@ import {
   FlaskConical, ToggleLeft, ToggleRight, XCircle, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import {
-  getGenerators, getGeneratorConfig, saveGeneratorConfig,
-  updateGeneratorConfig, setGeneratorCredentials, getGenerateModels,
-  testGenerator, getGeneratorFallback, setGeneratorFallback,
-  loadGenerateModel, getGenerateState,
+  getGenerators, getGeneratorPreferences, saveGeneratorPreferences,
+  setGeneratorCredentials, getGenerateModels,
+  testGenerator, loadGenerateModel, getGenerateState,
 } from '../services/api';
 
 // The built-in on-device engine. Older builds shipped a separate "Needle
@@ -45,13 +44,13 @@ const GeneratorPage = () => {
     [cfg]
   );
 
-  const detect = useCallback(async () => {
+  const detect = useCallback(async (storedParams) => {
     try {
       const { data } = await getGenerateModels();
       setCaps(data);
-      const stored = getGeneratorConfig().find((x) => x.name === BUILTIN) || { params: {} };
-      const model = stored.params?.model && data.models?.some((m) => m.id === stored.params.model)
-        ? stored.params.model : data.default_model;
+      const chosen = storedParams?.model;
+      const model = chosen && data.models?.some((m) => m.id === chosen)
+        ? chosen : data.default_model;
       setSelModel(model);
     } catch {
       setCaps(null);
@@ -61,33 +60,15 @@ const GeneratorPage = () => {
   const load = useCallback(async () => {
     try {
       setLoading(true); setError(null);
-      const r = await getGenerators();
-      const list = r.data || [];
-      setEngines(list);
-      setFallback(getGeneratorFallback());
-      let stored = getGeneratorConfig();
-      // Seed/repair config: keep order, ensure every engine present, drop stale
-      // entries (e.g. the retired companion-service engine).
-      const names = list.map((e) => e.name);
-      const availability = Object.fromEntries(list.map((e) => [e.name, !!e.available]));
-      if (!stored || stored.length === 0) {
-        stored = list.map((e) => ({ name: e.name, enabled: e.name === BUILTIN, params: {} }));
-      } else {
-        stored = stored.filter((c) => names.includes(c.name));
-        for (const n of names) if (!stored.some((c) => c.name === n)) stored.push({ name: n, enabled: n === BUILTIN, params: {} });
-      }
-      // An engine that cannot actually run must not read as "on for search":
-      // the built-in one has no downloaded weights yet, a cloud one has no API
-      // key. Search also uses this list to decide whether it is ready.
-      stored = stored.map((c) => ({ ...c, enabled: c.enabled && availability[c.name] }));
-      // Once the built-in engine becomes usable (the user downloaded a model)
-      // adopt it by default rather than leaving every engine off.
-      if (!stored.some((c) => c.enabled) && availability[BUILTIN]) {
-        stored = stored.map((c) => ({ ...c, enabled: c.name === BUILTIN }));
-      }
-      saveGeneratorConfig(stored);
-      setCfg(stored);
-      detect();
+      // Engine descriptions come from /generator; which ones are enabled, in
+      // what order, and the fallback flag are stored by the backend so that
+      // needlectl and the app always agree.
+      const [r, p] = await Promise.all([getGenerators(), getGeneratorPreferences()]);
+      setEngines(r.data || []);
+      const prefs = p.data || { engines: [], fallback: true };
+      setFallback(prefs.fallback !== false);
+      setCfg(prefs.engines || []);
+      detect((prefs.engines || []).find((e) => e.name === BUILTIN)?.params);
     } catch (err) {
       setError(err.response?.data?.detail || err.message || 'Failed to load generators');
     } finally {
@@ -103,7 +84,23 @@ const GeneratorPage = () => {
   const activeModel = selModel || builtinConf.params?.model || caps?.default_model;
   const dlPct = dlState?.total ? Math.round((dlState.current / dlState.total) * 100) : null;
 
-  const persist = (next) => { saveGeneratorConfig(next); setCfg([...next]); };
+  // Optimistic update: render immediately, then persist and adopt whatever the
+  // backend reports back (it re-checks availability).
+  const persist = useCallback(async (nextEngines, nextFallback) => {
+    setCfg(nextEngines);
+    setFallback(nextFallback);
+    try {
+      const { data } = await saveGeneratorPreferences(
+        nextEngines.map(({ name, enabled, params }) => ({ name, enabled, params: params || {} })),
+        nextFallback,
+      );
+      setCfg(data.engines || []);
+      setFallback(data.fallback !== false);
+    } catch (err) {
+      setError(err.response?.data?.detail || err.message || 'Could not save generator settings');
+      load();
+    }
+  }, [load]);
 
   const setUse = (name, on) => {
     let next = cfg.map((c) => ({ ...c }));
@@ -113,23 +110,27 @@ const GeneratorPage = () => {
     } else {
       next = next.map((c) => (c.name === name ? { ...c, enabled: on } : c));
     }
-    persist(next);
+    persist(next, fallback);
   };
 
   const toggleFallback = (on) => {
-    setGeneratorFallback(on);
-    setFallback(on);
     if (!on) {
       // Collapse to a single active engine: keep the first enabled (or first).
       const keep = cfg.find((c) => c.enabled)?.name || cfg[0]?.name;
-      persist(cfg.map((c) => ({ ...c, enabled: c.name === keep })));
+      persist(cfg.map((c) => ({ ...c, enabled: c.name === keep })), false);
+    } else {
+      persist(cfg, true);
     }
   };
 
   const chooseModel = (id) => {
     setSelModel(id);
-    const updated = updateGeneratorConfig(BUILTIN, { params: { ...(builtinConf.params || {}), model: id } });
-    setCfg([...updated]);
+    persist(
+      cfg.map((c) => (c.name === BUILTIN
+        ? { ...c, params: { ...(c.params || {}), model: id } }
+        : c)),
+      fallback,
+    );
   };
 
   const runTest = async (key, name, testParams) => {
@@ -202,12 +203,15 @@ const GeneratorPage = () => {
     if (!editing) return;
     setSaving(true);
     try {
-      const updated = updateGeneratorConfig(editing.name, { params });
-      setCfg([...updated]);
       if (editing.requires_credentials) {
         const clean = Object.fromEntries(Object.entries(params).filter(([, v]) => v));
         if (Object.keys(clean).length) await setGeneratorCredentials(editing.name, clean);
       }
+      // Non-credential settings live with the rest of the preferences.
+      await persist(
+        cfg.map((c) => (c.name === editing.name ? { ...c, params: { ...params } } : c)),
+        fallback,
+      );
       await load();
       setEditing(null); setParams({});
     } catch (err) {
@@ -227,7 +231,7 @@ const GeneratorPage = () => {
     const next = [...cfg];
     const [moved] = next.splice(idx, 1);
     next.splice(to, 0, moved);
-    persist(next);
+    persist(next, fallback);
   };
 
   const TestResult = ({ state }) => {

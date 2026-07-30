@@ -74,28 +74,17 @@ export const getSearchLogs = () => api.get('/search/logs');
 
 // Search
 export const search = (queryId, config) => {
-  // Ordered, enabled generators define the fallback chain (first = highest
-  // priority). When fallback is off, only the first enabled generator is used.
-  const fallbackOn = getGeneratorFallback();
-  const ordered = getGeneratorConfig().filter((g) => g.enabled);
-  const active = fallbackOn ? ordered : ordered.slice(0, 1);
-
-  const engines = active.map((generator) => ({
-    name: generator.name,
-    params: { ...(generator.params || {}) },
-  }));
-
+  // Engines are omitted on purpose: the backend applies the saved generator
+  // preferences (order, enabled, fallback), which needlectl shares. Sending
+  // them from here would make the two interfaces able to disagree again.
   const searchRequest = {
     qid: queryId,
     num_images_to_retrieve: config.num_images_to_retrieve || 10,
     include_base_images_in_preview: config.include_base_images_in_preview || false,
     verbose: config.verbose || false,
     generation_config: {
-      engines: engines,
-      num_engines_to_use: 1,
       num_images: config.num_images_to_generate || 1,
       image_size: config.generated_image_size || "SMALL",
-      use_fallback: fallbackOn,
     },
   };
   return api.post('/search', searchRequest);
@@ -115,41 +104,13 @@ export const setGeneratorCredentials = (name, params) =>
 // timeout since generation can take a while, especially on first (cold) run.
 export const testGenerator = (name, params, prompt) =>
   api.post(`/generator/${name}/test`, { params: { ...params, ...(prompt ? { prompt } : {}) } }, { timeout: 180000 });
-export const getGeneratorConfig = () => {
-  // Get from localStorage or return default
-  const config = localStorage.getItem('generatorConfig');
-  return config ? JSON.parse(config) : [];
-};
-export const saveGeneratorConfig = (config) => {
-  localStorage.setItem('generatorConfig', JSON.stringify(config));
-};
-export const updateGeneratorConfig = (generatorName, updates) => {
-  const config = getGeneratorConfig();
-  const index = config.findIndex(g => g.name === generatorName);
-  if (index !== -1) {
-    config[index] = { ...config[index], ...updates };
-    saveGeneratorConfig(config);
-  }
-  return config;
-};
-export const reorderGenerators = (newOrder) => {
-  const config = getGeneratorConfig();
-  const reorderedConfig = newOrder.map(name => 
-    config.find(g => g.name === name)
-  ).filter(Boolean);
-  saveGeneratorConfig(reorderedConfig);
-  return reorderedConfig;
-};
-// Global fallback flag: when on, failed generators fall through to the next one
-// in the ordered list; when off, only the first enabled generator is used.
-export const getGeneratorFallback = () => {
-  const v = localStorage.getItem('generatorFallback');
-  return v === null ? true : v === 'true';
-};
-export const setGeneratorFallback = (on) => {
-  localStorage.setItem('generatorFallback', on ? 'true' : 'false');
-  return on;
-};
+
+// Generator preferences (which engines are enabled, their order, and whether a
+// failure falls through to the next one). Stored by the backend so the desktop
+// app and needlectl always read and write the same configuration.
+export const getGeneratorPreferences = () => api.get('/generator/preferences');
+export const saveGeneratorPreferences = (engines, fallback) =>
+  api.put('/generator/preferences', { engines, fallback });
 
 // File Access
 export const getFile = (filePath) => api.get('/file', {

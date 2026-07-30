@@ -82,52 +82,78 @@ class BackendClient:
         """
         return self._get("/generator")
 
+    def get_generator_preferences(self) -> Any:
+        """Which engines are enabled, their order and the fallback flag.
+
+        Stored by the backend and shared with the desktop app.
+        """
+        return self._get("/generator/preferences")
+
+    def set_generator_preferences(self, engines: list, fallback: bool) -> Any:
+        return self._put("/generator/preferences",
+                         data={"engines": engines, "fallback": fallback})
+
+    def set_generator_credentials(self, name: str, params: Dict[str, str]) -> Any:
+        return self._post(f"/generator/{name}/credentials", data={"params": params})
+
+    def test_generator(self, name: str, params: Optional[Dict[str, Any]] = None) -> Any:
+        return self._post(f"/generator/{name}/test", data={"params": params or {}})
+
+    # -------------------------------------------------------------------------
+    # On-device generation
+    # -------------------------------------------------------------------------
+    def get_generate_models(self) -> Any:
+        return self._get("/generate/models")
+
+    def get_generate_state(self) -> Any:
+        return self._get("/generate/state")
+
+    def load_generate_model(self, model: str) -> Any:
+        return self._post("/generate/load", data={"model": model})
+
+    # -------------------------------------------------------------------------
+    # Setup / onboarding
+    # -------------------------------------------------------------------------
+    def get_setup_status(self) -> Any:
+        return self._get("/setup/status")
+
+    def get_setup_options(self) -> Any:
+        return self._get("/setup/options")
+
+    def configure_setup(self, profile: str, use_gpu: bool) -> Any:
+        return self._post("/setup/configure", data={"profile": profile, "use_gpu": use_gpu})
+
+    def set_gpu(self, use_gpu: bool) -> Any:
+        return self._post("/setup/gpu", data={"use_gpu": use_gpu})
+
+    def get_system_info(self) -> Any:
+        return self._get("/system/info")
+
     # -------------------------------------------------------------------------
     # Searching
     # -------------------------------------------------------------------------
     def run_search(
             self,
             prompt: str,
-            engine_configs: list,
             num_images_to_retrieve: Optional[int] = None,
             include_base_images: Optional[bool] = None,
-            num_engines_to_use: Optional[int] = None,
             num_images_per_engine: Optional[int] = None,
             image_size: Optional[str] = None,
-            use_fallback: Optional[bool] = None
     ) -> Any:
-        """
-        1) Create a query via POST /query
-           Body: { "q": "<prompt>" }
-        2) Run the search via POST /search
-           Body: SearchRequest, including:
-                {
-                    "qid": <query_id>,
-                    "num_images_to_retrieve": ...,
-                    "include_base_images_in_preview": ...,
-                    "generation_config": {
-                        "engines": [
-                            { "name": "...", "params": {...} },
-                            ...
-                        ],
-                        "num_engines_to_use": ...,
-                        "num_images": ...,
-                        "image_size": ...,
-                        "use_fallback": ...
-                    }
-                }
+        """Create a query, then run the search for it.
+
+        Engines are deliberately not sent: the backend applies the shared
+        generator preferences, so the CLI and the desktop app resolve a search
+        exactly the same way.
         """
         qres = self._post("/query", data={"q": prompt})
         qid = qres["qid"]
 
-        generation_config = {
-            "engines": engine_configs,
+        generation_config = {}
+        generation_optionals = {
+            "num_images_per_engine": num_images_per_engine,
+            "image_size": image_size,
         }
-
-        generation_optionals = {"num_images_per_engine": num_images_per_engine,
-                                "num_engines_to_use": num_engines_to_use,
-                                "image_size": image_size, "use_fallback": use_fallback}
-
         for optional, value in generation_optionals.items():
             if value is not None:
                 generation_config[optional] = value

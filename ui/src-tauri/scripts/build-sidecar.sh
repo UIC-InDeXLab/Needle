@@ -118,7 +118,34 @@ else
   echo "SERVICE__USE_CUDA=false" > "$RES_DIR/service.env"
 fi
 
-echo ">> Done ($NEEDLE_ACCEL build). Backend dir: $BACKEND_DIST/needle-backend"
+# -- needlectl ---------------------------------------------------------------
+# The CLI ships with the app so that installing Needle gives you both. It talks
+# to the same backend and shares its settings, so the two stay in step.
+echo ">> Building needlectl"
+CLI_SRC="$ROOT/needlectl"
+CLI_DIST="$RES_DIR/bin"
+rm -rf "$CLI_DIST"
+mkdir -p "$CLI_DIST"
+
+python -m pip install -r "$CLI_SRC/requirements.txt" >/dev/null
+pyinstaller \
+  --noconfirm --clean --onefile \
+  --name needlectl \
+  --distpath "$CLI_DIST" \
+  --workpath "$BUILD_DIR/cli-work" \
+  --specpath "$BUILD_DIR" \
+  --paths "$CLI_SRC" \
+  --collect-submodules shellingham \
+  "$CLI_SRC/needlectl.py"
+
+if [ ! -f "$CLI_DIST/needlectl$EXE_SUFFIX" ]; then
+  echo ">> ERROR: needlectl was not produced at $CLI_DIST/needlectl$EXE_SUFFIX" >&2
+  exit 1
+fi
+
+echo ">> Done ($NEEDLE_ACCEL build)."
+echo "   Backend: $BACKEND_DIST/needle-backend"
+echo "   CLI:     $CLI_DIST/needlectl$EXE_SUFFIX"
 
 # Fail loudly if the expected executable is missing: the Tauri shell resolves it
 # by an exact path, so a silently renamed/missing binary would only surface as a

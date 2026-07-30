@@ -71,12 +71,17 @@ class EngineConfig(BaseModel):
 
 
 class GenerationConfig(BaseModel):
-    engines: List[EngineConfig]
+    # Optional on purpose: when omitted the backend applies the saved generator
+    # preferences, so every client resolves a search the same way. Supplying
+    # engines explicitly is still allowed for one-off overrides.
+    engines: Optional[List[EngineConfig]] = Field(
+        None, description="Engines in priority order; defaults to the saved preferences")
     num_engines_to_use: int = Field(settings.query.num_engines_to_use, description="Number of engines to use")
     num_images: int = Field(settings.query.num_images_to_generate,
                             description="Number of images to generate per engine")
     image_size: str = Field(settings.query.generated_image_size, description="Image size in pixels")
-    use_fallback: bool = Field(settings.query.use_fallback, description="Whether to use fallback engines on failure")
+    use_fallback: Optional[bool] = Field(
+        None, description="Override the saved fallback setting for this search")
 
 
 class SearchRequest(BaseModel):
@@ -114,6 +119,19 @@ class GeneratorInfo(BaseModel):
 
 class SetCredentialsRequest(BaseModel):
     params: Dict[str, str] = Field(..., description="Credential key/value pairs (e.g. api_key)")
+
+
+class GeneratorPreference(BaseModel):
+    name: str = Field(..., description="Engine id, e.g. needle-local")
+    enabled: bool = Field(False, description="Use this engine for search")
+    params: Dict[str, Any] = Field(default_factory=dict,
+                                   description="Per-engine settings, e.g. the model to use")
+
+
+class GeneratorPreferencesRequest(BaseModel):
+    engines: List[GeneratorPreference] = Field(
+        ..., description="Engines in priority order; the first enabled one is tried first")
+    fallback: bool = Field(True, description="On failure, fall through to the next enabled engine")
 
 
 class ConfigureSetupRequest(BaseModel):

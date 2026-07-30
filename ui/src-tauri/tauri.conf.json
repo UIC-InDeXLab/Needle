@@ -41,10 +41,16 @@
     "longDescription": "Needle indexes your image folders and lets you find images with natural-language queries. Fully local: no accounts, no cloud required.",
     "linux": {
       "deb": {
-        "depends": []
+        "depends": [],
+        "files": {
+          "/usr/bin/needlectl": "resources/bin/needlectl"
+        }
       },
       "rpm": {
         "depends": [],
+        "files": {
+          "/usr/bin/needlectl": "resources/bin/needlectl"
+        },
         "compression": {
           "type": "none"
         }

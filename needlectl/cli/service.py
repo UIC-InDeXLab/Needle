@@ -10,8 +10,9 @@ from typing import Optional
 
 import requests
 
+from backend.api_client import BackendClient
 from cli.utils import print_result
-from config.config_manager import EnvConfigManager
+
 
 service_app = typer.Typer(help="Manage the local Needle backend (embedded, no Docker).")
 
@@ -385,15 +386,86 @@ def service_status_cmd(ctx: typer.Context):
 
 @service_app.command("log")
 def service_log_cmd(ctx: typer.Context, service: str = typer.Argument("backend", help="(kept for compatibility)")):
-    """Show where backend logs can be found.
+    """Show where backend logs can be found."""
+    from utils import get_data_dir
 
-    In the desktop build the backend runs as a sidecar and its logs are streamed
-    to the Needle app process. When run from source, logs go to the terminal
-    running the backend.
-    """
     typer.echo("The Needle backend runs inside the desktop app; its logs stream to the app process.")
     typer.echo("If you started the backend from source (make backend), logs appear in that terminal.")
-    typer.echo("Application data (SQLite + LanceDB): ~/.needle/data")
+    typer.echo(f"Application data and logs: {get_data_dir()}")
+
+
+@service_app.command("setup")
+def service_setup(
+    ctx: typer.Context,
+    profile: Optional[str] = typer.Option(None, help="fast | balanced | accurate"),
+    gpu: Optional[bool] = typer.Option(None, "--gpu/--no-gpu", help="Use the GPU when available."),
+    wait: bool = typer.Option(True, help="Wait for the models to finish downloading."),
+):
+    """Run first-time setup.
+
+    Until this completes the backend rejects indexing and search, which is why a
+    fresh install would otherwise answer every command with "not ready yet".
+    Running it here does the same thing as the app's welcome screen.
+    """
+    import time
+
+    client = BackendClient(ctx.obj["api_url"])
+    status = client.get_setup_status()
+
+    if status.get("configured") and profile is None and gpu is None:
+        typer.echo(f"Already set up (profile: {status.get('profile')}).")
+        typer.echo("Pass --profile to change it; this re-indexes your library.")
+        return
+
+    options = client.get_setup_options()
+    if profile is None:
+        profile = options.get("default_profile", "fast")
+    valid = [p["id"] for p in options.get("profiles", [])] or ["fast", "balanced", "accurate"]
+    if profile not in valid:
+        typer.echo(f"Unknown profile '{profile}'. Choose from: {', '.join(valid)}")
+        raise typer.Exit(code=1)
+
+    if gpu is None:
+        gpu = bool(options.get("gpu_available"))
+
+    client.configure_setup(profile, gpu)
+    typer.echo(f"Setting up with the '{profile}' profile (GPU: {'on' if gpu else 'off'}).")
+    if not wait:
+        return
+
+    last = None
+    while True:
+        state = client.get_setup_status()
+        if state.get("ready") or state.get("state") == "error":
+            break
+        message = state.get("message")
+        if message and message != last:
+            typer.echo(message)
+            last = message
+        time.sleep(1)
+
+    if state.get("state") == "error":
+        typer.echo(f"Setup failed: {state.get('message')}")
+        raise typer.Exit(code=1)
+    typer.echo("Needle is ready.")
+
+
+@service_app.command("info")
+def service_info(ctx: typer.Context):
+    """Show version, platform, library and storage details."""
+    client = BackendClient(ctx.obj["api_url"])
+    print_result(client.get_system_info(), ctx.obj["output"])
+
+
+@service_app.command("gpu")
+def service_gpu(ctx: typer.Context, state: str = typer.Argument(..., help="on | off")):
+    """Turn hardware acceleration on or off."""
+    if state not in ("on", "off"):
+        typer.echo("Expected 'on' or 'off'.")
+        raise typer.Exit(code=1)
+    client = BackendClient(ctx.obj["api_url"])
+    result = client.set_gpu(state == "on")
+    typer.echo(f"GPU {'enabled' if result.get('use_gpu') else 'disabled'}; reloading models.")
 
 
 @service_app.command("update")
@@ -411,6 +483,12 @@ def service_update(
 
 @service_app.command("config")
 def service_config(ctx: typer.Context):
-    """Manage service configuration."""
-    manager = EnvConfigManager(service_name="service")
-    manager.handle()
+    """Show where Needle's settings live."""
+    from utils import get_data_dir
+
+    typer.echo("Settings are managed by the app and stored alongside your data:")
+    typer.echo(f"  {get_data_dir()}")
+    typer.echo("")
+    typer.echo("Generator settings:   needlectl generator list")
+    typer.echo("Accuracy profile:     needlectl service setup --profile <name>")
+    typer.echo("Hardware accel:       needlectl service gpu on|off")

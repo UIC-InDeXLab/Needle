@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from backend.api_client import BackendClient
 from cli.utils import print_result
-from config.config_manager import EnvConfigManager, DirectoryConfigManager
+
 
 directory_app = typer.Typer(help="Manage directories.")
 
@@ -86,11 +86,20 @@ def list_directories(ctx: typer.Context):
     print_result(result, ctx.obj["output"])
 
 
-@directory_app.command("modify")
-def modify_directories(ctx: typer.Context):
+@directory_app.command("enable")
+def directory_enable(ctx: typer.Context, did: int):
+    """Include a folder in searches again."""
     client = BackendClient(ctx.obj["api_url"])
-    manager = DirectoryConfigManager(service_name="directory", backend_client=client)
-    manager.handle()
+    client.update_directory(did, True)
+    typer.echo(f"Directory {did} enabled.")
+
+
+@directory_app.command("disable")
+def directory_disable(ctx: typer.Context, did: int):
+    """Keep a folder indexed but exclude it from searches."""
+    client = BackendClient(ctx.obj["api_url"])
+    client.update_directory(did, False)
+    typer.echo(f"Directory {did} disabled.")
 
 
 @directory_app.command("describe")
@@ -98,11 +107,3 @@ def directory_detail(ctx: typer.Context, did: int):
     client = BackendClient(ctx.obj["api_url"])
     result = client.describe_directory(did)
     print_result(result, ctx.obj["output"])
-
-
-@directory_app.command("config")
-def directory_config(
-        ctx: typer.Context,
-):
-    manager = EnvConfigManager(service_name="directory")
-    manager.handle()

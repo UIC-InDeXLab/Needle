@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import {
   createQuery, search, getSearchLogs, getFile,
-  getDirectories, getGenerators, getGeneratorConfig,
+  getDirectories, getGeneratorPreferences,
 } from '../services/api';
 import logoImage from '../assets/images/logo.png';
 
@@ -47,15 +47,10 @@ const SearchPage = () => {
       library = (d.data.directories || []).some((x) => x.is_indexed);
     } catch { /* ignore */ }
     try {
-      const g = await getGenerators();
-      const engines = g.data || [];
-      const stored = getGeneratorConfig();
-      // Before the user has ever opened the Generators tab there is no stored
-      // config. That does not mean "nothing is enabled": the backend falls back
-      // to the first available engine, so any usable engine counts as ready.
-      generator = stored.length === 0
-        ? engines.some((e) => e.available)
-        : engines.some((e) => e.available && stored.some((c) => c.enabled && c.name === e.name));
+      // Preferences are annotated with availability, and an engine that cannot
+      // run is never reported as enabled, so this is the whole check.
+      const p = await getGeneratorPreferences();
+      generator = (p.data.engines || []).some((e) => e.enabled && e.available);
     } catch { /* ignore */ }
     setReady({ library, generator, checked: true });
   }, []);

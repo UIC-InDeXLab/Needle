@@ -5,5 +5,6 @@
 * [Searching Your Images](searching.md)
 * [Image Generation](generating.md)
 * [Status & Settings](status.md)
+* [Command Line](cli.md)
 * [Demo](demo.md)
 * [Uninstallation](uninstallation.md)

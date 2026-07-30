@@ -48,8 +48,14 @@ const SearchPage = () => {
     } catch { /* ignore */ }
     try {
       const g = await getGenerators();
-      const enabled = getGeneratorConfig().filter((c) => c.enabled).map((c) => c.name);
-      generator = (g.data || []).some((e) => enabled.includes(e.name) && e.available);
+      const engines = g.data || [];
+      const stored = getGeneratorConfig();
+      // Before the user has ever opened the Generators tab there is no stored
+      // config. That does not mean "nothing is enabled": the backend falls back
+      // to the first available engine, so any usable engine counts as ready.
+      generator = stored.length === 0
+        ? engines.some((e) => e.available)
+        : engines.some((e) => e.available && stored.some((c) => c.enabled && c.name === e.name));
     } catch { /* ignore */ }
     setReady({ library, generator, checked: true });
   }, []);

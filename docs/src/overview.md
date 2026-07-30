@@ -5,7 +5,31 @@
 *We have found the* ***Needle*** *in haystack!* 🪡🔍
 
 <!-- Description -->
-Needle is an open-source image retrieval database with high accuracy that can easily handle complex queries in natural language. It is **Fast**, **Efficient**, and **Precise**, outperforming state-of-the-art methods. Born from high-end research, Needle is designed to be accessible to everyone while delivering top-notch performance. Whether you’re a researcher, developer, or an enthusiast, Needle opens up innovative ways to explore your image datasets. ✨
+Needle is an open-source image search engine that finds pictures from a
+description in plain language. It runs as a **desktop app on your own machine** —
+no accounts, no cloud, no Docker, and nothing uploaded. Point it at a folder,
+describe the picture you're after, and it finds the closest matches.
+
+Born from research on high-accuracy retrieval, Needle outperforms
+state-of-the-art methods on complex natural-language queries while staying
+approachable enough to install and use in a couple of minutes. ✨
+
+![Searching a photo library in plain language](media/app/search-results.png)
+
+**How it works.** Needle doesn't match your words against text or filenames.
+It generates a small preview image from your query, embeds it with the same
+models used to index your library, and retrieves the images that look closest.
+Comparing images to images is what lets it handle descriptions that tagging and
+keyword search cannot.
+
+- 🔍 **Search in plain language** across your own folders.
+- 🖥️ **Fully local** — your photos never leave your machine.
+- 🎨 **Built-in image generation**, on-device and optional.
+- 📁 **Stays in sync** — folders are watched, so new and deleted images are
+  picked up automatically.
+- 🍎🐧🪟 **macOS, Linux and Windows** installers.
+
+[**Get started →**](getting-started.md)
 
 <!-- Demonstration GIF -->
 ## See Needle in Action

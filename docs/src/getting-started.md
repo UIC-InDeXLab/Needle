@@ -91,71 +91,51 @@ build locally are never quarantined, so they open with no extra steps.
 ```bash
 git clone https://github.com/UIC-InDeXLab/Needle.git
 cd Needle
-./scripts/install.sh            # or: fast | balanced | accurate
+./scripts/build-app.sh
 ```
 
-This builds the desktop app (with a bundled backend) and the `needlectl` CLI,
-then installs both. Your data is stored in `~/.needle/data`.
+This builds the UI, bundles the backend into the app, and produces an installer
+for your platform under `ui/src-tauri/target/release/bundle/`. Apps you build
+yourself are never quarantined, so they open without the warnings above.
 
-### Configuration modes
+### Accuracy profiles
 
-Pass a mode to `install.sh` to control accuracy vs. speed:
+Needle can trade speed for accuracy:
 
-- **fast** (default): 2 lightweight models, fastest indexing/retrieval.
-- **balanced**: 4 models, balanced accuracy.
-- **accurate**: 6 models, best accuracy (slower).
+- **fast** (default): 2 lightweight models, quickest indexing and search.
+- **balanced**: 4 models.
+- **accurate**: 6 models, best results but slower and a larger download.
 
-You can also pick the mode in the app's welcome screen on first launch.
+You pick a profile on the welcome screen at first launch, and can change it
+later — though changing it means re-indexing your library.
 
 ### First launch
 
-The first time you open Needle it downloads the models for the mode you chose
-(roughly 3.7 GB for **fast**) and shows live progress. Models are cached in
-`~/.cache/huggingface`, so later launches start quickly.
+On first launch Needle asks you to pick an accuracy profile, then downloads the
+embedding models for it (roughly 3.7 GB for **fast**) with live progress. Models
+are cached in `~/.cache/huggingface`, so later launches start immediately.
 
-> **Note:** Needle automatically uses your GPU (CUDA) or Apple Silicon (MPS) when
-> available. It is enabled by default, and you can turn it on or off later under
+![Needle's search screen after setup](media/app/search-home.png)
+
+Once setup finishes, you're ready to
+[add a folder and search it](searching.md).
+
+> **Note:** Needle uses your GPU (CUDA) or Apple Silicon (MPS) when available.
+> It is enabled by default, and you can turn it on or off later under
 > **Status → Hardware acceleration**; switching reloads the models but does not
 > re-download them.
 
-## Verifying the installation
+## What's inside
 
-Confirm the CLI is installed:
+The app runs a local backend on `127.0.0.1:8000` and starts it for you. Nothing
+is exposed to the network, and no data leaves your machine.
 
-```bash
-needlectl --version
-```
+If you want to script against it, the API is documented at
+<http://127.0.0.1:8000/docs> while Needle is running.
 
-### Access Points
+## Next steps
 
-The app starts its backend automatically on launch. When running, you can access:
-
-- **Backend API:** http://127.0.0.1:8000
-- **API Documentation:** http://127.0.0.1:8000/docs
-
-## Managing Services
-
-Use `needlectl` to manage all services:
-
-```bash
-# Start all services
-needlectl service start
-
-# Stop all services
-needlectl service stop
-
-# Check status
-needlectl service status
-
-# View logs
-needlectl service log backend
-needlectl service log image-generator-hub
-needlectl service log infrastructure
-
-# Restart services
-needlectl service restart
-```
-
-## About needlectl
-
-The `needlectl` command-line tool is the primary interface for interacting with Needle. It will be discussed in detail in the subsequent sections, where you'll learn how to leverage its full capabilities.
+- [Searching Your Images](searching.md) — add a folder and run your first query.
+- [Image Generation](generating.md) — how Needle turns a query into images, and
+  how to generate images yourself.
+- [Status & Settings](status.md) — storage, updates and hardware acceleration.

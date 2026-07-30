@@ -1,7 +1,6 @@
 [book]
 authors = ["UIC Index-Lab"]
 language = "en"
-multilingual = false
 src = "src"
 title = "Needle"
 
@@ -11,4 +10,4 @@ default-theme = "rust"
 preferred-dark-theme = "rust"
 smart-punctuation = true
 git-repository-url = "https://github.com/UIC-IndexLab/Needle"
-git-repository-icon = "fa-github"
+git-repository-icon = "fab-github"

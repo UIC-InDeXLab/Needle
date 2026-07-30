@@ -90,7 +90,7 @@ For detailed customization instructions, see the [Demo Customization Guide](http
 After trying the demo, you can:
 
 1. **Install Needle**: Follow our [Getting Started](getting-started.md) guide
-2. **Use Needlectl**: Learn about our [command-line interface](needlectl/README.md)
+2. **Search your own images**: See [Searching Your Images](searching.md)
 3. **Configure Services**: Set up your own image generation and search pipeline
 
 ---

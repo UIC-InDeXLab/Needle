@@ -18,16 +18,16 @@ Or if you have the repository cloned:
 
 By default, the uninstallation script removes:
 
-- **The Needle desktop app** (`/Applications/Needle.app` on macOS; the `.deb`
-  package or `~/.local/bin/Needle.AppImage` on Linux)
-- **needlectl binary** (from `/usr/local/bin` or `~/.local/bin`)
+- **The Needle desktop app** (`/Applications/Needle.app` on macOS; the installed
+  package on Linux and Windows)
 
 Your indexed data is **kept by default**. It lives in:
 
-- `~/.needle` — source and CLI installs
-- `~/Library/Application Support/com.needle.app` — the packaged macOS app
-  (`~/.local/share/com.needle.app` on Linux)
-- `~/.cache/huggingface` — downloaded model weights (several GB)
+- `~/Library/Application Support/com.needle.app` — macOS
+- `~/.local/share/com.needle.app` — Linux
+- `%APPDATA%\com.needle.app` — Windows
+- `~/.cache/huggingface` — downloaded model weights (several GB, shared with
+  other Hugging Face tools)
 
 ## Complete Cleanup
 
@@ -48,18 +48,20 @@ If you prefer to remove things by hand:
 ```bash
 # Remove the app
 rm -rf /Applications/Needle.app            # macOS
-sudo dpkg -r needle                        # Linux (.deb)
-rm -f ~/.local/bin/Needle.AppImage         # Linux (AppImage)
-
-# Remove the CLI
-sudo rm -f /usr/local/bin/needlectl ~/.local/bin/needlectl
+sudo apt remove needle                     # Linux (.deb)
+sudo dnf remove needle                     # Linux (.rpm)
 
 # Remove all user data (optional)
-rm -rf ~/.needle
 rm -rf ~/Library/Application\ Support/com.needle.app   # macOS
 rm -rf ~/.local/share/com.needle.app                   # Linux
 
 # Remove downloaded models (optional, several GB)
 rm -rf ~/.cache/huggingface
 ```
+
+On Windows, uninstall Needle from **Settings → Apps**, then optionally delete
+`%APPDATA%\com.needle.app` and `%USERPROFILE%\.cache\huggingface`.
+
+> Deleting only the data directory (and keeping the Hugging Face cache) resets
+> Needle to a first run without re-downloading several gigabytes of models.
 

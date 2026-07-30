@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+pydantic
+pillow
+torch
+diffusers
+transformers
+accelerate
+safetensors
+# FLUX.1-schnell text encoders (T5) need these:
+sentencepiece
+protobuf

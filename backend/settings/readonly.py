@@ -11,6 +11,7 @@ class ReadOnlySettings:
             cls._instance = super().__new__(cls)
             cls._instance._settings = Settings()
             cls._instance._settings.load_embedders_config()
+            cls._instance._settings.storage.ensure_dirs()
             cls._log_settings()
         return cls._instance
 
@@ -35,6 +36,10 @@ class ReadOnlySettings:
         return self._settings.milvus
 
     @property
+    def storage(self):
+        return self._settings.storage
+
+    @property
     def service(self):
         return self._settings.service
 
@@ -52,7 +57,14 @@ class ReadOnlySettings:
 
     @property
     def image_embedders(self):
+        if not self._settings.embedders_config:
+            return []
         return self._settings.embedders_config.image_embedders
+
+    def reload_embedders(self):
+        """Re-read the active embedders config (after onboarding writes a new one)."""
+        self._settings.load_embedders_config()
+        return self._settings.embedders_config
 
     def get_image_embedder_details(self, name: str):
         embedder = next(

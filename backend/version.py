@@ -64,5 +64,7 @@ def get_version_from_git():
         # Fallback to a default version if git fails
         return "0.1.0"
 
-# Get version dynamically from git
-VERSION = get_version_from_git()
+# The packaged desktop app has no git checkout, so the Tauri shell passes the
+# bundle version in the environment. Prefer it and only fall back to git when
+# running from a source tree.
+VERSION = os.environ.get("NEEDLE_APP_VERSION") or get_version_from_git()

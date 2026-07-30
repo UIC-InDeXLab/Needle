@@ -3,6 +3,7 @@ import platform
 import torch
 import torch.nn as nn
 from core.singleton import Singleton
+from monitoring import logger
 from settings import settings
 from timm import create_model, data
 
@@ -17,8 +18,8 @@ class ImageEmbedder:
         # Create and move the model to the device.
         model = create_model(model_name, pretrained=True, num_classes=0).to(device)
 
-        # Wrap the model with DataParallel if more than one GPU is available.
-        if torch.cuda.is_available() and torch.cuda.device_count() > 1 and settings.service.use_cuda:
+        # Wrap the model with DataParallel if more than one CUDA GPU is available.
+        if device.type == "cuda" and torch.cuda.device_count() > 1:
             self.model = nn.DataParallel(model)
         else:
             self.model = model
@@ -73,19 +74,51 @@ class ImageEmbedder:
 
 @Singleton
 class EmbedderManager:
+    """Lazily manages image embedders.
+
+    Models are NOT loaded at construction — that would make first launch heavy and
+    can exhaust memory before the user has chosen a profile. Call ``load()`` (driven
+    by the onboarding/setup flow) to actually instantiate the models.
+    """
+
     def __init__(self):
-        self._device = torch.device(
-            "cuda" if torch.cuda.is_available() and settings.service.use_cuda else
-            "mps" if torch.backends.mps.is_available() and platform.system() == "Darwin" else
-            "cpu")
         self._image_embedders = {}
-        for embedder_config in settings.image_embedders:
-            self._image_embedders[embedder_config.name] = ImageEmbedder(
-                name=embedder_config.name,
-                model_name=embedder_config.model_name,
-                weight=embedder_config.weight if embedder_config.weight is not None
-                else 1 / len(settings.image_embedders),
-                device=self._device)
+        self._loaded = False
+
+    @property
+    def loaded(self) -> bool:
+        return self._loaded
+
+    def load(self, progress=None):
+        """Instantiate embedders from the current settings. Heavy: downloads/loads weights.
+
+        ``progress`` is an optional callback ``(index, total, name)`` invoked before
+        each model loads, so the UI can show onboarding progress.
+        """
+        from core.device import select_device
+
+        device = select_device()
+        configs = list(settings.image_embedders)
+        total = len(configs)
+        embedders = {}
+        for i, cfg in enumerate(configs):
+            if progress:
+                progress(i, total, cfg.name)
+            logger.info(f"Loading embedder {i + 1}/{total}: {cfg.name} ({cfg.model_name}) on {device}")
+            embedders[cfg.name] = ImageEmbedder(
+                name=cfg.name,
+                model_name=cfg.model_name,
+                weight=cfg.weight if cfg.weight is not None else 1 / total,
+                device=device,
+            )
+        self._image_embedders = embedders
+        self._loaded = True
+        logger.info(f"Loaded {total} embedder(s) on {device}")
+        return self._image_embedders
+
+    def unload(self):
+        self._image_embedders = {}
+        self._loaded = False
 
     def get_image_embedders(self):
         return self._image_embedders

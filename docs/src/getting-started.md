@@ -2,80 +2,125 @@
 
 ## Prerequisites
 
-Before installing Needle, ensure that you have the following prerequisites installed:
+Needle is a self-contained desktop application. **End users do not need Docker,
+PostgreSQL, or any external services** — everything (metadata via SQLite, vectors
+via LanceDB, and on-device image generation) runs locally inside the app.
 
-- **Docker:** Needle relies on Docker to containerize its infrastructure services.  
-  [Install Docker](https://docs.docker.com/get-docker/)
+To **build** Needle from source you need:
 
-- **Docker Compose:** This tool is required to orchestrate the multi-container setup.  
-  [Install Docker Compose](https://docs.docker.com/compose/install/)
+- **Python 3.12+** — for the bundled backend. [Install Python](https://www.python.org/downloads/)
+- **Node.js 18+** — for the UI. [Install Node.js](https://nodejs.org/)
+- **Rust toolchain** — for the Tauri desktop shell. [Install Rust](https://rustup.rs/)
 
-- **Python 3.8+:** Required for the backend and image generator services (Python 3.12+ recommended).  
-  [Install Python](https://www.python.org/downloads/)
-
-- **Git:** Required for cloning the repository and managing updates.  
-  [Install Git](https://git-scm.com/downloads)
-
-> **Warning:** Make sure your user account is added to the Docker group so you can run Docker commands (e.g., `docker ps`) without needing root privileges.
-
-> **Note:** Currently, Needle is supported on **Linux** and **macOS**.
+> **Note:** Needle is supported on **Linux**, **macOS** and **Windows**.
+>
+> On macOS, Needle requires **macOS 14 (Sonoma) or later** on an **Apple Silicon**
+> Mac. Intel Macs are not supported: PyTorch stopped publishing macOS x86_64
+> builds after 2.2, so the bundled backend cannot be built for them.
+>
+> On Windows, Needle requires **Windows 10 or later** (x64).
 
 ## Installation
 
-### Quick Install (Recommended)
+### Option A — Download an installer (recommended)
 
-Install Needle with a single command - no cloning required:
+Download the installer for your platform from the
+[releases page](https://github.com/UIC-InDeXLab/Needle/releases):
 
-```bash
-# Default installation (fast mode - recommended for getting started)
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash
+- **macOS:** `Needle_x.y.z_macos_arm64.dmg` — open it and drag Needle to
+  Applications, then see [Opening Needle on macOS](#opening-needle-on-macos) below.
+- **Linux:** `Needle_x.y.z_linux_amd64.deb` (`sudo apt install ./Needle_*.deb`) or
+  `Needle_x.y.z_linux_x86_64.rpm` (`sudo dnf install ./Needle_*.rpm`).
+- **Windows:** `Needle_x.y.z_windows_x64-setup.exe` — run it, then see
+  [Opening Needle on Windows](#opening-needle-on-windows) below.
 
-# Or with a specific configuration mode
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash -s fast
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash -s balanced
-curl -fsSL https://raw.githubusercontent.com/UIC-InDeXLab/Needle/main/scripts/install-oneliner.sh | bash -s accurate
-```
-
-This installs Needle to `~/.needle` and adds the `needlectl` command-line tool.
-
-### Configuration Options
-
-Choose your performance configuration:
-
-- **Fast (Default):** Single CLIP model, fastest indexing and retrieval - best for getting started quickly
-- **Balanced:** 4 models with balanced performance and accuracy
-- **Accurate:** 6 models with highest accuracy but slower performance
-
-> **Warning:** Once the configuration mode is set, it cannot be changed without uninstalling and reinstalling Needle, which will result in data loss.
-
-> **Note:** Needle automatically checks for GPU accessibility and will use the GPU if available to optimize performance.
-
-### What Gets Installed
-
-The installation process sets up:
-
-- **Virtual Environments:** Separate Python environments for backend and image generator services
-- **Docker Infrastructure:** PostgreSQL, Milvus, MinIO, and etcd services via Docker Compose
-- **Configuration Files:** Performance-optimized settings based on your chosen mode
-- **needlectl CLI:** Command-line interface for managing Needle (installed to `/usr/local/bin/needlectl`)
-
-## Starting the Needle Service
-
-Once installed, start the Needle service by running:
+Each release also ships a `.sha256` file so you can verify the download:
 
 ```bash
-needlectl service start
+shasum -a 256 -c Needle_*_macos_arm64.dmg.sha256
 ```
 
-This command will start all the necessary infrastructure services (PostgreSQL, Milvus, etc.) and the Needle backend.
+### Opening Needle on macOS
 
-To verify that everything is running as expected, check the service status:
+The released app is **not signed with an Apple Developer ID**, because signing
+and notarization require a paid Apple Developer account. The first time you open
+it, macOS will refuse and show something like:
+
+> **"Needle is damaged and can't be opened. You should move it to the Bin."**
+
+**The app is not damaged.** That wording is what macOS shows for any app it
+cannot attribute to a registered developer. When you download a file, your
+browser attaches a `com.apple.quarantine` flag to it; Gatekeeper checks that
+flagged apps are both signed by a known developer and notarized by Apple, and
+Needle is neither.
+
+To open it, remove the quarantine flag once:
 
 ```bash
-needlectl service status
+xattr -dr com.apple.quarantine /Applications/Needle.app
 ```
 
-And confirm the installed version using:
+Then launch Needle normally. You only need to do this once per install.
+
+### Opening Needle on Windows
+
+The released installer is **not code-signed**, because a signing certificate is
+a paid, per-year purchase. Windows SmartScreen therefore blocks it the first
+time with:
+
+> **"Windows protected your PC"**
+
+Click **More info**, then **Run anyway** to continue. The installer places
+Needle under your user profile, so no administrator prompt is needed.
+
+Some antivirus products also flag freshly built PyInstaller executables as
+suspicious. This is a known false positive caused by the way the Python runtime
+is bundled; verify the download against the published `.sha256` if in doubt, or
+build from source.
+
+> **Why not just right-click → Open?** That shortcut no longer works for
+> unsigned apps on recent macOS versions. Removing the quarantine attribute (or
+> approving the app under **System Settings → Privacy & Security** after a
+> blocked launch attempt) is the supported route.
+
+If you would rather not run that command, build from source instead — apps you
+build locally are never quarantined, so they open with no extra steps.
+
+### Option B — Build & install from source
+
+```bash
+git clone https://github.com/UIC-InDeXLab/Needle.git
+cd Needle
+./scripts/install.sh            # or: fast | balanced | accurate
+```
+
+This builds the desktop app (with a bundled backend) and the `needlectl` CLI,
+then installs both. Your data is stored in `~/.needle/data`.
+
+### Configuration modes
+
+Pass a mode to `install.sh` to control accuracy vs. speed:
+
+- **fast** (default): 2 lightweight models, fastest indexing/retrieval.
+- **balanced**: 4 models, balanced accuracy.
+- **accurate**: 6 models, best accuracy (slower).
+
+You can also pick the mode in the app's welcome screen on first launch.
+
+### First launch
+
+The first time you open Needle it downloads the models for the mode you chose
+(roughly 3.7 GB for **fast**) and shows live progress. Models are cached in
+`~/.cache/huggingface`, so later launches start quickly.
+
+> **Note:** Needle automatically uses your GPU (CUDA) or Apple Silicon (MPS) when
+> available. It is enabled by default, and you can turn it on or off later under
+> **Status → Hardware acceleration**; switching reloads the models but does not
+> re-download them.
+
+## Verifying the installation
+
+Confirm the CLI is installed:
 
 ```bash
 needlectl --version
@@ -83,11 +128,10 @@ needlectl --version
 
 ### Access Points
 
-After starting services, you can access:
+The app starts its backend automatically on launch. When running, you can access:
 
-- **Backend API:** http://localhost:8000
-- **API Documentation:** http://localhost:8000/docs
-- **Image Generator:** http://localhost:8010
+- **Backend API:** http://127.0.0.1:8000
+- **API Documentation:** http://127.0.0.1:8000/docs
 
 ## Managing Services
 

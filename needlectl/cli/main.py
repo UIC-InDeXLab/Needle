@@ -98,15 +98,6 @@ def main(
     ),
 ):
     needle_home = get_storage_dir()
-    
-    # Set up Docker compose files for infrastructure services only
-    # Check if we're in the current directory (for development) or use the home directory
-    current_dir = Path.cwd()
-    if (current_dir / "docker" / "docker-compose.infrastructure.yaml").exists():
-        files = [current_dir / "docker" / "docker-compose.infrastructure.yaml"]
-    else:
-        files = [Path(needle_home) / "docker" / "docker-compose.infrastructure.yaml"]
-    os.environ["NEEDLE_COMPOSE_FILES"] = os.pathsep.join(str(p) for p in files)
 
     ctx.obj = {
         "api_url": api_url,

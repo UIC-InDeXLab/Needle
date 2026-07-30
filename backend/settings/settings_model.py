@@ -1,9 +1,44 @@
 import json
+import os
 from pathlib import Path
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
+
+
+def _default_data_dir() -> str:
+    """Resolve the application data directory.
+
+    Honours the NEEDLE_DATA_DIR environment variable so packaged desktop builds
+    can point at a per-user location; defaults to ``~/.needle/data``.
+    """
+    env = os.environ.get("NEEDLE_DATA_DIR")
+    if env:
+        return env
+    return str(Path.home() / ".needle" / "data")
+
+
+class StorageSettings(BaseModel):
+    """Filesystem locations for the embedded SQLite + LanceDB stores."""
+
+    data_dir: str = Field(default_factory=_default_data_dir)
+
+    def ensure_dirs(self) -> None:
+        Path(self.data_dir).mkdir(parents=True, exist_ok=True)
+        Path(self.lancedb_path).mkdir(parents=True, exist_ok=True)
+
+    @property
+    def sqlite_path(self) -> str:
+        return str(Path(self.data_dir, "needle.db"))
+
+    @property
+    def sqlite_url(self) -> str:
+        return f"sqlite:///{self.sqlite_path}"
+
+    @property
+    def lancedb_path(self) -> str:
+        return str(Path(self.data_dir, "lancedb"))
 
 
 class ImageEmbedder(BaseModel):
@@ -48,7 +83,9 @@ class QuerySettings(BaseModel):
 
 class DirectorySettings(BaseModel):
     num_watcher_workers: int = Field(4)
-    batch_size: int = Field(50)
+    # Kept small: the embedder models are large and indexing runs a full batch
+    # through each of them in one forward pass. Big batches exhaust RAM/VRAM.
+    batch_size: int = Field(8)
     recursive_indexing: bool = Field(False)
     consistency_check_interval: int = Field(1800)
 
@@ -61,6 +98,9 @@ class ServiceSettings(BaseModel):
 class ImageGeneratorSettings(BaseModel):
     host: str = Field("0.0.0.0")
     port: int = Field(8001)
+    # Generation is delegated to the Needle Generator companion or an API
+    # provider (no bundled model). "remote" is still accepted as an alias.
+    default_engine: str = Field("needle-local")
 
     @property
     def url(self) -> str:
@@ -69,6 +109,7 @@ class ImageGeneratorSettings(BaseModel):
 
 class Settings(BaseSettings):
     # Environment-based settings
+    storage: StorageSettings = StorageSettings()
     postgres: PostgresSettings = PostgresSettings()
     milvus: MilvusSettings = MilvusSettings()
     service: ServiceSettings = ServiceSettings()
@@ -85,12 +126,19 @@ class Settings(BaseSettings):
 
     def load_embedders_config(self):
         """
-        Load and parse the JSON configuration file specified in app.config_path.
+        Load the active embedders config.
+
+        Prefers ``<data_dir>/embedders.json`` (written by the onboarding flow into a
+        writable location) and falls back to the bundled default in the config dir.
+        Missing config is tolerated (the app is simply "not configured" yet).
         """
-        config_path = Path(self.service.config_dir_path, "embedders.json")
+        data_path = Path(self.storage.data_dir, "embedders.json")
+        bundled_path = Path(self.service.config_dir_path, "embedders.json")
+        config_path = data_path if data_path.exists() else bundled_path
         if config_path.exists():
             with open(config_path, "r") as file:
                 json_data = json.load(file)
             self.embedders_config = EmbeddersConfig(**json_data)
         else:
-            raise FileNotFoundError(f"JSON config file not found at {config_path}")
+            # Not configured yet (fresh install). Onboarding will write this later.
+            self.embedders_config = None

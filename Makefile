@@ -1,21 +1,31 @@
-COMPOSE_INFRA := docker compose -f docker/docker-compose.infrastructure.yaml
+.PHONY: dev backend app install install-fast install-balanced install-accurate uninstall sidecar icons
 
-.PHONY: dev install uninstall start stop status
+# Development: run the backend from source (embedded SQLite + LanceDB, no Docker)
+backend:
+	@cd backend && . venv/bin/activate && uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 
-# Development mode - starts infrastructure services and backend in dev mode
+# Development: run the Tauri desktop app against the dev backend + Vite/CRA dev server
 dev:
-	$(COMPOSE_INFRA) up -d
-	@echo "Waiting for infrastructure services to be ready..."
-	@sleep 15
-	@echo "Starting backend in development mode..."
-	@cd backend && source venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+	@cd ui && npm run tauri:dev
 
-# Install Needle (for development - use one-liner for production)
+# Build the backend sidecar binary (PyInstaller)
+sidecar:
+	@bash ui/src-tauri/scripts/build-sidecar.sh
+
+# Generate desktop app icons from the logo
+icons:
+	@cd ui && npx tauri icon src/assets/images/logo.png
+
+# Build the desktop app + native installers
+app:
+	@chmod +x scripts/build-app.sh
+	@./scripts/build-app.sh
+
+# Install Needle desktop app + CLI (Docker-free)
 install:
 	@chmod +x scripts/install.sh
 	@./scripts/install.sh
 
-# Install with specific configuration
 install-fast:
 	@chmod +x scripts/install.sh
 	@./scripts/install.sh fast
@@ -28,19 +38,8 @@ install-accurate:
 	@chmod +x scripts/install.sh
 	@./scripts/install.sh accurate
 
-# Uninstall Needle (only removes ~/.needle installation)
+# Uninstall Needle (add PURGE=1 to also remove ~/.needle data)
 uninstall:
 	@chmod +x scripts/uninstall.sh
-	@./scripts/uninstall.sh
+	@./scripts/uninstall.sh $(if $(PURGE),--purge,)
 
-# Start all services using needlectl
-start:
-	@needlectl service start
-
-# Stop all services using needlectl
-stop:
-	@needlectl service stop
-
-# Check service status using needlectl
-status:
-	@needlectl service status

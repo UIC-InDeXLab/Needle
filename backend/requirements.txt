@@ -2,22 +2,27 @@ fastapi
 uvicorn
 python-dotenv
 
-pymilvus
+lancedb
+pyarrow
 watchdog
 
 torch
+torchvision
 pillow
 requests
-transformers
 timm
-scikit-learn
 websockets
 asyncio
+
+# On-device text-to-image generation.
+diffusers
+transformers
+accelerate
+safetensors
 
 pydantic-settings
 typer
 sqlalchemy
-psycopg2-binary
 
 pyyaml
 

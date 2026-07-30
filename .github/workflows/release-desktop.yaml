@@ -1,0 +1,351 @@
+name: Release desktop app
+
+# Publishes the Needle desktop app for macOS, Linux and Windows.
+#
+# None of the builds are code-signed, because signing needs a paid Apple
+# Developer ID / Windows OV certificate. Each platform therefore shows a warning
+# the first time the app is opened; the release notes below explain how to get
+# past it on each OS.
+#
+# Platform notes:
+#   macOS   - Apple Silicon only. PyTorch has not shipped macOS x86_64 wheels
+#             since 2.2, so the bundled backend cannot be built for Intel Macs.
+#   Linux   - .deb and .rpm. No AppImage: it bundles its own libEGL/Mesa, which
+#             conflicts with the host driver and renders a blank window on some
+#             distributions (observed on Fedora).
+#   Windows - x64 NSIS installer, installed per-user so no UAC prompt is needed.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g. 1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  # ---------------------------------------------------------------- macOS ---
+  build-macos:
+    name: Build macOS (Apple Silicon)
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ui/src-tauri
+
+      - name: Free up disk space
+        # The bundled backend (torch + diffusers) plus the PyInstaller work
+        # directory need well over the headroom a clean runner leaves.
+        run: |
+          sudo rm -rf /Applications/Xcode_14*.app /Applications/Xcode_15.0*.app || true
+          df -h /
+
+      - name: Build app + DMG
+        # build-app.sh already sets CI on macOS so create-dmg skips the Finder
+        # AppleScript, which cannot run on a headless runner.
+        run: ./scripts/build-app.sh
+
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.v.outputs.version }}"
+          BUNDLE=ui/src-tauri/target/release/bundle
+          mkdir -p dist
+          DMG=$(find "$BUNDLE/dmg" -name '*.dmg' | head -1)
+          if [ -z "$DMG" ]; then echo "::error::no DMG produced"; exit 1; fi
+          cp "$DMG" "dist/Needle_${VERSION}_macos_arm64.dmg"
+          cd dist
+          shasum -a 256 *.dmg > "Needle_${VERSION}_macos_arm64.dmg.sha256"
+          ls -lh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64
+          path: dist/*
+          retention-days: 7
+
+  # ---------------------------------------------------------------- Linux ---
+  build-linux:
+    name: Build Linux (x86_64)
+    # Built on the oldest supported runner: glibc is backwards- but not
+    # forwards-compatible, so this keeps the packages usable on older distros.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            rpm \
+            build-essential \
+            curl wget file
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ui/src-tauri
+
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          df -h /
+
+      - name: Build frontend + backend sidecar
+        run: |
+          set -euo pipefail
+          cd ui
+          npm ci
+          npm run build
+          bash src-tauri/scripts/build-sidecar.sh
+        env:
+          CI: "false" # react-scripts treats warnings as errors when CI=true
+          NEEDLE_ACCEL: cpu
+
+      - name: Build installers (deb + rpm)
+        run: |
+          set -euo pipefail
+          cd ui
+          npx tauri build --bundles deb,rpm
+
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.v.outputs.version }}"
+          BUNDLE=ui/src-tauri/target/release/bundle
+          mkdir -p dist
+          DEB=$(find "$BUNDLE/deb" -name '*.deb' | head -1)
+          RPM=$(find "$BUNDLE/rpm" -name '*.rpm' | head -1)
+          if [ -z "$DEB" ] || [ -z "$RPM" ]; then echo "::error::missing Linux package"; exit 1; fi
+          cp "$DEB" "dist/Needle_${VERSION}_linux_amd64.deb"
+          cp "$RPM" "dist/Needle_${VERSION}_linux_x86_64.rpm"
+          cd dist
+          sha256sum *.deb > "Needle_${VERSION}_linux_amd64.deb.sha256"
+          sha256sum *.rpm > "Needle_${VERSION}_linux_x86_64.rpm.sha256"
+          ls -lh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: dist/*
+          retention-days: 7
+
+  # -------------------------------------------------------------- Windows ---
+  build-windows:
+    name: Build Windows (x64)
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: v
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Enable long paths
+        # torch and diffusers nest well past the historic 260-character limit,
+        # which breaks both pip installs and PyInstaller's collection step.
+        shell: pwsh
+        run: |
+          New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
+            -Name LongPathsEnabled -Value 1 -PropertyType DWORD -Force
+          git config --system core.longpaths true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ui/src-tauri
+
+      - name: Build frontend + backend sidecar
+        # The sidecar script is bash; Git Bash ships on the Windows runners and
+        # the script detects MINGW/MSYS to pick the right venv layout, PyInstaller
+        # data separator and .exe suffix.
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ui
+          npm ci
+          npm run build
+          bash src-tauri/scripts/build-sidecar.sh
+        env:
+          CI: "false"
+          NEEDLE_ACCEL: cpu
+
+      - name: Build installer (NSIS)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ui
+          npx tauri build --bundles nsis
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.v.outputs.version }}"
+          BUNDLE=ui/src-tauri/target/release/bundle
+          mkdir -p dist
+          EXE=$(find "$BUNDLE/nsis" -name '*.exe' | head -1)
+          if [ -z "$EXE" ]; then echo "::error::no NSIS installer produced"; exit 1; fi
+          cp "$EXE" "dist/Needle_${VERSION}_windows_x64-setup.exe"
+          cd dist
+          sha256sum *.exe > "Needle_${VERSION}_windows_x64-setup.exe.sha256"
+          ls -lh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: dist/*
+          retention-days: 7
+
+  # --------------------------------------------------------------- Release ---
+  release:
+    name: Publish release
+    needs: [build-macos, build-linux, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh dist
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          draft: false
+          generate_release_notes: true
+          body: |
+            Needle is fully local: no accounts, no cloud required. The download
+            is large because the app bundles its own Python runtime, PyTorch and
+            the image-generation stack.
+
+            None of these builds are code-signed, so each OS shows a warning the
+            first time you open the app. Instructions per platform below.
+
+            ## macOS (Apple Silicon)
+
+            Requires **macOS 14 (Sonoma) or later**. Intel Macs are not
+            supported: PyTorch no longer ships macOS x86_64 builds, so the
+            bundled backend cannot be built for them.
+
+            1. Download the `.dmg` and drag **Needle** to Applications.
+            2. macOS will refuse to open it with a message such as
+               *"Needle is damaged and can't be opened."* That message is
+               misleading -- the app is not damaged, it is simply unsigned, so
+               macOS cannot identify who built it.
+            3. Clear the quarantine flag your browser attached to the download:
+
+               ```sh
+               xattr -dr com.apple.quarantine /Applications/Needle.app
+               ```
+
+               Then open the app normally. This is only needed once.
+
+            ## Linux (x86_64)
+
+            ```sh
+            # Debian / Ubuntu
+            sudo apt install ./Needle_*_linux_amd64.deb
+
+            # Fedora / RHEL
+            sudo dnf install ./Needle_*_linux_x86_64.rpm
+            ```
+
+            Needs a WebKitGTK 4.1 runtime (`libwebkit2gtk-4.1-0` / `webkit2gtk4.1`),
+            which the package manager pulls in automatically. There is no
+            AppImage: it ships its own Mesa/libEGL, which clashes with the host
+            driver and renders a blank window on some distributions.
+
+            ## Windows (x64)
+
+            Requires **Windows 10 or later**. Run the `-setup.exe` installer; it
+            installs for the current user, so no administrator prompt appears.
+
+            Windows SmartScreen will show *"Windows protected your PC"* because
+            the installer is unsigned. Choose **More info -> Run anyway** to
+            continue.
+
+            ## Build from source instead
+
+            Locally built apps skip every one of these warnings:
+
+            ```sh
+            git clone https://github.com/UIC-InDeXLab/Needle.git
+            cd Needle && ./scripts/build-app.sh
+            ```

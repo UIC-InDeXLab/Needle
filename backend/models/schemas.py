@@ -107,6 +107,43 @@ class GeneratorInfo(BaseModel):
     name: str
     description: str
     required_params: List[GeneratorRequirement]
+    available: bool = True
+    requires_credentials: bool = False
+    credentials_set: bool = True
+
+
+class SetCredentialsRequest(BaseModel):
+    params: Dict[str, str] = Field(..., description="Credential key/value pairs (e.g. api_key)")
+
+
+class ConfigureSetupRequest(BaseModel):
+    profile: str = Field(..., description="Embedder profile: fast | balanced | accurate")
+    use_gpu: bool = Field(False, description="Enable GPU (CUDA/MPS) for embeddings and generation")
+
+
+class SetGpuRequest(BaseModel):
+    use_gpu: bool = Field(..., description="Enable GPU (CUDA/MPS) for embeddings and generation")
+
+
+class LoadModelRequest(BaseModel):
+    model: str = Field(..., description="On-device generation model id, e.g. sd-turbo")
+
+
+class GenerateImagesRequest(BaseModel):
+    prompt: str = Field(..., description="Text prompt")
+    model: Optional[str] = Field(None, description="Model id; defaults to the fastest one")
+    num_images: int = Field(1, ge=1, le=8, description="How many images to generate")
+    size: str = Field("MEDIUM", description="Named size: SMALL | MEDIUM | LARGE")
+    width: Optional[int] = Field(None, ge=128, le=1536)
+    height: Optional[int] = Field(None, ge=128, le=1536)
+    steps: Optional[int] = Field(None, ge=1, le=50, description="Denoising steps")
+    seed: Optional[int] = Field(None, description="Seed for reproducible output; omit for random")
+
+
+class SaveImageRequest(BaseModel):
+    image: str = Field(..., description="PNG image as a base64 string or data URL")
+    directory: str = Field(..., description="Destination folder chosen by the user")
+    filename: Optional[str] = Field(None, description="Preferred file name (without extension)")
 
 
 class QueryLogEntry(BaseModel):

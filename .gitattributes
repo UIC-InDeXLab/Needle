@@ -1,0 +1,7 @@
+# Shell scripts must keep LF endings. Windows checkouts default to converting
+# them to CRLF, which makes bash fail with confusing "\r: command not found"
+# errors when the release workflow runs build-sidecar.sh under Git Bash.
+*.sh text eol=lf
+
+# Same reasoning for the files bash reads at build time.
+*.env text eol=lf

@@ -22,18 +22,18 @@ OS_NAME="$(uname -s)"
 case "$OS_NAME" in
   MINGW*|MSYS*|CYGWIN*)
     VENV_BIN="Scripts"; SEP=";"; EXE_SUFFIX=".exe"
-    # Git Bash rewrites arguments that look like POSIX paths before handing
-    # them to native programs, and it treats a semicolon as a path-list
-    # separator -- which mangles PyInstaller's `--add-data "src;dest"`. Turn
-    # the rewriting off and convert paths ourselves via `nat` below, so the
-    # separator survives and PyInstaller still receives real Windows paths.
-    export MSYS2_ARG_CONV_EXCL="*"
-    export MSYS_NO_PATHCONV=1
+    # Git Bash treats a semicolon as a path-list separator when it rewrites
+    # arguments for native programs, which corrupts PyInstaller's
+    # `--add-data "src;dest"`. Turn the rewriting off for PyInstaller only and
+    # hand it Windows paths built by `nat`; every other command still relies on
+    # the automatic conversion.
     nat() { cygpath -w "$1"; }
+    pyi() { MSYS2_ARG_CONV_EXCL='*' MSYS_NO_PATHCONV=1 pyinstaller "$@"; }
     ;;
   *)
     VENV_BIN="bin"; SEP=":"; EXE_SUFFIX=""
     nat() { printf '%s' "$1"; }
+    pyi() { pyinstaller "$@"; }
     ;;
 esac
 
@@ -82,7 +82,7 @@ fi
 python -m pip install -r "$BACKEND/requirements.txt" pyinstaller
 
 echo ">> Building backend (PyInstaller onedir; unpacked at install time, not at launch)"
-pyinstaller \
+pyi \
   --noconfirm --clean --onedir \
   --name needle-backend \
   --distpath "$(nat "$BACKEND_DIST")" \
@@ -144,7 +144,7 @@ rm -rf "$CLI_DIST"
 mkdir -p "$CLI_DIST"
 
 python -m pip install -r "$CLI_SRC/requirements.txt" >/dev/null
-pyinstaller \
+pyi \
   --noconfirm --clean --onefile \
   --name needlectl \
   --distpath "$(nat "$CLI_DIST")" \

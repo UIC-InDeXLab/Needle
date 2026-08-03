@@ -21,9 +21,20 @@ BACKEND="$ROOT/backend"
 OS_NAME="$(uname -s)"
 case "$OS_NAME" in
   MINGW*|MSYS*|CYGWIN*)
-    VENV_BIN="Scripts"; SEP=";"; EXE_SUFFIX=".exe" ;;
+    VENV_BIN="Scripts"; SEP=";"; EXE_SUFFIX=".exe"
+    # Git Bash rewrites arguments that look like POSIX paths before handing
+    # them to native programs, and it treats a semicolon as a path-list
+    # separator -- which mangles PyInstaller's `--add-data "src;dest"`. Turn
+    # the rewriting off and convert paths ourselves via `nat` below, so the
+    # separator survives and PyInstaller still receives real Windows paths.
+    export MSYS2_ARG_CONV_EXCL="*"
+    export MSYS_NO_PATHCONV=1
+    nat() { cygpath -w "$1"; }
+    ;;
   *)
-    VENV_BIN="bin"; SEP=":"; EXE_SUFFIX="" ;;
+    VENV_BIN="bin"; SEP=":"; EXE_SUFFIX=""
+    nat() { printf '%s' "$1"; }
+    ;;
 esac
 
 BUILD_DIR="$SRC_TAURI/.sidecar-build"
@@ -35,11 +46,16 @@ mkdir -p "$RES_DIR"
 
 echo ">> Creating build virtualenv"
 # Windows installs the interpreter as `python`; most Unix distros as `python3`.
-if command -v python3 >/dev/null 2>&1; then
+# On Windows `python3` is often an App Execution Alias that opens the Microsoft
+# Store and exits non-zero, so it is not enough for `command -v` to find it.
+if [ "$VENV_BIN" = "Scripts" ]; then
+  PYTHON_BIN="python"
+elif command -v python3 >/dev/null 2>&1; then
   PYTHON_BIN="python3"
 else
   PYTHON_BIN="python"
 fi
+echo ">> Using interpreter: $PYTHON_BIN ($("$PYTHON_BIN" --version 2>&1))"
 "$PYTHON_BIN" -m venv "$BUILD_DIR/venv"
 # shellcheck disable=SC1091
 source "$BUILD_DIR/venv/$VENV_BIN/activate"
@@ -69,12 +85,12 @@ echo ">> Building backend (PyInstaller onedir; unpacked at install time, not at 
 pyinstaller \
   --noconfirm --clean --onedir \
   --name needle-backend \
-  --distpath "$BACKEND_DIST" \
-  --workpath "$BUILD_DIR/work" \
-  --specpath "$BUILD_DIR" \
-  --paths "$BACKEND" \
-  --add-data "$BACKEND/static${SEP}static" \
-  --add-data "$BACKEND/templates${SEP}templates" \
+  --distpath "$(nat "$BACKEND_DIST")" \
+  --workpath "$(nat "$BUILD_DIR/work")" \
+  --specpath "$(nat "$BUILD_DIR")" \
+  --paths "$(nat "$BACKEND")" \
+  --add-data "$(nat "$BACKEND/static")${SEP}static" \
+  --add-data "$(nat "$BACKEND/templates")${SEP}templates" \
   --collect-all uvicorn \
   --collect-all fastapi \
   --collect-all lancedb \
@@ -105,7 +121,7 @@ pyinstaller \
   --copy-metadata regex \
   --copy-metadata tqdm \
   --copy-metadata pillow \
-  "$BACKEND/run_backend.py"
+  "$(nat "$BACKEND/run_backend.py")"
 
 echo ">> Copying runtime config into Tauri resources"
 cp "$ROOT/configs/embedders.json" "$RES_DIR/"
@@ -131,12 +147,12 @@ python -m pip install -r "$CLI_SRC/requirements.txt" >/dev/null
 pyinstaller \
   --noconfirm --clean --onefile \
   --name needlectl \
-  --distpath "$CLI_DIST" \
-  --workpath "$BUILD_DIR/cli-work" \
-  --specpath "$BUILD_DIR" \
-  --paths "$CLI_SRC" \
+  --distpath "$(nat "$CLI_DIST")" \
+  --workpath "$(nat "$BUILD_DIR/cli-work")" \
+  --specpath "$(nat "$BUILD_DIR")" \
+  --paths "$(nat "$CLI_SRC")" \
   --collect-submodules shellingham \
-  "$CLI_SRC/needlectl.py"
+  "$(nat "$CLI_SRC/needlectl.py")"
 
 if [ ! -f "$CLI_DIST/needlectl$EXE_SUFFIX" ]; then
   echo ">> ERROR: needlectl was not produced at $CLI_DIST/needlectl$EXE_SUFFIX" >&2

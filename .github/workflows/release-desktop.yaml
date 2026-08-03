@@ -66,16 +66,47 @@ jobs:
           workspaces: ui/src-tauri
 
       - name: Free up disk space
-        # The bundled backend (torch + diffusers) plus the PyInstaller work
-        # directory need well over the headroom a clean runner leaves.
+        # macOS gets the full PyTorch wheel (there is no CPU-only build for it),
+        # so the venv, the PyInstaller work directory and the bundle together
+        # need far more room than a clean runner leaves. Simulator runtimes are
+        # the biggest thing that can go, and nothing here uses them.
         run: |
+          set -x
+          df -h /
+          # Simulator runtimes are several GB and nothing here uses them.
+          sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes || true
+          sudo rm -rf ~/Library/Developer/CoreSimulator/Caches || true
+          # Only older Xcodes: removing the selected one would break the build.
           sudo rm -rf /Applications/Xcode_14*.app /Applications/Xcode_15.0*.app || true
+          echo "active Xcode: $(xcode-select -p)"
           df -h /
 
-      - name: Build app + DMG
-        # build-app.sh already sets CI on macOS so create-dmg skips the Finder
-        # AppleScript, which cannot run on a headless runner.
-        run: ./scripts/build-app.sh
+      # Split into separate steps rather than calling build-app.sh: when the
+      # whole build is one step a failure only says "exit code 1", with no
+      # indication of which phase broke.
+      - name: Install frontend dependencies
+        run: cd ui && npm ci
+
+      - name: Build frontend
+        run: cd ui && npm run build
+        env:
+          CI: "false" # react-scripts treats warnings as errors when CI=true
+
+      - name: Generate app icons
+        # Icons are generated from a tracked source image rather than committed,
+        # and the Rust build embeds them, so they must exist before tauri build.
+        run: cd ui && npx tauri icon src/assets/images/logo-square.png
+
+      - name: Build backend sidecar + needlectl
+        run: bash ui/src-tauri/scripts/build-sidecar.sh
+        env:
+          NEEDLE_ACCEL: cpu
+
+      - name: Build DMG
+        # CI is already true on Actions, which makes Tauri pass --skip-jenkins to
+        # create-dmg. That skips the Finder AppleScript, which needs Automation
+        # permission and aborts on a headless runner.
+        run: cd ui && npx tauri build --bundles dmg
 
       - name: Collect artifacts
         run: |
@@ -149,26 +180,26 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
           df -h /
 
-      - name: Build frontend + backend sidecar
-        run: |
-          set -euo pipefail
-          cd ui
-          npm ci
-          npm run build
-          # The app icons are generated from a tracked source image rather than
-          # committed, and the Rust build embeds them, so they have to exist
-          # before `tauri build`. The macOS job gets this via build-app.sh.
-          npx tauri icon src/assets/images/logo-square.png
-          bash src-tauri/scripts/build-sidecar.sh
+      - name: Install frontend dependencies
+        run: cd ui && npm ci
+
+      - name: Build frontend
+        run: cd ui && npm run build
         env:
           CI: "false" # react-scripts treats warnings as errors when CI=true
+
+      - name: Generate app icons
+        # Icons are generated from a tracked source image rather than committed,
+        # and the Rust build embeds them, so they must exist before tauri build.
+        run: cd ui && npx tauri icon src/assets/images/logo-square.png
+
+      - name: Build backend sidecar + needlectl
+        run: bash ui/src-tauri/scripts/build-sidecar.sh
+        env:
           NEEDLE_ACCEL: cpu
 
       - name: Build installers (deb + rpm)
-        run: |
-          set -euo pipefail
-          cd ui
-          npx tauri build --bundles deb,rpm
+        run: cd ui && npx tauri build --bundles deb,rpm
 
       - name: Collect artifacts
         run: |
@@ -241,29 +272,42 @@ jobs:
         with:
           workspaces: ui/src-tauri
 
-      - name: Build frontend + backend sidecar
+      - name: Install frontend dependencies
+        shell: bash
+        run: cd ui && npm ci
+
+      - name: Build frontend
+        shell: bash
+        run: cd ui && npm run build
+        env:
+          CI: "false"
+
+      - name: Generate app icons
+        shell: bash
+        run: cd ui && npx tauri icon src/assets/images/logo-square.png
+
+      - name: Show build environment
+        # Windows is the platform that has never completed a build, so record
+        # what the shell actually resolves before the script runs.
+        shell: bash
+        run: |
+          uname -s
+          echo "python:  $(command -v python || echo none)"
+          echo "python3: $(command -v python3 || echo none)"
+          python --version || true
+
+      - name: Build backend sidecar + needlectl
         # The sidecar script is bash; Git Bash ships on the Windows runners and
         # the script detects MINGW/MSYS to pick the right venv layout, PyInstaller
         # data separator and .exe suffix.
         shell: bash
-        run: |
-          set -euo pipefail
-          cd ui
-          npm ci
-          npm run build
-          # Icons are generated, not committed, and the Rust build embeds them.
-          npx tauri icon src/assets/images/logo-square.png
-          bash src-tauri/scripts/build-sidecar.sh
+        run: bash ui/src-tauri/scripts/build-sidecar.sh
         env:
-          CI: "false"
           NEEDLE_ACCEL: cpu
 
       - name: Build installer (NSIS)
         shell: bash
-        run: |
-          set -euo pipefail
-          cd ui
-          npx tauri build --bundles nsis
+        run: cd ui && npx tauri build --bundles nsis
 
       - name: Collect artifacts
         shell: bash
